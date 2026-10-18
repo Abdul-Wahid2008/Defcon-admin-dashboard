@@ -80,7 +80,7 @@ function LoginForm() {
           className="login-brief"
           initial={{ opacity: 0, x: -24 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.7, ease: 'easeOut' }}
+          transition={{ duration: 0.45, ease: 'easeOut' }}
         >
           <div className="eyebrow"><span className="eyebrow-dot" /> CONTROL PLANE / SECURE ACCESS</div>
           <div className="login-brand">
@@ -100,9 +100,9 @@ function LoginForm() {
           className="login-card"
           initial={{ opacity: 0, y: 18, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.65, delay: 0.12, ease: 'easeOut' }}
+          transition={{ duration: 0.45, delay: 0.08, ease: 'easeOut' }}
         >
-          <div className="login-card-top"><span>ORGANIZER AUTHENTICATION</span><Wifi size={14} /></div>
+          <div className="login-card-top"><span>ORGANIZER AUTHENTICATION</span><Wifi size={16} /></div>
           <div className="login-card-heading">
             <h2>Welcome back</h2>
             <p>Sign in to access the operations console.</p>
@@ -140,7 +140,7 @@ function LoginForm() {
                 onChange={e => setPassword(e.target.value)}
                 disabled={loading || retryAfter > 0}
                 required
-                className="login-input pr-10"
+                className="login-input login-password-input"
                 placeholder="••••••••"
               />
               <button
@@ -179,7 +179,7 @@ function LoginForm() {
           <div className="login-card-footer"><span>SIMULATED ENVIRONMENT</span><span className="footer-pulse" /> <span>LOCAL CONTROL PLANE</span></div>
         </motion.section>
       </div>
-      <footer className="login-footer"><span>DEFCON 2.0 · TECHN0ZION / NIT WARANGAL</span><span>SESSION ENCRYPTED · 8H TTL</span></footer>
+      <footer className="login-footer"><span>DEFCON 2.0 · TECHNOZION / NIT WARANGAL</span><span>SESSION ENCRYPTED · 8H TTL</span></footer>
     </main>
   );
 }
