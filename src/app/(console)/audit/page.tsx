@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ChevronDown, ChevronRight, Download, Search } from 'lucide-react';
 import { useAudit } from '@/lib/queries';
 import { Button } from '@/components/ui/button';
@@ -14,13 +15,29 @@ import { formatTimestamp } from '@/lib/format';
 const ACTION_GROUPS = ['auth', 'team', 'env', 'credential', 'settings', 'demo'];
 
 export default function AuditPage() {
-  const [search, setSearch] = useState('');
-  const [outcome, setOutcome] = useState('');
-  const [action, setAction] = useState('');
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const [search, setSearch] = useState(params.get('q') ?? '');
+  const [outcome, setOutcome] = useState(params.get('outcome') ?? '');
+  const [action, setAction] = useState(params.get('action') ?? '');
   const [expanded, setExpanded] = useState<number | null>(null);
   const query = useAudit({ q: search || undefined, outcome: outcome || undefined, action: action || undefined, pageSize: 50 });
   const page = query.data;
-  const exportCsv = () => { window.open('/api/audit/export.csv', '_self'); };
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (search) next.set('q', search);
+    if (outcome) next.set('outcome', outcome);
+    if (action) next.set('action', action);
+    router.replace(`${pathname}${next.toString() ? `?${next.toString()}` : ''}`, { scroll: false });
+  }, [action, outcome, pathname, router, search]);
+  const exportCsv = () => {
+    const next = new URLSearchParams();
+    if (search) next.set('q', search);
+    if (outcome) next.set('outcome', outcome);
+    if (action) next.set('action', action);
+    window.open(`/api/audit/export.csv${next.toString() ? `?${next.toString()}` : ''}`, '_self');
+  };
   return <QueryState loading={query.isLoading} error={query.error} onRetry={() => query.refetch()}>
     <PageHeader title="Audit log" description="Append-only record of organizer activity" onRefresh={() => query.refetch()} refreshing={query.isFetching}><Button variant="outline" onClick={exportCsv}><Download size={15} />Export CSV</Button></PageHeader>
     <div className="mb-4 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-3 text-sm text-[var(--muted)]">Audit entries are append-only and cannot be edited or deleted.</div>

@@ -2,7 +2,9 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { LogOut, ChevronDown, User, Menu, LayoutDashboard, Users, ScrollText, Settings } from 'lucide-react';
+import type { FormEvent } from 'react';
+import { LogOut, ChevronDown, User, Menu, LayoutDashboard, Users, ScrollText, Settings, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { AdapterBadge } from './AdapterBadge';
 import { useMeta } from '@/lib/queries';
 import { apiLogout } from '@/lib/api-client';
@@ -52,6 +54,24 @@ export function Topbar({ title, user }: TopbarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === '/' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+        event.preventDefault();
+        document.getElementById('global-team-search')?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const value = search.trim();
+    if (value) router.push(`/teams?q=${encodeURIComponent(value)}`);
+  };
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -98,6 +118,11 @@ export function Topbar({ title, user }: TopbarProps) {
       </h1>
 
       <div className="flex items-center gap-3">
+        <form onSubmit={submitSearch} className="relative hidden w-48 lg:block" role="search">
+          <Search size={14} className="pointer-events-none absolute left-2.5 top-2 text-[var(--muted)]" aria-hidden="true" />
+          <Input id="global-team-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find a team  /" aria-label="Find a team" className="h-8 pl-8 pr-8 text-xs" />
+          <kbd className="pointer-events-none absolute right-2 top-1.5 rounded border border-[var(--border)] px-1 text-[10px] text-[var(--muted)]">/</kbd>
+        </form>
         <ServerClock />
         <AdapterBadge />
 

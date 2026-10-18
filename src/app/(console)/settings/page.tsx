@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { CheckCircle2, FlaskConical, Info, Save, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useMeta, useSettings, useUpdateSettings } from '@/lib/queries';
+import { useDemoFailNext, useDemoInject, useDemoReseed, useMeta, useSettings, useTeam, useTeams, useUpdateSettings } from '@/lib/queries';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PageHeader, QueryState } from '@/components/console/DashboardPrimitives';
@@ -19,6 +19,14 @@ export default function SettingsPage() {
   const meta = useMeta();
   const settings = useSettings();
   const update = useUpdateSettings();
+  const teams = useTeams({ pageSize: 100 });
+  const [demoTeamId, setDemoTeamId] = useState('');
+  const selectedTeam = useTeam(demoTeamId || undefined);
+  const demoInject = useDemoInject();
+  const demoFailNext = useDemoFailNext();
+  const demoReseed = useDemoReseed();
+  const [demoAction, setDemoAction] = useState('reset');
+  const [demoCheck, setDemoCheck] = useState<'reachability' | 'functional'>('reachability');
   const [status, setStatus] = useState<string | null>(null);
   const selectedStatus = status ?? settings.data?.competitionStatus ?? 'not_started';
 
@@ -61,6 +69,16 @@ export default function SettingsPage() {
                 <CardHeader className="border-b border-amber-300/20"><CardTitle className="flex items-center gap-2 text-[var(--warn)]"><FlaskConical size={17} />Simulation boundary</CardTitle></CardHeader>
                 <CardContent className="pt-4 text-sm leading-6 text-[var(--muted)]">The default SQLite adapter is deliberately simulated. Actions update demo state and never control real containers. Docker Compose, when explicitly selected, remains a partial adapter and is never reported as live.</CardContent>
               </Card>
+              {meta.data.demoControls && <Card className="console-surface border-amber-300/30">
+                <CardHeader className="border-b border-amber-300/20"><CardTitle className="flex items-center gap-2 text-[var(--warn)]"><FlaskConical size={17} />Demo controls</CardTitle></CardHeader>
+                <CardContent className="space-y-3 pt-4 text-sm">
+                  <p className="text-[var(--muted)]">Simulation only. Every demo action is audited and never controls real containers.</p>
+                  <select aria-label="Demo team" value={demoTeamId} onChange={(event) => setDemoTeamId(event.target.value)} className="h-8 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-2 text-sm"><option value="">Choose a team</option>{teams.data?.items.map((team) => <option key={team.id} value={team.id}>{team.id} · {team.name}</option>)}</select>
+                  <div className="grid grid-cols-2 gap-2"><select aria-label="Demo check type" value={demoCheck} onChange={(event) => setDemoCheck(event.target.value as 'reachability' | 'functional')} className="h-8 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-2 text-sm"><option value="reachability">Reachability</option><option value="functional">Functional</option></select><select aria-label="Demo service" disabled={!selectedTeam.data} className="h-8 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-2 text-sm" onChange={(event) => { if (demoTeamId) demoInject.mutate({ teamId: demoTeamId, serviceKey: event.target.value, checkType: demoCheck, mode: 'fail', detail: 'Forced demo failure' }); }}><option value="">Inject failure…</option>{selectedTeam.data?.environment.services.map((service) => <option key={service.key} value={service.key}>{service.name}</option>)}</select></div>
+                  <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={!demoTeamId || demoFailNext.isPending} onClick={() => demoFailNext.mutate({ teamId: demoTeamId, action: demoAction })}>Make next {demoAction} fail</Button><select aria-label="Demo failure action" value={demoAction} onChange={(event) => setDemoAction(event.target.value)} className="h-8 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-2 text-sm"><option value="start">start</option><option value="stop">stop</option><option value="reset">reset</option><option value="provision">provision</option></select><Button size="sm" variant="destructive" disabled={demoReseed.isPending} onClick={() => { if (window.confirm('Reseed demo data? This clears mock data but keeps the audit log.')) demoReseed.mutate(); }}>Reseed demo</Button></div>
+                  {demoInject.error && <p role="alert" className="text-[var(--bad)]">{demoInject.error.message}</p>}
+                </CardContent>
+              </Card>}
             </div>
           </div>
         </div>

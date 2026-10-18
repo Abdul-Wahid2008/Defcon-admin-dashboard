@@ -2,19 +2,42 @@
 
 import Link from 'next/link';
 import type React from 'react';
-import { AlertCircle, CheckCircle2, Clock3, Minus, RefreshCw, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock3, Minus, RefreshCw, XCircle, CircleHelp, CircleX, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { HealthBadge } from '@/components/status/HealthBadge';
 import { StateBadge } from '@/components/status/StateBadge';
 import { RelativeTime } from '@/components/ui/relative-time';
 import { formatTimestamp } from '@/lib/format';
-import type { AuditEntry, Health, LifecycleState } from '@/lib/schemas';
+import type { AuditEntry, Health, LifecycleState, ResourceUsage } from '@/lib/schemas';
 
 export function QueryState({ loading, error, onRetry, children }: { loading: boolean; error?: Error | null; onRetry?: () => void; children: React.ReactNode }) {
   if (loading) return <div className="space-y-3" aria-label="Loading"><div className="h-20 animate-pulse rounded-xl bg-[var(--panel)]" /><div className="h-40 animate-pulse rounded-xl bg-[var(--panel)]" /></div>;
-  if (error) return <Card><CardContent className="flex items-center justify-between gap-4 py-8 text-[var(--bad)]"><span>Unable to load data. {error.message}</span>{onRetry && <Button variant="outline" onClick={onRetry}>Retry</Button>}</CardContent></Card>;
+  if (error) return <Card role="alert"><CardContent className="flex flex-wrap items-center justify-between gap-4 py-8"><div><p className="font-medium text-[var(--bad)]">Unable to load this view.</p><p className="mt-1 text-sm text-[var(--muted)]">{error.message}</p></div>{onRetry && <Button variant="outline" onClick={onRetry}>Retry</Button>}</CardContent></Card>;
   return <>{children}</>;
+}
+
+export function CheckStatus({ status, detail }: { status: 'pass' | 'fail' | 'unknown'; detail?: string | null }) {
+  const config = {
+    pass: { label: 'Pass', Icon: ShieldCheck, color: 'text-[var(--ok)]' },
+    fail: { label: 'Fail', Icon: CircleX, color: 'text-[var(--bad)]' },
+    unknown: { label: 'Unknown', Icon: CircleHelp, color: 'text-[var(--idle)]' },
+  }[status];
+  return <span className={`inline-flex items-center gap-1.5 ${config.color}`} title={detail ?? undefined}><config.Icon size={14} aria-hidden="true" />{config.label}</span>;
+}
+
+export function ResourceBars({ resources }: { resources: ResourceUsage | null }) {
+  if (!resources) return <div className="rounded-lg border border-dashed border-[var(--border-strong)] p-4 text-sm text-[var(--muted)]">No resource data while this environment is not running.</div>;
+  const values = [
+    { label: 'CPU', used: `${resources.cpu.usedPct.toFixed(0)}%`, ratio: resources.cpu.usedPct / 100, limit: `${resources.cpu.limitCores} cores` },
+    { label: 'Memory', used: `${resources.memory.usedMb} MB`, ratio: resources.memory.usedMb / resources.memory.limitMb, limit: `${resources.memory.limitMb} MB` },
+    { label: 'Processes', used: String(resources.processes.used), ratio: resources.processes.used / resources.processes.limit, limit: String(resources.processes.limit) },
+    { label: 'Storage', used: `${resources.storage.usedMb} MB`, ratio: resources.storage.usedMb / resources.storage.limitMb, limit: `${resources.storage.limitMb} MB` },
+  ];
+  return <div className="space-y-4" title={resources.isMock ? 'Simulated values' : undefined}>{values.map((item) => {
+    const ratio = Math.min(1, Math.max(0, item.ratio));
+    return <div key={item.label}><div className="mb-1 flex items-center justify-between gap-3 text-xs"><span>{item.label}</span><span className="font-mono text-[var(--muted)]">{item.used} / {item.limit}</span></div><div className="h-2 overflow-hidden rounded-full bg-[var(--surface-inset)]"><div className={`h-full rounded-full ${ratio >= 0.85 ? 'bg-[var(--bad)]' : ratio >= 0.7 ? 'bg-[var(--warn)]' : 'bg-[var(--ok)]'}`} style={{ width: `${ratio * 100}%` }} /></div></div>;
+  })}</div>;
 }
 
 export function StatCard({ label, value, caption, href, tone = 'neutral' }: { label: string; value: number; caption: string; href?: string; tone?: 'neutral' | 'ok' | 'warn' | 'bad' }) {

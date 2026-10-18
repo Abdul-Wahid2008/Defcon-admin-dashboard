@@ -3,6 +3,7 @@
 import type { ChangeEvent, ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Download, Eye, EyeOff, FileUp, Plus, Search, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBulkEnvironmentAction, useCreateTeam, useImportTeams, useTeams } from '@/lib/queries';
@@ -69,7 +70,10 @@ function Overlay({ children, onClose }: { children: ReactNode; onClose?: () => v
 function CredentialsReveal({ credentials, onClose }: { credentials: IssuedCredential[]; onClose: () => void }) {
   const [saved, setSaved] = useState(false);
   const [visible, setVisible] = useState<string[]>([]);
+  const allVisible = visible.length === credentials.length;
   const toggleVisible = (participantId: string) => setVisible((current) => current.includes(participantId) ? current.filter((id) => id !== participantId) : [...current, participantId]);
+  const copy = (value: string) => { void navigator.clipboard.writeText(value); toast.success('Copied'); };
+  const copyAll = () => copy(credentials.map((item) => `${item.username}\t${item.password}`).join('\n'));
   const download = () => {
     const csv = ['participant_id,username,password', ...credentials.map((item) => `${item.participantId},${item.username},${item.password}`)].join('\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -78,8 +82,8 @@ function CredentialsReveal({ credentials, onClose }: { credentials: IssuedCreden
   return <Overlay>
     <h2 className="mb-2 text-lg font-semibold">Credentials — save these now</h2>
     <p className="mb-4 text-sm text-[var(--bad)]">Passwords are shown only once and cannot be retrieved later.</p>
-    <div className="overflow-x-auto rounded border border-[var(--border)]"><Table><TableHeader><TableRow><TableHead>Participant</TableHead><TableHead>Username</TableHead><TableHead>Password</TableHead></TableRow></TableHeader><TableBody>
-      {credentials.map((credential) => <TableRow key={credential.participantId}><TableCell>{credential.participantId}</TableCell><TableCell className="font-mono">{credential.username}</TableCell><TableCell><span className="font-mono">{visible.includes(credential.participantId) ? credential.password : '••••••••••••'}</span><button type="button" className="ml-2 rounded p-1 text-[var(--muted)] hover:text-[var(--accent)]" onClick={() => toggleVisible(credential.participantId)} aria-label={`${visible.includes(credential.participantId) ? 'Hide' : 'Reveal'} password for ${credential.username}`}>{visible.includes(credential.participantId) ? <EyeOff size={14} /> : <Eye size={14} />}</button></TableCell></TableRow>)}
+    <div className="mb-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => setVisible(allVisible ? [] : credentials.map((item) => item.participantId))}>{allVisible ? <EyeOff size={14} /> : <Eye size={14} />}{allVisible ? 'Hide all' : 'Reveal all'}</Button><Button size="sm" variant="outline" onClick={copyAll}>Copy all</Button><Button size="sm" variant="outline" onClick={() => window.print()}>Print</Button></div><div className="overflow-x-auto rounded border border-[var(--border)]"><Table><TableHeader><TableRow><TableHead>Participant</TableHead><TableHead>Username</TableHead><TableHead>Password</TableHead><TableHead /></TableRow></TableHeader><TableBody>
+      {credentials.map((credential) => <TableRow key={credential.participantId}><TableCell>{credential.participantId}</TableCell><TableCell className="font-mono">{credential.username}</TableCell><TableCell><span className="font-mono">{visible.includes(credential.participantId) ? credential.password : '••••••••••••'}</span><button type="button" className="ml-2 rounded p-1 text-[var(--muted)] hover:text-[var(--accent)]" onClick={() => toggleVisible(credential.participantId)} aria-label={`${visible.includes(credential.participantId) ? 'Hide' : 'Reveal'} password for ${credential.username}`}>{visible.includes(credential.participantId) ? <EyeOff size={14} /> : <Eye size={14} />}</button></TableCell><TableCell><Button size="sm" variant="ghost" onClick={() => copy(`${credential.username}\t${credential.password}`)}>Copy</Button></TableCell></TableRow>)}
     </TableBody></Table></div>
     <label className="mt-4 flex items-center gap-2 text-sm"><input type="checkbox" checked={saved} onChange={(event) => setSaved(event.target.checked)} /> I have saved these credentials</label>
     <div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={download}><Download size={15} />Download CSV</Button><Button disabled={!saved} onClick={onClose}>Close</Button></div>
@@ -136,9 +140,16 @@ function BulkDialog({ action, teams, onClose }: { action: 'start' | 'stop'; team
 }
 
 export default function TeamsPage() {
-  const [search, setSearch] = useState('');
-  const [term, setTerm] = useState('');
-  const [state, setState] = useState('');
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const [search, setSearch] = useState(params.get('q') ?? '');
+  const [term, setTerm] = useState(params.get('q') ?? '');
+  const [state, setState] = useState(params.get('state') ?? '');
+  const [healthFilter, setHealthFilter] = useState(params.get('health') ?? '');
+  const [accountFilter, setAccountFilter] = useState(params.get('account') ?? '');
+  const [pageNumber, setPageNumber] = useState(Number(params.get('page') ?? '1'));
+  const [sort, setSort] = useState(params.get('sort') ?? 'id');
   const [selected, setSelected] = useState<string[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -146,9 +157,21 @@ export default function TeamsPage() {
   const [credentials, setCredentials] = useState<IssuedCredential[] | null>(null);
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
+  const [participantNames, setParticipantNames] = useState('Participant 1\nParticipant 2\nParticipant 3\nParticipant 4');
+  const [autoProvision, setAutoProvision] = useState(true);
   const create = useCreateTeam();
   useEffect(() => { const id = window.setTimeout(() => setTerm(search), 250); return () => window.clearTimeout(id); }, [search]);
-  const query = useTeams({ q: term || undefined, state: state || undefined });
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (term) next.set('q', term);
+    if (state) next.set('state', state);
+    if (healthFilter) next.set('health', healthFilter);
+    if (accountFilter) next.set('account', accountFilter);
+    if (pageNumber > 1) next.set('page', String(pageNumber));
+    if (sort !== 'id') next.set('sort', sort);
+    router.replace(`${pathname}${next.toString() ? `?${next.toString()}` : ''}`, { scroll: false });
+  }, [accountFilter, healthFilter, pageNumber, pathname, router, sort, state, term]);
+  const query = useTeams({ q: term || undefined, state: state || undefined, health: healthFilter || undefined, account: accountFilter || undefined, page: pageNumber, pageSize: 25, sort });
   const page = query.data;
   const selectedTeams = useMemo(() => page?.items.filter((team) => selected.includes(team.id)) ?? [], [page?.items, selected]);
   const allVisibleSelected = !!page?.items.length && page.items.every((team) => selected.includes(team.id));
@@ -156,23 +179,24 @@ export default function TeamsPage() {
   const toggleTeam = (teamId: string) => setSelected((current) => current.includes(teamId) ? current.filter((id) => id !== teamId) : [...current, teamId]);
   const submit = async () => {
     if (!name.trim()) return;
-    const result = await create.mutateAsync({ body: { name: name.trim(), notes: notes.trim() || undefined, autoProvision: true } });
-    setCredentials(result.credentials); setName(''); setNotes(''); setShowCreate(false);
+    const names = participantNames.split(/\r?\n/).map((value) => value.trim()).filter(Boolean).slice(0, 8);
+    const result = await create.mutateAsync({ body: { name: name.trim(), notes: notes.trim() || undefined, participantNames: names, autoProvision } });
+    setCredentials(result.credentials); setName(''); setNotes(''); setParticipantNames('Participant 1\nParticipant 2\nParticipant 3\nParticipant 4'); setAutoProvision(true); setShowCreate(false);
   };
   const handleImport = (result: TeamImportResponse) => {
     if (result.created.length) setCredentials(result.created.flatMap((item) => item.credentials));
     if (result.skipped.length) toast.warning(`${result.skipped.length} row(s) skipped during import`);
   };
   return <QueryState loading={query.isLoading} error={query.error} onRetry={() => query.refetch()}>
-    <PageHeader title="Teams" description={page ? `Showing ${page.items.length ? 1 : 0}–${page.items.length} of ${page.total}` : undefined} onRefresh={() => query.refetch()} refreshing={query.isFetching}>
+    <PageHeader title="Teams" description={page ? `Showing ${page.total ? ((page.page - 1) * page.pageSize) + 1 : 0}–${Math.min(page.page * page.pageSize, page.total)} of ${page.total}` : undefined} onRefresh={() => query.refetch()} refreshing={query.isFetching}>
       <Button variant="outline" onClick={() => setShowImport(true)}><Upload size={15} />Import CSV</Button><Button onClick={() => setShowCreate(true)}><Plus size={15} />Create team</Button>
     </PageHeader>
     <Card className="console-surface"><CardContent className="p-4">
-      <div className="mb-4 flex flex-wrap gap-3"><div className="relative min-w-[240px] flex-1"><Search size={15} className="absolute left-3 top-2.5 text-[var(--muted)]" /><Input className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by team name or ID" aria-label="Search teams" /></div><select aria-label="Filter by lifecycle state" value={state} onChange={(e) => setState(e.target.value)} className="h-8 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-3 text-sm"><option value="">All states</option><option value="running">Running</option><option value="stopped">Stopped</option><option value="failed">Failed</option><option value="starting">Starting</option><option value="stopping">Stopping</option></select></div>
+      <div className="mb-4 flex flex-wrap gap-3"><div className="relative min-w-[240px] flex-1"><Search size={15} className="absolute left-3 top-2.5 text-[var(--muted)]" /><Input className="pl-9" value={search} onChange={(e) => { setSearch(e.target.value); setPageNumber(1); }} placeholder="Search by team name or ID" aria-label="Search teams" /></div><select aria-label="Filter by lifecycle state" value={state} onChange={(e) => { setState(e.target.value); setPageNumber(1); }} className="h-8 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-3 text-sm"><option value="">All states</option><option value="running">Running</option><option value="stopped">Stopped</option><option value="failed">Failed</option><option value="starting">Starting</option><option value="stopping">Stopping</option></select><select aria-label="Filter by health" value={healthFilter} onChange={(e) => { setHealthFilter(e.target.value); setPageNumber(1); }} className="h-8 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-3 text-sm"><option value="">All health</option><option value="healthy">Healthy</option><option value="degraded">Degraded</option><option value="down">Down</option><option value="unknown">Unknown</option></select><select aria-label="Filter by account status" value={accountFilter} onChange={(e) => { setAccountFilter(e.target.value); setPageNumber(1); }} className="h-8 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-3 text-sm"><option value="">All accounts</option><option value="active">Active</option><option value="suspended">Suspended</option></select><select aria-label="Sort teams" value={sort} onChange={(e) => { setSort(e.target.value); setPageNumber(1); }} className="h-8 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-3 text-sm"><option value="id">Sort: ID</option><option value="name">Sort: Name</option><option value="-updated">Sort: Recently updated</option><option value="state">Sort: State</option><option value="health">Sort: Health</option></select>{(search || state || healthFilter || accountFilter || sort !== 'id' || pageNumber > 1) && <Button size="sm" variant="ghost" onClick={() => { setSearch(''); setTerm(''); setState(''); setHealthFilter(''); setAccountFilter(''); setSort('id'); setPageNumber(1); }}>Clear filters</Button>}</div>
       {selectedTeams.length > 0 && <div className="mb-4 flex items-center justify-between rounded border border-[var(--accent)] bg-[var(--panel-2)] p-3 text-sm"><span>{selectedTeams.length} selected</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setBulkAction('start')}>Start selected</Button><Button size="sm" variant="outline" onClick={() => setBulkAction('stop')}>Stop selected</Button><Button size="sm" variant="ghost" onClick={() => setSelected([])}>Clear</Button></div></div>}
-      {!page?.items.length ? <div className="py-12 text-center text-sm text-[var(--muted)]">{term || state ? 'No teams match these filters' : 'No teams yet'}</div> : <Table><TableHeader><TableRow><TableHead><input type="checkbox" aria-label="Select visible teams" checked={allVisibleSelected} onChange={toggleAll} /></TableHead><TableHead>Team</TableHead><TableHead>State</TableHead><TableHead>Health</TableHead><TableHead>Participants</TableHead><TableHead>Account</TableHead><TableHead>Updated</TableHead></TableRow></TableHeader><TableBody>{page.items.map((team) => <TableRow key={team.id}><TableCell><input type="checkbox" aria-label={`Select ${team.id}`} checked={selected.includes(team.id)} onChange={() => toggleTeam(team.id)} /></TableCell><TableCell><Link href={`/teams/${team.id}`} className="block hover:text-[var(--accent)]"><div className="font-mono text-xs text-[var(--muted)]">{team.id}</div><div className="font-medium">{team.name}</div></Link></TableCell><TableCell><StateBadge state={team.lifecycleState} size="sm" /></TableCell><TableCell><HealthBadge health={team.health} size="sm" /></TableCell><TableCell>{team.participantCount}</TableCell><TableCell><span className={team.accountStatus === 'active' ? 'text-[var(--ok)]' : 'text-[var(--warn)]'}>{team.accountStatus === 'active' ? 'Active' : 'Suspended'}</span></TableCell><TableCell><RelativeTime ts={team.updatedAt} className="text-xs text-[var(--muted)]" /></TableCell></TableRow>)}</TableBody></Table>}
+      {!page?.items.length ? <div className="py-12 text-center text-sm text-[var(--muted)]">{term || state || healthFilter || accountFilter ? 'No teams match these filters' : 'No teams yet'}</div> : <><Table><TableHeader><TableRow><TableHead><input type="checkbox" aria-label="Select visible teams" checked={allVisibleSelected} onChange={toggleAll} /></TableHead><TableHead>Team</TableHead><TableHead>State</TableHead><TableHead>Health</TableHead><TableHead>Participants</TableHead><TableHead>Account</TableHead><TableHead>Updated</TableHead></TableRow></TableHeader><TableBody>{page.items.map((team) => <TableRow key={team.id}><TableCell><input type="checkbox" aria-label={`Select ${team.id}`} checked={selected.includes(team.id)} onChange={() => toggleTeam(team.id)} /></TableCell><TableCell><Link href={`/teams/${team.id}`} className="block hover:text-[var(--accent)]"><div className="font-mono text-xs text-[var(--muted)]">{team.id}</div><div className="font-medium">{team.name}</div></Link></TableCell><TableCell><StateBadge state={team.lifecycleState} size="sm" /></TableCell><TableCell><HealthBadge health={team.health} size="sm" /></TableCell><TableCell>{team.participantCount}</TableCell><TableCell><span className={team.accountStatus === 'active' ? 'text-[var(--ok)]' : 'text-[var(--warn)]'}>{team.accountStatus === 'active' ? 'Active' : 'Suspended'}</span></TableCell><TableCell><RelativeTime ts={team.updatedAt} className="text-xs text-[var(--muted)]" /></TableCell></TableRow>)}</TableBody></Table><div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-3 text-xs text-[var(--muted)]"><span>Page {page.page} of {Math.max(1, Math.ceil(page.total / page.pageSize))}</span><div className="flex gap-2"><Button size="sm" variant="outline" disabled={page.page <= 1} onClick={() => setPageNumber((value) => Math.max(1, value - 1))}>Previous</Button><Button size="sm" variant="outline" disabled={page.page * page.pageSize >= page.total} onClick={() => setPageNumber((value) => value + 1)}>Next</Button></div></div></>}
     </CardContent></Card>
-    {showCreate && <Overlay onClose={() => setShowCreate(false)}><h2 className="text-lg font-semibold">Create team</h2><label className="mt-4 block text-sm">Team name<Input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} autoFocus /></label><label className="mt-3 block text-sm">Notes<textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} className="mt-1 min-h-20 w-full rounded-lg border border-[var(--border)] bg-[var(--panel-2)] p-2" /></label>{create.error && <p className="mt-3 text-sm text-[var(--bad)]">{create.error.message}</p>}<div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button><Button onClick={submit} disabled={!name.trim() || create.isPending}>{create.isPending ? 'Creating…' : 'Create team'}</Button></div></Overlay>}
+    {showCreate && <Overlay onClose={() => setShowCreate(false)}><h2 className="text-lg font-semibold">Create team</h2><p className="mt-1 text-sm text-[var(--muted)]">Credentials are shown once after the team is created.</p><label className="mt-4 block text-sm">Team name<Input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} autoFocus /></label><label className="mt-3 block text-sm">Notes<textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} className="mt-1 min-h-20 w-full rounded-lg border border-[var(--border)] bg-[var(--panel-2)] p-2" /></label><label className="mt-3 block text-sm">Participants <span className="text-xs text-[var(--muted)]">(one name per line, up to 8)</span><textarea value={participantNames} onChange={(e) => setParticipantNames(e.target.value)} className="mt-1 min-h-24 w-full rounded-lg border border-[var(--border)] bg-[var(--panel-2)] p-2 text-sm" /></label><label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={autoProvision} onChange={(e) => setAutoProvision(e.target.checked)} /> Provision environment now</label>{create.error && <p role="alert" className="mt-3 text-sm text-[var(--bad)]">{create.error.message}</p>}<div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button><Button onClick={submit} disabled={!name.trim() || create.isPending}>{create.isPending ? 'Creating…' : 'Create team'}</Button></div></Overlay>}
     {showImport && <ImportDialog onClose={() => setShowImport(false)} onCredentials={handleImport} />}
     {bulkAction && <BulkDialog action={bulkAction} teams={selectedTeams} onClose={() => { setBulkAction(null); setSelected([]); }} />}
     {credentials && <CredentialsReveal credentials={credentials} onClose={() => setCredentials(null)} />}

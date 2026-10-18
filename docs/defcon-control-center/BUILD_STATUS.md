@@ -8,6 +8,10 @@ This status uses the canonical P1–P17 slices from `07_CLAUDE_CODE_PLAYBOOK.md 
 
 The authenticated shell visual regression was traced to missing Tailwind v4 PostCSS integration: authored CSS loaded, but utility classes such as `flex`, `grid`, spacing, typography, and responsive variants were not emitted. The fix adds the official `@tailwindcss/postcss` plugin, a repository-level `postcss.config.mjs`, and an explicit source declaration in `globals.css`. A fresh production build now emits the expected utility selectors (`flex`, `grid`, `px-4`, and `md:flex`); the live login page computes as a grid at desktop width with no current console errors after a cache-busting navigation.
 
+### Latest release note — organizer usability and feature pass
+
+The authenticated UI now has shareable, paginated team filters (search, lifecycle, health, account status, and sort), a global team search field with `/` keyboard focus, resource usage bars, icon-plus-text service check states, copyable simulated terminal endpoints, participant add and credential rotation/reveal flows, account suspend/reactivate controls, participant-aware team creation, audited mock demo controls on Settings, and audit export that preserves active filters. These changes preserve the existing API/state/permission contracts and do not add a new dependency.
+
 ### Latest release note — 21:33 IST
 
 The authenticated console received a coherent production hardening and redesign pass across the shared shell, overview, teams directory, team detail, audit log, and settings. The pass adds responsive mobile navigation, clearer operational surface hierarchy, stronger attention/health grouping, an implemented settings screen, masked one-time credential reveals, accessible lifecycle dialogs with typed delete confirmation, final-state lifecycle feedback, and a stricter same-origin requirement for all state-changing API requests. API contracts, permissions, adapter labeling, polling semantics, and simulated-runtime honesty were preserved.
@@ -45,6 +49,7 @@ This is production-grade dashboard infrastructure around a mock/adapter contract
 - `npm test` — pass; 31 tests
 - `npm run build` — pass; Turbopack emits three non-failing Tailwind v4 CSS parser warnings
 - Tailwind utility regression fix — production CSS grew from 14,791 bytes without utilities to 89,906 bytes with generated `flex`, `grid`, spacing, and responsive selectors; live server verified the rebuilt stylesheet
+- Organizer usability pass — typecheck pass, lint pass with existing warnings, 31 tests pass, production build pass; changed surfaces: Teams, Team detail, Audit, Settings, shared Topbar, and dashboard primitives
 - Final console redesign — typecheck pass, test pass (31 tests), production build pass
 - Production HTTP smoke — `/login` 200, `/api/meta` 200, unauthenticated `/overview` redirects, authenticated `/api/auth/me`, `/api/overview`, `/api/teams`, `/api/audit`, and `/api/settings` all returned 200
 - Browser visual/console pass — live `/login` snapshot at desktop viewport; zero browser console errors observed
@@ -72,6 +77,7 @@ The default release path is the SQLite-backed `MockAdapter` and is reported as `
 - Docker one-team smoke testing requires the club-provided `teams-template/docker-compose.yml` and a Docker runtime.
 - Full authenticated browser visual/keyboard verification remains a manual demo-machine task; this terminal run verified the live login/public-route visual and console state plus authenticated production HTTP/API flows. No claim is made for authenticated browser screenshots or screen-reader output.
 - The prior authenticated dashboard collapse was caused by missing Tailwind utility emission, not by dashboard component markup. The PostCSS integration fix is now applied; authenticated route visual verification after login still requires the configured demo credentials in the browser session.
+- Remaining contract gaps are now explicitly tracked: full Playwright acceptance coverage, complete focus-trapped credentials/import overlays, richer audit date/actor/team filters, filtered bulk-action idempotency, and club-dependent Docker smoke testing.
 - Login and shared visual language were redesigned with a responsive control-plane layout, stronger contrast, explicit grid alignment, accessible focus states, reduced-motion handling, and Motion entrance/feedback animations. Decorative scan/drift motion was removed to match the UI spec.
 - Shared theme tokens were corrected so semantic accent/muted colors are no longer overwritten by dark surface colors; primary buttons, focus rings, labels, and dashboard status UI now retain their intended contrast.
 - Login received an anti-slop polish pass: removed decorative radar/grid/orb treatment and fake telemetry statuses, simplified copy to organizer-relevant language, and retained a restrained single-accent motion treatment.
