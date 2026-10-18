@@ -54,9 +54,10 @@ The default release path is the SQLite-backed `MockAdapter` and is reported as `
 - The import endpoint returns plaintext credentials only for successfully created rows, matching the one-time credential contract; the teams page clears that response after the reveal dialog closes.
 - Docker one-team smoke testing requires the club-provided `teams-template/docker-compose.yml` and a Docker runtime.
 - Full browser visual/keyboard/console verification remains a manual demo-machine task; this terminal run verified the equivalent HTTP session and polling flows.
+- Login and shared visual language were redesigned with a responsive control-plane layout, mission-control palette, accessible focus states, reduced-motion handling, and Motion entrance/feedback animations. The `motion` package is now a production dependency.
 
 ## Next production slice
 
-1. Perform the remaining manual browser visual, keyboard, and console checks on the demo machine.
+1. Perform the remaining manual browser visual, keyboard, and console checks on a real browser/demo machine; this terminal environment has no browser driver.
 2. Obtain the club's Compose template and start Docker Desktop before attempting the one-team `PARTIAL` adapter smoke test.
 3. Reduce remaining legacy `any` warnings and resolve the Tailwind v4/Turbopack parser warnings without changing the contract.

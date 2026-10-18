@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
-import { Eye, EyeOff, Shield, Loader2 } from 'lucide-react';
+import { motion } from 'motion/react';
+import { Activity, ArrowRight, Eye, EyeOff, Loader2, LockKeyhole, Radar, ShieldCheck, Wifi } from 'lucide-react';
 import { apiLogin } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -67,27 +68,46 @@ function LoginForm() {
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4"
-      style={{ background: 'var(--bg)' }}
-    >
-      <div
-        className="w-full max-w-sm rounded-lg border p-8 shadow-xl"
-        style={{ background: 'var(--panel)', borderColor: 'var(--border)' }}
-      >
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full mb-4"
-            style={{ background: 'var(--accent)20' }}>
-            <Shield size={24} className="text-[var(--accent)]" aria-hidden="true" />
+    <main className="login-shell">
+      <div className="login-grid" aria-hidden="true" />
+      <div className="login-orb login-orb-one" aria-hidden="true" />
+      <div className="login-orb login-orb-two" aria-hidden="true" />
+      <div className="login-layout">
+        <motion.section
+          className="login-brief"
+          initial={{ opacity: 0, x: -24 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.7, ease: 'easeOut' }}
+        >
+          <div className="eyebrow"><span className="eyebrow-dot" /> CONTROL PLANE / SECURE ACCESS</div>
+          <div className="login-brand">
+            <div className="brand-mark"><Radar size={27} strokeWidth={1.7} /></div>
+            <div><p className="brand-kicker">DEFCON</p><p className="brand-name">CONTROL CENTER <span>2.0</span></p></div>
           </div>
-          <h1 className="text-xl font-semibold text-[var(--text)]">DEFCON Control Center</h1>
-          <p className="text-xs text-[var(--muted)] mt-1">Organizer access only</p>
-        </div>
+          <h1>Operate with<br /><span>confidence.</span></h1>
+          <p className="login-lede">A calm, auditable command surface for every team environment at Technozion.</p>
+          <div className="login-signal-list">
+            <div><ShieldCheck size={16} /><span>Permission-aware operations</span><b>READY</b></div>
+            <div><Activity size={16} /><span>Live state reconciliation</span><b>ONLINE</b></div>
+            <div><LockKeyhole size={16} /><span>Organizer network boundary</span><b>ENFORCED</b></div>
+          </div>
+        </motion.section>
 
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <motion.section
+          className="login-card"
+          initial={{ opacity: 0, y: 18, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.65, delay: 0.12, ease: 'easeOut' }}
+        >
+          <div className="login-card-top"><span>ORGANIZER AUTHENTICATION</span><Wifi size={14} /></div>
+          <div className="mb-7">
+            <h2>Welcome back</h2>
+            <p>Sign in to access the operations console.</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           <div className="space-y-1.5">
-            <Label htmlFor="username" className="text-xs text-[var(--muted)]">
+            <Label htmlFor="username" className="login-label">
               Username
             </Label>
             <Input
@@ -99,13 +119,13 @@ function LoginForm() {
               onChange={e => setUsername(e.target.value)}
               disabled={loading || retryAfter > 0}
               required
-              className="bg-[var(--panel-2)] border-[var(--border)] text-[var(--text)] placeholder:text-[var(--muted)]"
+              className="login-input"
               placeholder="admin"
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="password" className="text-xs text-[var(--muted)]">
+            <Label htmlFor="password" className="login-label">
               Password
             </Label>
             <div className="relative">
@@ -117,7 +137,7 @@ function LoginForm() {
                 onChange={e => setPassword(e.target.value)}
                 disabled={loading || retryAfter > 0}
                 required
-                className="bg-[var(--panel-2)] border-[var(--border)] text-[var(--text)] pr-10"
+                className="login-input pr-10"
                 placeholder="••••••••"
               />
               <button
@@ -132,18 +152,15 @@ function LoginForm() {
           </div>
 
           {error && (
-            <p
-              role="alert"
-              className="text-xs text-[var(--bad)] bg-[var(--bad)]/10 border border-[var(--bad)]/20 rounded px-3 py-2"
-            >
+            <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} role="alert" className="login-error">
               {retryAfter > 0 ? `Too many attempts. Retry in ${retryAfter}s.` : error}
-            </p>
+            </motion.p>
           )}
 
           <Button
             type="submit"
             disabled={loading || retryAfter > 0 || !username || !password}
-            className="w-full bg-[var(--accent)] text-[var(--bg)] hover:bg-[var(--accent)]/90 font-semibold"
+            className="login-submit"
           >
             {loading ? (
               <>
@@ -151,16 +168,14 @@ function LoginForm() {
                 Signing in…
               </>
             ) : (
-              'Sign in'
+              <>Enter control center <ArrowRight size={16} /></>
             )}
           </Button>
-        </form>
-
-        {/* Adapter badge at footer */}
-        <p className="text-center text-[10px] text-[var(--muted)] mt-6 font-mono">
-          DEFCON 2.0 · Technozion · NIT Warangal
-        </p>
+          </form>
+          <div className="login-card-footer"><span>SIMULATED ENVIRONMENT</span><span className="footer-pulse" /> <span>LOCAL CONTROL PLANE</span></div>
+        </motion.section>
       </div>
-    </div>
+      <footer className="login-footer"><span>DEFCON 2.0 · TECHN0ZION / NIT WARANGAL</span><span>SESSION ENCRYPTED · 8H TTL</span></footer>
+    </main>
   );
 }
