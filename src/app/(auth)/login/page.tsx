@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import { Activity, ArrowRight, Eye, EyeOff, Loader2, LockKeyhole, Radar, ShieldCheck, Wifi } from 'lucide-react';
 import { apiLogin } from '@/lib/api-client';
@@ -11,17 +10,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 export default function LoginPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen" style={{ background: 'var(--bg)' }} />}>
-      <LoginForm />
-    </Suspense>
-  );
+  return <LoginForm />;
 }
 
 function LoginForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const next = searchParams.get('next') || '/overview';
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -29,9 +22,14 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [retryAfter, setRetryAfter] = useState(0);
+  const [next, setNext] = useState('/overview');
 
   const usernameRef = useRef<HTMLInputElement>(null);
-  useEffect(() => { usernameRef.current?.focus(); }, []);
+  useEffect(() => {
+    const requestedPath = new URLSearchParams(window.location.search).get('next');
+    if (requestedPath?.startsWith('/')) setNext(requestedPath);
+    usernameRef.current?.focus();
+  }, []);
 
   // Countdown for rate limit
   useEffect(() => {
