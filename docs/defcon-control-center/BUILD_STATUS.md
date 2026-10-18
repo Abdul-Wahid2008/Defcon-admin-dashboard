@@ -4,6 +4,12 @@ This status uses the canonical P1–P17 slices from `07_CLAUDE_CODE_PLAYBOOK.md 
 
 ## Executive summary — 18 Oct 2026
 
+### Latest release note — 20:50 IST
+
+The polished login build is deployed on the demo machine at `127.0.0.1:3000`. The latest committed UI pass is `aa1be08` (`feat(ui): polish editorial login layout`), pushed to `origin/main`. The login route returns HTTP 200, renders the editorial organizer-facing layout and principle content, and no longer renders the historical blank-screen fallback.
+
+The `ai-team-orchestration` plugin was installed from the registered `awesome-copilot` marketplace for the next implementation session. This is development tooling only and does not change the application runtime, security model, adapter behavior, or production release claims.
+
 The repository now contains a working organizer-facing DEFCON Control Center built around the documented Next.js, TypeScript, SQLite, Zod, TanStack Query, and adapter architecture. The default runtime is deliberately the persistent SQLite `MockAdapter`; it is not a live orchestrator and the UI/API report `SIMULATED`. The opt-in Docker Compose path is implemented as an experimental `PARTIAL` adapter and is never selected implicitly.
 
 The P1–P16 implementation is verified by typecheck, lint, unit tests, production build, seeded authenticated API smoke tests, lifecycle completion/audit checks, and authorization checks. P17 is now complete: the documented import and bulk endpoints have focused coverage, and the teams directory provides CSV dry-run/import with one-time credential reveal plus typed-confirmation bulk start/stop controls.
@@ -59,9 +65,10 @@ The default release path is the SQLite-backed `MockAdapter` and is reported as `
 - Login received an anti-slop polish pass: removed decorative radar/grid/orb treatment and fake telemetry statuses, simplified copy to organizer-relevant language, and retained a restrained single-accent motion treatment.
 - Security hardening removed the JWT secret fallback, requires a configured 32-character minimum `SESSION_SECRET`, and restricts post-login redirects to same-origin paths.
 - The login editorial pass is complete: the left column now uses a restrained product hierarchy, useful organizer principles, aligned responsive spacing, standard text sizing, and accessible contrast rather than decorative telemetry.
+- The deployed login verification at 20:50 IST returned HTTP 200, included the new “Keep every team” heading and “See what needs attention” principle, and contained no `min-h-screen` blank fallback.
 
 ## Next production slice
 
-1. Perform the remaining manual browser visual, keyboard, and console checks on a real browser/demo machine; this terminal environment has no browser driver.
+1. Perform the remaining manual browser visual, keyboard, and console checks on a real browser/demo machine, then execute the master UI remediation prompt against every authenticated panel.
 2. Obtain the club's Compose template and start Docker Desktop before attempting the one-team `PARTIAL` adapter smoke test.
 3. Reduce remaining legacy `any` warnings and resolve the Tailwind v4/Turbopack parser warnings without changing the contract.
