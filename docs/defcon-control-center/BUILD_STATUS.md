@@ -58,6 +58,7 @@ The default release path is the SQLite-backed `MockAdapter` and is reported as `
 - Shared theme tokens were corrected so semantic accent/muted colors are no longer overwritten by dark surface colors; primary buttons, focus rings, labels, and dashboard status UI now retain their intended contrast.
 - Login received an anti-slop polish pass: removed decorative radar/grid/orb treatment and fake telemetry statuses, simplified copy to organizer-relevant language, and retained a restrained single-accent motion treatment.
 - Security hardening removed the JWT secret fallback, requires a configured 32-character minimum `SESSION_SECRET`, and restricts post-login redirects to same-origin paths.
+- The login editorial pass is complete: the left column now uses a restrained product hierarchy, useful organizer principles, aligned responsive spacing, standard text sizing, and accessible contrast rather than decorative telemetry.
 
 ## Next production slice
 

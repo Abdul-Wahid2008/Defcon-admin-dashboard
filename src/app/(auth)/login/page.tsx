@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
-import { ArrowRight, Eye, EyeOff, Loader2, LockKeyhole, Radar } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Eye, EyeOff, History, Loader2, Radar, ShieldCheck } from 'lucide-react';
 import { apiLogin } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -79,15 +79,30 @@ function LoginForm() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.45, ease: 'easeOut' }}
         >
+          <div className="login-eyebrow">DEFCON 2.0 <span>/</span> ORGANIZER CONSOLE</div>
           <div className="login-brand">
             <div className="brand-mark"><Radar size={27} strokeWidth={1.7} /></div>
             <div><p className="brand-kicker">DEFCON 2.0</p><p className="brand-name">CONTROL CENTER</p></div>
           </div>
-          <h1>Run the event<br /><span>with confidence.</span></h1>
-          <p className="login-lede">The organizer workspace for teams, environments, health checks, and audit history.</p>
+          <h1>Keep every team<br /><span>moving forward.</span></h1>
+          <p className="login-lede">One clear workspace for team environments, health checks, and the decisions behind every change.</p>
+          <div className="login-principles">
+            <div className="login-principle">
+              <span className="login-principle-icon"><CheckCircle2 size={17} /></span>
+              <span><strong>See what needs attention</strong><small>Understand the current state at a glance.</small></span>
+            </div>
+            <div className="login-principle">
+              <span className="login-principle-icon"><ShieldCheck size={17} /></span>
+              <span><strong>Act with guardrails</strong><small>Permissions and confirmations protect live work.</small></span>
+            </div>
+            <div className="login-principle">
+              <span className="login-principle-icon"><History size={17} /></span>
+              <span><strong>Trace every change</strong><small>Actions stay visible in the append-only audit log.</small></span>
+            </div>
+          </div>
           <div className="login-trust">
-            <LockKeyhole size={16} aria-hidden="true" />
-            <span>Organizer access · changes are recorded in the audit log</span>
+            <span className="login-trust-rule" />
+            <span>Organizer access · local simulation environment</span>
           </div>
         </motion.section>
 
