@@ -147,8 +147,32 @@ html { color-scheme: dark; }
   place-items: center;
   padding: 48px 32px 72px;
   background:
-    radial-gradient(circle at 78% 12%, rgba(34, 211, 238, 0.06), transparent 28%),
+    radial-gradient(circle at 78% 12%, rgba(34, 211, 238, 0.09), transparent 30%),
+    radial-gradient(circle at 16% 76%, rgba(59, 130, 246, 0.06), transparent 32%),
+    linear-gradient(115deg, rgba(255,255,255,.025) 0 1px, transparent 1px 140px),
     var(--bg);
+}
+.login-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .5;
+  background:
+    radial-gradient(circle at 78% 15%, transparent 0 116px, rgba(34,211,238,.12) 117px, transparent 118px 154px, rgba(34,211,238,.07) 155px, transparent 156px 198px, rgba(34,211,238,.04) 199px, transparent 200px),
+    radial-gradient(circle at 18% 82%, transparent 0 74px, rgba(96,165,250,.08) 75px, transparent 76px 112px, rgba(96,165,250,.04) 113px, transparent 114px);
+  mask-image: linear-gradient(135deg, black, transparent 72%);
+}
+.login-shell::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 10%;
+  bottom: 0;
+  width: 1px;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(34,211,238,.2) 25%, rgba(34,211,238,.05) 72%, transparent);
+  box-shadow: 28px 0 0 rgba(34,211,238,.035), 56px 0 0 rgba(34,211,238,.02);
 }
 .login-layout { position: relative; z-index: 1; width: min(100%, 1080px); display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: clamp(56px, 8vw, 104px); align-items: center; }
 .login-brief { max-width: 540px; padding: 8px 0; }
@@ -164,6 +188,7 @@ html { color-scheme: dark; }
 .login-trust svg { flex: 0 0 auto; color: var(--ok); }
 .login-card { position: relative; width: 100%; padding: 32px; border: 1px solid rgba(143,163,196,.3); border-radius: 12px; background: linear-gradient(145deg, rgba(27,39,61,.98), rgba(12,19,34,.99)); box-shadow: 0 24px 80px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.06); }
 .login-card::before { content: ""; position: absolute; top: -1px; left: 28px; right: 28px; height: 2px; border-radius: 999px; background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: .9; }
+.login-card::after { content: ""; position: absolute; right: 20px; bottom: 20px; width: 34px; height: 34px; pointer-events: none; border-right: 1px solid rgba(34,211,238,.22); border-bottom: 1px solid rgba(34,211,238,.22); border-radius: 0 0 8px 0; }
 .login-card-top { display: flex; justify-content: space-between; align-items: center; padding-bottom: 18px; border-bottom: 1px solid rgba(143,163,196,.3); color: #D3DEEC; }
 .login-card-mode { color: var(--warn); }
 .login-card-heading { margin-top: 28px; }
