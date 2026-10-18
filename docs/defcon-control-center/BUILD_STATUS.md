@@ -4,7 +4,9 @@ This status uses the canonical P1–P17 slices from `07_CLAUDE_CODE_PLAYBOOK.md 
 
 ## Executive summary — 18 Oct 2026
 
-### Latest release note — 20:50 IST
+### Latest release note — 21:33 IST
+
+The authenticated console received a coherent production hardening and redesign pass across the shared shell, overview, teams directory, team detail, audit log, and settings. The pass adds responsive mobile navigation, clearer operational surface hierarchy, stronger attention/health grouping, an implemented settings screen, masked one-time credential reveals, accessible lifecycle dialogs with typed delete confirmation, final-state lifecycle feedback, and a stricter same-origin requirement for all state-changing API requests. API contracts, permissions, adapter labeling, polling semantics, and simulated-runtime honesty were preserved.
 
 The polished login build is deployed on the demo machine at `127.0.0.1:3000`. The latest committed UI pass is `aa1be08` (`feat(ui): polish editorial login layout`), pushed to `origin/main`. The login route returns HTTP 200, renders the editorial organizer-facing layout and principle content, and no longer renders the historical blank-screen fallback.
 
@@ -38,6 +40,10 @@ This is production-grade dashboard infrastructure around a mock/adapter contract
 - `npm run lint` — pass; legacy explicit-`any` warnings remain
 - `npm test` — pass; 31 tests
 - `npm run build` — pass; Turbopack emits three non-failing Tailwind v4 CSS parser warnings
+- Final console redesign — typecheck pass, test pass (31 tests), production build pass
+- Production HTTP smoke — `/login` 200, `/api/meta` 200, unauthenticated `/overview` redirects, authenticated `/api/auth/me`, `/api/overview`, `/api/teams`, `/api/audit`, and `/api/settings` all returned 200
+- Browser visual/console pass — live `/login` snapshot at desktop viewport; zero browser console errors observed
+- Security hardening — state-changing requests without `Origin` now fail closed; GET/HEAD/OPTIONS remain compatible
 - `npm run seed` — pass with `ALLOW_DEFAULT_PASSWORDS=true`
 - Authenticated `/api/teams` smoke — HTTP 200, 24 seeded teams
 - Lifecycle reset/poll/audit smoke — HTTP 202, final `running`, completion audit observed
@@ -59,7 +65,7 @@ The default release path is the SQLite-backed `MockAdapter` and is reported as `
 - ESLint reports 72 legacy explicit-`any` warnings; the command exits successfully, but these should be reduced before a strict lint policy is reinstated.
 - The import endpoint returns plaintext credentials only for successfully created rows, matching the one-time credential contract; the teams page clears that response after the reveal dialog closes.
 - Docker one-team smoke testing requires the club-provided `teams-template/docker-compose.yml` and a Docker runtime.
-- Full browser visual/keyboard/console verification remains a manual demo-machine task; this terminal run verified the equivalent HTTP session and polling flows.
+- Full authenticated browser visual/keyboard verification remains a manual demo-machine task; this terminal run verified the live login/public-route visual and console state plus authenticated production HTTP/API flows. No claim is made for authenticated browser screenshots or screen-reader output.
 - Login and shared visual language were redesigned with a responsive control-plane layout, stronger contrast, explicit grid alignment, accessible focus states, reduced-motion handling, and Motion entrance/feedback animations. Decorative scan/drift motion was removed to match the UI spec.
 - Shared theme tokens were corrected so semantic accent/muted colors are no longer overwritten by dark surface colors; primary buttons, focus rings, labels, and dashboard status UI now retain their intended contrast.
 - Login received an anti-slop polish pass: removed decorative radar/grid/orb treatment and fake telemetry statuses, simplified copy to organizer-relevant language, and retained a restrained single-accent motion treatment.

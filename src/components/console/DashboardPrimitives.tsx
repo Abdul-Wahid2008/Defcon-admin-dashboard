@@ -17,8 +17,9 @@ export function QueryState({ loading, error, onRetry, children }: { loading: boo
   return <>{children}</>;
 }
 
-export function StatCard({ label, value, caption, href }: { label: string; value: number; caption: string; href?: string }) {
-  const content = <Card className="h-full"><CardContent className="py-4"><div className="text-xs uppercase tracking-wider text-[var(--muted)]">{label}</div><div className="mt-1 font-mono text-3xl font-semibold">{value}</div><div className="text-xs text-[var(--muted)]">{caption}</div></CardContent></Card>;
+export function StatCard({ label, value, caption, href, tone = 'neutral' }: { label: string; value: number; caption: string; href?: string; tone?: 'neutral' | 'ok' | 'warn' | 'bad' }) {
+  const toneClass = { neutral: 'border-[var(--border)]', ok: 'border-[var(--ok)]/40', warn: 'border-[var(--warn)]/40', bad: 'border-[var(--bad)]/40' }[tone];
+  const content = <Card className={`h-full border ${toneClass}`}><CardContent className="py-4"><div className="console-label">{label}</div><div className="mt-2 font-mono text-3xl font-semibold tracking-tight">{value}</div><div className="mt-1 text-xs text-[var(--muted)]">{caption}</div></CardContent></Card>;
   return href ? <Link href={href} className="block transition hover:-translate-y-0.5">{content}</Link> : content;
 }
 
@@ -44,7 +45,7 @@ export function EnvironmentTile({ team }: { team: { teamId: string; name: string
 }
 
 export function PageHeader({ title, description, updatedAt, onRefresh, refreshing, children }: { title: string; description?: React.ReactNode; updatedAt?: string; onRefresh?: () => void; refreshing?: boolean; children?: React.ReactNode }) {
-  return <div className="mb-6 flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-2xl font-semibold">{title}</h1>{description && <p className="mt-1 text-sm text-[var(--muted)]">{description}</p>}{updatedAt && <p className="mt-1 text-xs text-[var(--muted)]">Updated <RelativeTime ts={updatedAt} /></p>}</div><div className="flex items-center gap-2">{children}{onRefresh && <Button variant="outline" size="icon" aria-label="Refresh" onClick={onRefresh} disabled={refreshing}><RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} /></Button>}</div></div>;
+  return <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-[var(--border)] pb-5"><div className="min-w-0"><h1 className="text-2xl font-semibold tracking-tight">{title}</h1>{description && <p className="mt-1 text-sm text-[var(--muted)]">{description}</p>}{updatedAt && <p className="mt-2 text-xs text-[var(--muted)]">Last sync <RelativeTime ts={updatedAt} /></p>}</div><div className="flex items-center gap-2">{children}{onRefresh && <Button variant="outline" size="icon" aria-label="Refresh" onClick={onRefresh} disabled={refreshing}><RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} /></Button>}</div></div>;
 }
 
 export function AuditEntryDetails({ entry }: { entry: AuditEntry }) {

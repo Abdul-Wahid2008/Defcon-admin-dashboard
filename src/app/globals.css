@@ -54,6 +54,13 @@
   --sidebar-accent-foreground:  var(--text);
   --sidebar-border:             var(--border);
   --sidebar-ring:               var(--accent);
+
+  /* Console-specific semantic surfaces */
+  --surface-quiet: #0E1728;
+  --surface-raised: #18243A;
+  --surface-inset: #0A1424;
+  --border-strong: #425572;
+  --text-subtle: #AFC0D8;
 }
 
 /* Always dark — no light mode */
@@ -109,6 +116,48 @@ html { color-scheme: dark; }
   }
   code, kbd, pre, samp, .font-mono {
     font-family: var(--font-mono), ui-monospace, monospace;
+  }
+
+  ::selection {
+    color: var(--bg);
+    background: var(--accent);
+  }
+
+  .console-main {
+    background:
+      linear-gradient(90deg, rgba(34, 211, 238, 0.025) 1px, transparent 1px) 0 0 / 32px 32px,
+      var(--bg);
+  }
+
+  .console-surface {
+    border: 1px solid var(--border);
+    background: var(--panel);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  }
+
+  .console-inset {
+    border: 1px solid rgba(66, 85, 114, 0.7);
+    background: var(--surface-inset);
+  }
+
+  .console-label {
+    color: var(--text-subtle);
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .console-table-row {
+    transition: background-color 150ms ease;
+  }
+
+  .console-table-row:hover {
+    background: rgba(26, 38, 58, 0.72);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .console-table-row { transition: none; }
   }
 }
 
@@ -227,6 +276,11 @@ html { color-scheme: dark; }
   .login-trust { margin-top: 24px; }
   .login-footer { left: 20px; right: 20px; }
   .login-footer span:last-child { display: none; }
+}
+
+@media (max-width: 767px) {
+  .console-main { background: var(--bg); }
+  .console-content { padding: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .login-card, .login-brief { transition: none; }

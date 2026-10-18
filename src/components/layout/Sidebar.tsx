@@ -34,18 +34,20 @@ export function Sidebar({ role }: SidebarProps) {
 
   return (
     <aside
-      className="hidden md:flex flex-col w-[240px] shrink-0 border-r bg-[var(--panel)]"
+      className="hidden w-[240px] shrink-0 flex-col border-r bg-[var(--panel)] md:flex"
       style={{ borderColor: 'var(--border)' }}
     >
       {/* Logo */}
-      <div className="px-4 py-5 border-b" style={{ borderColor: 'var(--border)' }}>
+      <div className="border-b px-4 py-5" style={{ borderColor: 'var(--border)' }}>
         <div className="flex items-center gap-2">
-          <Shield size={18} className="text-[var(--accent)]" aria-hidden="true" />
+          <div className="grid size-8 shrink-0 place-items-center rounded-lg border border-cyan-300/30 bg-cyan-300/10">
+            <Shield size={17} className="text-[var(--accent)]" aria-hidden="true" />
+          </div>
           <div>
-            <p className="text-sm font-semibold text-[var(--text)] leading-tight">
-              DEFCON Control Center
-            </p>
-            <p className="font-mono text-[10px] text-[var(--muted)] mt-0.5">v{meta?.version ?? '1.1.0'}</p>
+          <p className="text-sm font-semibold leading-tight text-[var(--text)]">
+            DEFCON Control Center
+          </p>
+          <p className="mt-1 font-mono text-[10px] text-[var(--muted)]">control plane · v{meta?.version ?? '1.1.0'}</p>
           </div>
         </div>
       </div>
@@ -60,10 +62,10 @@ export function Sidebar({ role }: SidebarProps) {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
+                'flex items-center gap-3 rounded-md border border-transparent px-3 py-2.5 text-sm transition-colors',
                 active
-                  ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
-                  : 'text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--panel-2)]',
+                  ? 'border-cyan-300/20 bg-cyan-300/10 font-medium text-[var(--accent)]'
+                  : 'text-[var(--muted)] hover:bg-[var(--panel-2)] hover:text-[var(--text)]',
               )}
               aria-current={active ? 'page' : undefined}
             >
@@ -75,7 +77,7 @@ export function Sidebar({ role }: SidebarProps) {
       </nav>
 
       {/* Adapter info */}
-      <div className="px-4 py-3 border-t text-[10px] text-[var(--muted)] font-mono" style={{ borderColor: 'var(--border)' }}>
+      <div className="border-t px-4 py-3 text-[10px] font-mono text-[var(--muted)]" style={{ borderColor: 'var(--border)' }}>
         <span className="uppercase tracking-wide">
           {meta?.adapter === 'mock' ? 'SIMULATED' : meta?.adapter === 'real' ? 'LIVE' : 'PARTIAL'}
         </span>

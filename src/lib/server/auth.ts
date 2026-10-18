@@ -100,7 +100,10 @@ export async function requireUser(req: Request): Promise<SessionUser> {
 
 export function assertSameOrigin(req: Request): void {
   const origin = req.headers.get('origin');
-  if (!origin) return; // same-origin browser requests may omit Origin on GET; only enforce for mutations
+  if (!origin) {
+    if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return;
+    throw new AppError('FORBIDDEN', 'Origin header required for state-changing requests.');
+  }
   const host = req.headers.get('host');
   if (!host) return;
   try {

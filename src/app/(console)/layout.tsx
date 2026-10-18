@@ -38,8 +38,8 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           <ConsoleClient user={user}>
             <SimBanner />
-            <main className="flex-1 overflow-y-auto">
-              <div className="max-w-[1440px] mx-auto px-6 py-6">
+            <main className="console-main flex-1 overflow-y-auto">
+              <div className="console-content mx-auto w-full max-w-[1440px] px-6 py-6">
                 {children}
               </div>
             </main>
