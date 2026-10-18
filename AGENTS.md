@@ -7,6 +7,7 @@
 - Done: P1–P17, including ordered CSV import, dry-run preview, one-time credential reveal, and typed-confirmation bulk start/stop.
 - Known bugs: Tailwind v4/Turbopack emits three non-blocking CSS parser warnings; legacy explicit-`any` warnings remain; Docker Compose smoke test still needs the club template/runtime; real-browser visual/keyboard QA is not available in this terminal.
 - Security hardening: SESSION_SECRET is required and must be at least 32 characters; login redirects accept same-origin paths only.
+- UI hardening: semantic `--accent` and `--muted` tokens must not be redefined as surface colors; use dedicated surface tokens for Tailwind mappings.
 - Decisions made since blueprint: default remains the persistent SQLite `MockAdapter` (`SIMULATED`); Docker Compose remains opt-in and `PARTIAL`; import credentials are cleared when the reveal dialog closes.
 - Deadline: docs assumption — feature freeze 20 Oct 2026, rehearsal 21 Oct, emergency buffer 22 Oct.
 

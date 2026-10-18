@@ -55,6 +55,7 @@ The default release path is the SQLite-backed `MockAdapter` and is reported as `
 - Docker one-team smoke testing requires the club-provided `teams-template/docker-compose.yml` and a Docker runtime.
 - Full browser visual/keyboard/console verification remains a manual demo-machine task; this terminal run verified the equivalent HTTP session and polling flows.
 - Login and shared visual language were redesigned with a responsive control-plane layout, stronger contrast, explicit grid alignment, accessible focus states, reduced-motion handling, and Motion entrance/feedback animations. Decorative scan/drift motion was removed to match the UI spec.
+- Shared theme tokens were corrected so semantic accent/muted colors are no longer overwritten by dark surface colors; primary buttons, focus rings, labels, and dashboard status UI now retain their intended contrast.
 - Security hardening removed the JWT secret fallback, requires a configured 32-character minimum `SESSION_SECRET`, and restricts post-login redirects to same-origin paths.
 
 ## Next production slice
