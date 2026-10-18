@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
-import { Activity, ArrowRight, Eye, EyeOff, Loader2, LockKeyhole, Radar, ShieldCheck, Wifi } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Loader2, LockKeyhole, Radar } from 'lucide-react';
 import { apiLogin } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -72,9 +72,6 @@ function LoginForm() {
 
   return (
     <main className="login-shell">
-      <div className="login-grid" aria-hidden="true" />
-      <div className="login-orb login-orb-one" aria-hidden="true" />
-      <div className="login-orb login-orb-two" aria-hidden="true" />
       <div className="login-layout">
         <motion.section
           className="login-brief"
@@ -82,17 +79,15 @@ function LoginForm() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.45, ease: 'easeOut' }}
         >
-          <div className="eyebrow"><span className="eyebrow-dot" /> CONTROL PLANE / SECURE ACCESS</div>
           <div className="login-brand">
             <div className="brand-mark"><Radar size={27} strokeWidth={1.7} /></div>
-            <div><p className="brand-kicker">DEFCON</p><p className="brand-name">CONTROL CENTER <span>2.0</span></p></div>
+            <div><p className="brand-kicker">DEFCON 2.0</p><p className="brand-name">CONTROL CENTER</p></div>
           </div>
-          <h1>Operate with<br /><span>confidence.</span></h1>
-          <p className="login-lede">A calm, auditable command surface for every team environment at Technozion.</p>
-          <div className="login-signal-list">
-            <div><ShieldCheck size={16} /><span>Permission-aware operations</span><b>READY</b></div>
-            <div><Activity size={16} /><span>Live state reconciliation</span><b>ONLINE</b></div>
-            <div><LockKeyhole size={16} /><span>Organizer network boundary</span><b>ENFORCED</b></div>
+          <h1>Run the event<br /><span>with confidence.</span></h1>
+          <p className="login-lede">The organizer workspace for teams, environments, health checks, and audit history.</p>
+          <div className="login-trust">
+            <LockKeyhole size={16} aria-hidden="true" />
+            <span>Organizer access · changes are recorded in the audit log</span>
           </div>
         </motion.section>
 
@@ -102,10 +97,10 @@ function LoginForm() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.45, delay: 0.08, ease: 'easeOut' }}
         >
-          <div className="login-card-top"><span>ORGANIZER AUTHENTICATION</span><Wifi size={16} /></div>
+          <div className="login-card-top"><span>Organizer sign in</span><span className="login-card-mode">Local demo</span></div>
           <div className="login-card-heading">
             <h2>Welcome back</h2>
-            <p>Sign in to access the operations console.</p>
+            <p>Use your organizer account to continue.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="login-form" noValidate>

@@ -56,6 +56,7 @@ The default release path is the SQLite-backed `MockAdapter` and is reported as `
 - Full browser visual/keyboard/console verification remains a manual demo-machine task; this terminal run verified the equivalent HTTP session and polling flows.
 - Login and shared visual language were redesigned with a responsive control-plane layout, stronger contrast, explicit grid alignment, accessible focus states, reduced-motion handling, and Motion entrance/feedback animations. Decorative scan/drift motion was removed to match the UI spec.
 - Shared theme tokens were corrected so semantic accent/muted colors are no longer overwritten by dark surface colors; primary buttons, focus rings, labels, and dashboard status UI now retain their intended contrast.
+- Login received an anti-slop polish pass: removed decorative radar/grid/orb treatment and fake telemetry statuses, simplified copy to organizer-relevant language, and retained a restrained single-accent motion treatment.
 - Security hardening removed the JWT secret fallback, requires a configured 32-character minimum `SESSION_SECRET`, and restricts post-login redirects to same-origin paths.
 
 ## Next production slice
