@@ -5,6 +5,7 @@ import { QueryProvider } from '@/providers/query-provider';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { SimBanner } from '@/components/layout/SimBanner';
 import { Toaster } from '@/components/ui/sonner';
+import { getSessionSecret } from '@/lib/session-secret';
 import ConsoleClient from './ConsoleClient';
 
 const SESSION_COOKIE = 'dc_session';
@@ -14,10 +15,7 @@ async function getUser() {
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   try {
-    const secret = new TextEncoder().encode(
-      process.env.SESSION_SECRET || 'change-me-32-chars-minimum-secret!',
-    );
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, getSessionSecret());
     return {
       id: payload.sub as string,
       username: payload['username'] as string,

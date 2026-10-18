@@ -4,14 +4,10 @@ import { AppError } from './errors';
 import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
+import { getSessionSecret } from '../session-secret';
 
 const SESSION_COOKIE = 'dc_session';
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours
-
-function getSecret(): Uint8Array {
-  const secret = process.env.SESSION_SECRET || 'change-me-32-chars-minimum-secret!';
-  return new TextEncoder().encode(secret);
-}
 
 export interface SessionUser {
   id: string;
@@ -74,14 +70,14 @@ export async function createSession(user: SessionUser): Promise<string> {
     .setSubject(user.id)
     .setIssuedAt(Math.floor(now / 1000))
     .setExpirationTime(Math.floor((now + SESSION_DURATION_MS) / 1000))
-    .sign(getSecret());
+    .sign(getSessionSecret());
 
   return token;
 }
 
 export async function verifySession(token: string): Promise<SessionUser> {
   try {
-    const { payload } = await jwtVerify(token, getSecret());
+    const { payload } = await jwtVerify(token, getSessionSecret());
     return {
       id: payload.sub as string,
       username: payload['username'] as string,

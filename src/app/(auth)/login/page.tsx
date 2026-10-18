@@ -22,12 +22,17 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [retryAfter, setRetryAfter] = useState(0);
-  const [next, setNext] = useState('/overview');
+  const nextRef = useRef('/overview');
 
   const usernameRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const requestedPath = new URLSearchParams(window.location.search).get('next');
-    if (requestedPath?.startsWith('/')) setNext(requestedPath);
+    if (requestedPath && /^\/(?![\/\\])/.test(requestedPath)) {
+      const safePath = new URL(requestedPath, window.location.origin);
+      if (safePath.origin === window.location.origin) {
+        nextRef.current = `${safePath.pathname}${safePath.search}${safePath.hash}`;
+      }
+    }
     usernameRef.current?.focus();
   }, []);
 
@@ -50,7 +55,7 @@ function LoginForm() {
     setLoading(true);
     try {
       await apiLogin(username, password);
-      router.push(next);
+      router.push(nextRef.current);
     } catch (err: unknown) {
       const apiError = err as { code?: string; details?: { retryAfter?: number } };
       if (apiError.code === 'RATE_LIMITED') {
@@ -98,13 +103,13 @@ function LoginForm() {
           transition={{ duration: 0.65, delay: 0.12, ease: 'easeOut' }}
         >
           <div className="login-card-top"><span>ORGANIZER AUTHENTICATION</span><Wifi size={14} /></div>
-          <div className="mb-7">
+          <div className="login-card-heading">
             <h2>Welcome back</h2>
             <p>Sign in to access the operations console.</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-          <div className="space-y-1.5">
+          <form onSubmit={handleSubmit} className="login-form" noValidate>
+          <div className="login-field">
             <Label htmlFor="username" className="login-label">
               Username
             </Label>
@@ -122,11 +127,11 @@ function LoginForm() {
             />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="login-field">
             <Label htmlFor="password" className="login-label">
               Password
             </Label>
-            <div className="relative">
+            <div className="login-password-wrap">
               <Input
                 id="password"
                 type={showPw ? 'text' : 'password'}
@@ -141,7 +146,7 @@ function LoginForm() {
               <button
                 type="button"
                 onClick={() => setShowPw(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--text)] transition-colors"
+                className="login-password-toggle"
                 aria-label={showPw ? 'Hide password' : 'Show password'}
               >
                 {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -150,7 +155,7 @@ function LoginForm() {
           </div>
 
           {error && (
-            <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} role="alert" className="login-error">
+            <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} role="alert" aria-live="assertive" className="login-error">
               {retryAfter > 0 ? `Too many attempts. Retry in ${retryAfter}s.` : error}
             </motion.p>
           )}
@@ -159,6 +164,7 @@ function LoginForm() {
             type="submit"
             disabled={loading || retryAfter > 0 || !username || !password}
             className="login-submit"
+            aria-busy={loading}
           >
             {loading ? (
               <>

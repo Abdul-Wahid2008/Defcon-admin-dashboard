@@ -3,9 +3,10 @@
 > Also provided as `AGENTS.md` for other coding tools. Keep the two identical.
 
 ## STATUS (update at the end of every work session)
-- Date/slice: 18 Oct 2026 — P17 complete; production acceptance and runtime verification remain.
+- Date/slice: 18 Oct 2026 — P17 complete; login visual/security hardening complete; real-browser QA remains.
 - Done: P1–P17, including ordered CSV import, dry-run preview, one-time credential reveal, and typed-confirmation bulk start/stop.
-- Known bugs: Tailwind v4/Turbopack emits three non-blocking CSS parser warnings; legacy explicit-`any` warnings remain; Docker Compose smoke test still needs the club template/runtime.
+- Known bugs: Tailwind v4/Turbopack emits three non-blocking CSS parser warnings; legacy explicit-`any` warnings remain; Docker Compose smoke test still needs the club template/runtime; browser visual/keyboard QA remains manual.
+- Security hardening: SESSION_SECRET is required and must be at least 32 characters; login redirects accept same-origin paths only.
 - Decisions made since blueprint: default remains the persistent SQLite `MockAdapter` (`SIMULATED`); Docker Compose remains opt-in and `PARTIAL`; import credentials are cleared when the reveal dialog closes.
 - Deadline: ~5 days from 17 Oct 2026 (freeze end of Day 4 = 20 Oct). Confirm real date.
 

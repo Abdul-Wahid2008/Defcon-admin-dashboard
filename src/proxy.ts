@@ -1,13 +1,9 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
+import { getSessionSecret } from './lib/session-secret';
 
 const SESSION_COOKIE = 'dc_session';
-
-function getSecret(): Uint8Array {
-  const secret = process.env.SESSION_SECRET || 'change-me-32-chars-minimum-secret!';
-  return new TextEncoder().encode(secret);
-}
 
 const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/meta'];
 
@@ -38,7 +34,7 @@ export async function proxy(req: NextRequest) {
   }
 
   try {
-    await jwtVerify(token, getSecret());
+    await jwtVerify(token, getSessionSecret());
     return NextResponse.next();
   } catch {
     const url = req.nextUrl.clone();
