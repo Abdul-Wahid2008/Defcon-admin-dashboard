@@ -1,0 +1,46 @@
+# 09 — CHANGELOG: v1.0 → v1.1 (17 Oct 2026)
+
+## 1. Inputs reviewed and what each changed
+
+Reviewed: `BUILD_STATUS.md` (repo `docs/`), the club registration site (rendered), and the pasted WhatsApp messages (11–13 Oct). **Could not open:** `github.com/eveniota/HAM-DEFCON`, `github.com/Gal1lioDev/REGISTRATION`, `defcon-ham-arc.onrender.com` (all block automated access) and the ephemeral trycloudflare link — so nothing here claims to know their contents beyond what the chat said.
+
+| # | Finding | Source | Change made | Files |
+|---|---|---|---|---|
+| 1 | Event is a **4-hour attack-defense** competition → the console is likely operated live | Registration site | New assumption A19 and decision D15 (gate G1: real control on Day 4); soak test; audit CSV export promoted to P1; bulk start/stop first in stretch order; live-event ergonomics | 01, 05, 06, 07, 08 |
+| 2 | **5–6 services per team** | Group, 11 Oct | Mock has five services from a manifest (D14, A9); services card became a compact table; seed and overview numbers updated; AC-16 | 01, 03, 04, 05, 08 |
+| 3 | **Centralised `checker.py` per service** plants flags and checks services | Group, 11 Oct | Health verdict mapping (OK/OFFLINE/MUMBLE/INTERNAL_ERROR → our two checks) in `04 §4.1`; `checker_error` alert kind; checker rows in the real-orchestrator mapping; question to the club (A17) | 01, 03, 04 |
+| 4 | **Terminal = `ttyd` :7681 + Cloudflare quick tunnel**, per team (compose) | Group, 13 Oct | `Terminal` type and `Environment.terminal`; A15/A16/A18; AC-17; security rules (URL is a secret; never host the dashboard publicly); risk rows | 01, 03, 04, 05, 08 |
+| 5 | **Three difficulty tiers**, different points | Group, 13 Oct | Logged in `02 §11` only. No dashboard feature (considered: a difficulty chip per service — rejected: tier assignment is per vulnerability and point values are still unresolved) | 02 |
+| 6 | DocuVault UI requested from volunteers | Group, 13 Oct | Explicitly **out of scope** so it does not eat the 5 days | 00, 01, CLAUDE |
+| 7 | Registration systems exist (workers site, Render site, REGISTRATION repo) | Chat + site | F23 CSV import of registered teams (P2); `POST /api/teams/import`; question about export format | 01, 03, 05, 07 |
+| 8 | `BUILD_STATUS.md` used a **different slice list** (P2 "Mock Backend & Adapter", P4 "Team CRUD"…) and pointed at `docs/07 §5` | BUILD_STATUS | Slice numbering declared authoritative (`07 §0`); corrected `BUILD_STATUS.md` provided; rules added to 00 and CLAUDE.md | 00, 06, 07, CLAUDE, BUILD_STATUS |
+| 9 | Free-host registration sites | Chat | Never deploy the dashboard on public free hosts or quick tunnels | 01 |
+
+## 2. Contract/schema delta for Claude Code (additive; apply as prompt P1b)
+
+1. `Terminal { kind: 'ttyd'; port: number; url: string | null; isMock: boolean }` and `Environment.terminal: Terminal | null`.
+2. `Service.placeholder: boolean`.
+3. `Alert.kind` gains `'checker_error'`.
+4. `/api/meta.adapter`: `'mock' | 'real' | 'docker-compose'` (badge `PARTIAL` for `docker-compose` or mixed).
+5. New request/response schemas: `POST /api/teams/import` and `POST /api/environments/bulk` (both P2; schemas may be added now or in P17).
+6. DB (applies when writing P2): `environments.terminal_url TEXT`, `services.placeholder INTEGER NOT NULL DEFAULT 0`; mock seed gets a service manifest.
+7. Nothing renamed; P3 permissions unchanged (`env.start`/`env.stop` already cover bulk).
+
+## 3. Deliberately not changed
+
+- Per-participant credentials stay (A4), with the "one participant named `Team login`" fallback if the club ends up with per-team `ttyd -c` credentials. No schema change needed either way.
+- Reset/stop/delete semantics, append-only audit, idempotency, five-day structure, cut list.
+- No vulnerability details from the chat (e.g. DocuVault's three flags) were copied into these files: the dashboard does not need them and project knowledge should not become a spoiler sheet.
+
+## 4. Things to verify (progress report said "9/9 tests green")
+
+- P3 was specified as a table-driven matrix: 3 roles × 11 permissions = 33 role/permission cases, plus team own-vs-other-team and missing-resource cases. Vitest counts each `it.each` row as a test, so **9 tests suggests the matrix is grouped or not exhaustive**. Run `npx vitest run --reporter=verbose tests/permissions.test.ts` and check that every role × permission is asserted; if not, have Claude Code expand it before building on `can()`.
+- Confirm P1 `config.ts` keeps `HEALTH_INTERVAL_SEC` and `IDLE_SESSION_TIMEOUT_MIN` as `null` (spec: TBD).
+
+## 5. New questions for the club (also `01 §18` items 7–12)
+
+Spec newer than v1.2? · One container per team or attackbox + tunnel + services? · Terminal: raw `ttyd` behind quick tunnels or an authenticating gateway; credentials per team or per participant? · Who builds the orchestrator and by when; OK to ship the experimental `DockerComposeAdapter`? · Registration export format? · Is the checker enowars-style and can we read its latest verdicts?
+
+## 6. Observation on the pasted compose snippet
+
+As pasted it is not valid compose (`tunnel:` is not nested under `services:`; `restart` and `command` are mis-indented) — likely a paste artefact. Whoever packages it should run `docker compose config`. Also verify Cloudflare's current limits for quick tunnels before relying on 20–30 of them for four hours; they are documented as a testing feature.

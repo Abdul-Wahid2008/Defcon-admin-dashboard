@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "outDir": "dist-scripts",
+    "noEmit": false
+  },
+  "include": ["scripts/**/*.ts", "src/lib/server/**/*.ts", "migrations/**/*.sql"]
+}
