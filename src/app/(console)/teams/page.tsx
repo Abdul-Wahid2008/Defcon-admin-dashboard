@@ -1,9 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import type { ChangeEvent, ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Search } from 'lucide-react';
-import { useCreateTeam, useTeams } from '@/lib/queries';
+import { Download, FileUp, Plus, Search, Upload, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { useBulkEnvironmentAction, useCreateTeam, useImportTeams, useTeams } from '@/lib/queries';
+import type { IssuedCredential, TeamImportResponse, TeamSummary } from '@/lib/schemas';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,24 +16,163 @@ import { StateBadge } from '@/components/status/StateBadge';
 import { PageHeader, QueryState } from '@/components/console/DashboardPrimitives';
 import { RelativeTime } from '@/components/ui/relative-time';
 
+type ImportRow = { name: string; participantNames?: string[] };
+
+function parseCsv(input: string): { rows: ImportRow[]; errors: string[] } {
+  const records: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let quoted = false;
+  for (let i = 0; i < input.length; i += 1) {
+    const char = input[i];
+    if (char === '"') {
+      if (quoted && input[i + 1] === '"') { field += '"'; i += 1; }
+      else quoted = !quoted;
+    } else if (char === ',' && !quoted) {
+      row.push(field.trim()); field = '';
+    } else if ((char === '\n' || char === '\r') && !quoted) {
+      if (char === '\r' && input[i + 1] === '\n') i += 1;
+      row.push(field.trim()); field = '';
+      if (row.some(Boolean)) records.push(row);
+      row = [];
+    } else field += char;
+  }
+  if (quoted) return { rows: [], errors: ['Unclosed quoted field.'] };
+  row.push(field.trim());
+  if (row.some(Boolean)) records.push(row);
+  if (!records.length) return { rows: [], errors: ['CSV is empty.'] };
+  const header = records[0].map((value) => value.toLowerCase());
+  if (header[0] !== 'team_name' || (header.length > 2 && header[1] !== 'participants')) {
+    return { rows: [], errors: ['CSV must start with the columns team_name,participants.'] };
+  }
+  const rows: ImportRow[] = [];
+  const errors: string[] = [];
+  records.slice(1).forEach((record, index) => {
+    const name = record[0]?.trim() ?? '';
+    const participants = record[1]?.split(';').map((value) => value.trim()).filter(Boolean);
+    if (name.length < 2 || name.length > 60) errors.push(`Row ${index + 2}: team_name must be 2–60 characters.`);
+    else if (participants && participants.length > 8) errors.push(`Row ${index + 2}: at most 8 participants are allowed.`);
+    else rows.push({ name, ...(participants?.length ? { participantNames: participants } : {}) });
+  });
+  return { rows, errors };
+}
+
+function Overlay({ children, onClose }: { children: ReactNode; onClose?: () => void }) {
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true">
+    <Card className="max-h-[90vh] w-full max-w-3xl overflow-auto"><CardContent className="p-6">
+      {onClose && <button aria-label="Close" onClick={onClose} className="float-right rounded p-1 text-[var(--muted)] hover:text-[var(--text)]"><X size={18} /></button>}
+      {children}
+    </CardContent></Card>
+  </div>;
+}
+
+function CredentialsReveal({ credentials, onClose }: { credentials: IssuedCredential[]; onClose: () => void }) {
+  const [saved, setSaved] = useState(false);
+  const download = () => {
+    const csv = ['participant_id,username,password', ...credentials.map((item) => `${item.participantId},${item.username},${item.password}`)].join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a'); link.href = url; link.download = 'defcon-credentials.csv'; link.click(); URL.revokeObjectURL(url);
+  };
+  return <Overlay>
+    <h2 className="mb-2 text-lg font-semibold">Credentials — save these now</h2>
+    <p className="mb-4 text-sm text-[var(--bad)]">Passwords are shown only once and cannot be retrieved later.</p>
+    <div className="overflow-x-auto rounded border border-[var(--border)]"><Table><TableHeader><TableRow><TableHead>Participant</TableHead><TableHead>Username</TableHead><TableHead>Password</TableHead></TableRow></TableHeader><TableBody>
+      {credentials.map((credential) => <TableRow key={credential.participantId}><TableCell>{credential.participantId}</TableCell><TableCell className="font-mono">{credential.username}</TableCell><TableCell className="font-mono">{credential.password}</TableCell></TableRow>)}
+    </TableBody></Table></div>
+    <label className="mt-4 flex items-center gap-2 text-sm"><input type="checkbox" checked={saved} onChange={(event) => setSaved(event.target.checked)} /> I have saved these credentials</label>
+    <div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={download}><Download size={15} />Download CSV</Button><Button disabled={!saved} onClick={onClose}>Close</Button></div>
+  </Overlay>;
+}
+
+function ImportDialog({ onClose, onCredentials }: { onClose: () => void; onCredentials: (response: TeamImportResponse) => void }) {
+  const [csv, setCsv] = useState('team_name,participants\n');
+  const [parsed, setParsed] = useState<{ rows: ImportRow[]; errors: string[] } | null>(null);
+  const [preview, setPreview] = useState<TeamImportResponse | null>(null);
+  const [autoProvision, setAutoProvision] = useState(true);
+  const importTeams = useImportTeams();
+  const parse = () => {
+    const result = parseCsv(csv); setParsed(result); setPreview(null);
+    if (result.errors.length) return;
+    importTeams.mutate({ rows: result.rows, autoProvision, dryRun: true }, { onSuccess: setPreview });
+  };
+  const submit = () => {
+    if (!parsed || parsed.errors.length || !parsed.rows.length) return;
+    importTeams.mutate({ rows: parsed.rows, autoProvision }, { onSuccess: (result) => { onCredentials(result); onClose(); } });
+  };
+  const fileSelected = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) file.text().then(setCsv).catch(() => setParsed({ rows: [], errors: ['Unable to read the selected file.'] }));
+  };
+  return <Overlay onClose={onClose}>
+    <h2 className="mb-1 text-lg font-semibold">Import registered teams</h2>
+    <p className="mb-4 text-sm text-[var(--muted)]">CSV columns: <code>team_name,participants</code>. Separate participants with semicolons.</p>
+    <div className="mb-3 flex items-center gap-2"><label className="inline-flex cursor-pointer items-center gap-2 rounded border border-[var(--border)] px-3 py-1.5 text-sm"><FileUp size={15} />Choose CSV<input type="file" accept=".csv,text/csv" className="hidden" onChange={fileSelected} /></label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={autoProvision} onChange={(event) => setAutoProvision(event.target.checked)} />Provision environments</label></div>
+    <textarea value={csv} onChange={(event) => { setCsv(event.target.value); setParsed(null); setPreview(null); }} className="min-h-40 w-full rounded-lg border border-[var(--border)] bg-[var(--panel-2)] p-3 font-mono text-xs" spellCheck={false} />
+    {parsed?.errors.length ? <div className="mt-3 space-y-1 text-sm text-[var(--bad)]">{parsed.errors.map((error) => <p key={error}>{error}</p>)}</div> : null}
+    {preview && <div className="mt-4 rounded border border-[var(--border)] p-3 text-sm"><p className="font-medium">Preview: {preview.skipped.length ? `${preview.skipped.length} row(s) require attention` : 'all rows are valid'}</p>{preview.skipped.map((item, index) => <p key={`${item.row.name}-${index}`} className="mt-1 text-[var(--warn)]">{item.row.name}: {item.reason}</p>)}</div>}
+    {importTeams.error && <p className="mt-3 text-sm text-[var(--bad)]">{importTeams.error.message}</p>}
+    <div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={onClose}>Cancel</Button><Button variant="outline" disabled={importTeams.isPending} onClick={parse}><Search size={15} />Dry run</Button><Button disabled={!parsed || !!parsed.errors.length || !parsed.rows.length || importTeams.isPending} onClick={submit}><Upload size={15} />{importTeams.isPending ? 'Importing…' : 'Import teams'}</Button></div>
+  </Overlay>;
+}
+
+function BulkDialog({ action, teams, onClose }: { action: 'start' | 'stop'; teams: TeamSummary[]; onClose: () => void }) {
+  const [confirmation, setConfirmation] = useState('');
+  const bulk = useBulkEnvironmentAction();
+  const expected = action === 'start' ? 'START ALL' : 'STOP ALL';
+  const requiresConfirmation = teams.length >= 5;
+  const submit = () => bulk.mutate({ action, teamIds: teams.map((team) => team.id), ...(requiresConfirmation ? { confirm: confirmation } : {}) }, {
+    onSuccess: (result) => { const accepted = result.results.filter((item) => item.status === 'accepted').length; const rejected = result.results.filter((item) => item.status === 'rejected').length; toast.success(`${accepted} accepted, ${result.results.length - accepted - rejected} no-op, ${rejected} rejected`); onClose(); },
+  });
+  return <Overlay onClose={onClose}>
+    <h2 className="mb-2 text-lg font-semibold">{action === 'start' ? 'Start' : 'Stop'} selected environments?</h2>
+    <p className="text-sm text-[var(--muted)]">This will process {teams.length} selected team(s) independently using the same single-team rules.</p>
+    {action === 'stop' && <p className="mt-2 text-sm text-[var(--warn)]">Environments are retained; active terminal sessions will end.</p>}
+    {requiresConfirmation && <label className="mt-4 block text-sm">Type <strong>{expected}</strong> to confirm<Input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} className="mt-1" /></label>}
+    {bulk.error && <p className="mt-3 text-sm text-[var(--bad)]">{bulk.error.message}</p>}
+    <div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={onClose}>Cancel</Button><Button disabled={bulk.isPending || (requiresConfirmation && confirmation !== expected)} onClick={submit}>{bulk.isPending ? 'Processing…' : ` ${action === 'start' ? 'Start' : 'Stop'} environments`}</Button></div>
+  </Overlay>;
+}
+
 export default function TeamsPage() {
   const [search, setSearch] = useState('');
   const [term, setTerm] = useState('');
   const [state, setState] = useState('');
+  const [selected, setSelected] = useState<string[]>([]);
   const [showCreate, setShowCreate] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [bulkAction, setBulkAction] = useState<'start' | 'stop' | null>(null);
+  const [credentials, setCredentials] = useState<IssuedCredential[] | null>(null);
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
   const create = useCreateTeam();
   useEffect(() => { const id = window.setTimeout(() => setTerm(search), 250); return () => window.clearTimeout(id); }, [search]);
   const query = useTeams({ q: term || undefined, state: state || undefined });
   const page = query.data;
-  const submit = async () => { if (!name.trim()) return; await create.mutateAsync({ body: { name: name.trim(), notes: notes.trim() || undefined, autoProvision: true } }); setName(''); setNotes(''); setShowCreate(false); };
+  const selectedTeams = useMemo(() => page?.items.filter((team) => selected.includes(team.id)) ?? [], [page?.items, selected]);
+  const allVisibleSelected = !!page?.items.length && page.items.every((team) => selected.includes(team.id));
+  const toggleAll = () => setSelected(allVisibleSelected ? [] : (page?.items.map((team) => team.id) ?? []));
+  const toggleTeam = (teamId: string) => setSelected((current) => current.includes(teamId) ? current.filter((id) => id !== teamId) : [...current, teamId]);
+  const submit = async () => {
+    if (!name.trim()) return;
+    const result = await create.mutateAsync({ body: { name: name.trim(), notes: notes.trim() || undefined, autoProvision: true } });
+    setCredentials(result.credentials); setName(''); setNotes(''); setShowCreate(false);
+  };
+  const handleImport = (result: TeamImportResponse) => {
+    if (result.created.length) setCredentials(result.created.flatMap((item) => item.credentials));
+    if (result.skipped.length) toast.warning(`${result.skipped.length} row(s) skipped during import`);
+  };
   return <QueryState loading={query.isLoading} error={query.error} onRetry={() => query.refetch()}>
-    <PageHeader title="Teams" description={page ? `Showing ${page.items.length ? 1 : 0}–${page.items.length} of ${page.total}` : undefined} onRefresh={() => query.refetch()} refreshing={query.isFetching}><Button onClick={() => setShowCreate(true)}><Plus size={15} />Create team</Button></PageHeader>
+    <PageHeader title="Teams" description={page ? `Showing ${page.items.length ? 1 : 0}–${page.items.length} of ${page.total}` : undefined} onRefresh={() => query.refetch()} refreshing={query.isFetching}>
+      <Button variant="outline" onClick={() => setShowImport(true)}><Upload size={15} />Import CSV</Button><Button onClick={() => setShowCreate(true)}><Plus size={15} />Create team</Button>
+    </PageHeader>
     <Card><CardContent className="p-4">
       <div className="mb-4 flex flex-wrap gap-3"><div className="relative min-w-[240px] flex-1"><Search size={15} className="absolute left-3 top-2.5 text-[var(--muted)]" /><Input className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by team name or ID" /></div><select value={state} onChange={(e) => setState(e.target.value)} className="h-8 rounded-lg border border-[var(--border)] bg-[var(--panel-2)] px-3 text-sm"><option value="">All states</option><option value="running">Running</option><option value="stopped">Stopped</option><option value="failed">Failed</option><option value="starting">Starting</option><option value="stopping">Stopping</option></select></div>
-      {!page?.items.length ? <div className="py-12 text-center text-sm text-[var(--muted)]">{term || state ? 'No teams match these filters' : 'No teams yet'}</div> : <Table><TableHeader><TableRow><TableHead>Team</TableHead><TableHead>State</TableHead><TableHead>Health</TableHead><TableHead>Participants</TableHead><TableHead>Account</TableHead><TableHead>Updated</TableHead></TableRow></TableHeader><TableBody>{page.items.map((team) => <TableRow key={team.id}><TableCell><Link href={`/teams/${team.id}`} className="block hover:text-[var(--accent)]"><div className="font-mono text-xs text-[var(--muted)]">{team.id}</div><div className="font-medium">{team.name}</div></Link></TableCell><TableCell><StateBadge state={team.lifecycleState} size="sm" /></TableCell><TableCell><HealthBadge health={team.health} size="sm" /></TableCell><TableCell>{team.participantCount}</TableCell><TableCell><span className={team.accountStatus === 'active' ? 'text-[var(--ok)]' : 'text-[var(--warn)]'}>{team.accountStatus === 'active' ? 'Active' : 'Suspended'}</span></TableCell><TableCell><RelativeTime ts={team.updatedAt} className="text-xs text-[var(--muted)]" /></TableCell></TableRow>)}</TableBody></Table>}
+      {selectedTeams.length > 0 && <div className="mb-4 flex items-center justify-between rounded border border-[var(--accent)] bg-[var(--panel-2)] p-3 text-sm"><span>{selectedTeams.length} selected</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setBulkAction('start')}>Start selected</Button><Button size="sm" variant="outline" onClick={() => setBulkAction('stop')}>Stop selected</Button><Button size="sm" variant="ghost" onClick={() => setSelected([])}>Clear</Button></div></div>}
+      {!page?.items.length ? <div className="py-12 text-center text-sm text-[var(--muted)]">{term || state ? 'No teams match these filters' : 'No teams yet'}</div> : <Table><TableHeader><TableRow><TableHead><input type="checkbox" aria-label="Select visible teams" checked={allVisibleSelected} onChange={toggleAll} /></TableHead><TableHead>Team</TableHead><TableHead>State</TableHead><TableHead>Health</TableHead><TableHead>Participants</TableHead><TableHead>Account</TableHead><TableHead>Updated</TableHead></TableRow></TableHeader><TableBody>{page.items.map((team) => <TableRow key={team.id}><TableCell><input type="checkbox" aria-label={`Select ${team.id}`} checked={selected.includes(team.id)} onChange={() => toggleTeam(team.id)} /></TableCell><TableCell><Link href={`/teams/${team.id}`} className="block hover:text-[var(--accent)]"><div className="font-mono text-xs text-[var(--muted)]">{team.id}</div><div className="font-medium">{team.name}</div></Link></TableCell><TableCell><StateBadge state={team.lifecycleState} size="sm" /></TableCell><TableCell><HealthBadge health={team.health} size="sm" /></TableCell><TableCell>{team.participantCount}</TableCell><TableCell><span className={team.accountStatus === 'active' ? 'text-[var(--ok)]' : 'text-[var(--warn)]'}>{team.accountStatus === 'active' ? 'Active' : 'Suspended'}</span></TableCell><TableCell><RelativeTime ts={team.updatedAt} className="text-xs text-[var(--muted)]" /></TableCell></TableRow>)}</TableBody></Table>}
     </CardContent></Card>
-    {showCreate && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true"><Card className="w-full max-w-lg"><CardContent className="space-y-4 p-6"><h2 className="text-lg font-semibold">Create team</h2><label className="block text-sm">Team name<Input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} autoFocus /></label><label className="block text-sm">Notes<textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} className="mt-1 min-h-20 w-full rounded-lg border border-[var(--border)] bg-[var(--panel-2)] p-2" /></label><p className="text-xs text-[var(--muted)]">The environment will be provisioned after creation.</p>{create.error && <p className="text-sm text-[var(--bad)]">{create.error.message}</p>}<div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button><Button onClick={submit} disabled={!name.trim() || create.isPending}>{create.isPending ? 'Creating…' : 'Create team'}</Button></div></CardContent></Card></div>}
-    </QueryState>;
+    {showCreate && <Overlay onClose={() => setShowCreate(false)}><h2 className="text-lg font-semibold">Create team</h2><label className="mt-4 block text-sm">Team name<Input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} autoFocus /></label><label className="mt-3 block text-sm">Notes<textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} className="mt-1 min-h-20 w-full rounded-lg border border-[var(--border)] bg-[var(--panel-2)] p-2" /></label>{create.error && <p className="mt-3 text-sm text-[var(--bad)]">{create.error.message}</p>}<div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button><Button onClick={submit} disabled={!name.trim() || create.isPending}>{create.isPending ? 'Creating…' : 'Create team'}</Button></div></Overlay>}
+    {showImport && <ImportDialog onClose={() => setShowImport(false)} onCredentials={handleImport} />}
+    {bulkAction && <BulkDialog action={bulkAction} teams={selectedTeams} onClose={() => { setBulkAction(null); setSelected([]); }} />}
+    {credentials && <CredentialsReveal credentials={credentials} onClose={() => setCredentials(null)} />}
+  </QueryState>;
 }

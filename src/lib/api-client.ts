@@ -11,6 +11,10 @@ import type {
   TeamDetail,
   TeamSummary,
   User,
+  BulkEnvActionRequest,
+  BulkEnvActionResponse,
+  TeamImportRequest,
+  TeamImportResponse,
 } from './schemas';
 
 type QueryValue = string | string[] | boolean | number | undefined;
@@ -138,6 +142,26 @@ export async function apiCreateTeam(body: {
     credentials: 'same-origin',
   });
   return handleResponse<{ team: TeamDetail; credentials: IssuedCredential[] }>(res);
+}
+
+export async function apiImportTeams(body: TeamImportRequest) {
+  const res = await fetch('/api/teams/import', {
+    method: 'POST',
+    headers: defaultHeaders(),
+    body: JSON.stringify(body),
+    credentials: 'same-origin',
+  });
+  return handleResponse<TeamImportResponse>(res);
+}
+
+export async function apiBulkEnvironmentAction(body: BulkEnvActionRequest) {
+  const res = await fetch('/api/environments/bulk', {
+    method: 'POST',
+    headers: defaultHeaders(),
+    body: JSON.stringify(body),
+    credentials: 'same-origin',
+  });
+  return handleResponse<BulkEnvActionResponse>(res);
 }
 
 export async function apiUpdateTeam(teamId: string, patch: {

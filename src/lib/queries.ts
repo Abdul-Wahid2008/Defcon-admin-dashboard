@@ -20,6 +20,7 @@ import {
   apiAddParticipant, apiRemoveParticipant, apiRotateCredentials,
   apiRunHealthChecks, apiListAlerts, apiQueryAudit, apiGetSettings,
   apiUpdateSettings, apiDemoInject, apiDemoFailNext, apiDemoReseed,
+  apiImportTeams, apiBulkEnvironmentAction,
 } from './api-client';
 import { POLLING_INTERVALS } from './config';
 
@@ -83,6 +84,31 @@ export function useCreateTeam() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['teams'] });
       qc.invalidateQueries({ queryKey: ['overview'] });
+    },
+  });
+}
+
+export function useImportTeams() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: apiImportTeams,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['teams'] });
+      qc.invalidateQueries({ queryKey: ['overview'] });
+      qc.invalidateQueries({ queryKey: ['audit'] });
+    },
+  });
+}
+
+export function useBulkEnvironmentAction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: apiBulkEnvironmentAction,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['teams'] });
+      qc.invalidateQueries({ queryKey: ['overview'] });
+      qc.invalidateQueries({ queryKey: ['audit'] });
+      qc.invalidateQueries({ queryKey: ['alerts'] });
     },
   });
 }

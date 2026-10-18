@@ -228,8 +228,8 @@ export type MetaResponse = z.infer<typeof MetaResponseSchema>;
 
 export const TeamImportRequestSchema = z.object({
   rows: z.array(z.object({
-    name: z.string().min(2).max(60),
-    participantNames: z.array(z.string()).max(8).optional(),
+    name: z.string().trim().min(2).max(60),
+    participantNames: z.array(z.string().trim().min(1)).max(8).optional(),
   })).min(1).max(40),
   autoProvision: z.boolean().optional(),
   dryRun: z.boolean().optional(),

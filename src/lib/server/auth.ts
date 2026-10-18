@@ -17,7 +17,8 @@ export interface SessionUser {
   id: string;
   username: string;
   displayName: string;
-  role: 'organizer_admin' | 'organizer_operator';
+  role: 'organizer_admin' | 'organizer_operator' | 'team';
+  teamId?: string;
 }
 
 // In-memory login rate limiter: key = `${ip}:${username}` → { count, resetAt }
@@ -67,8 +68,10 @@ export async function createSession(user: SessionUser): Promise<string> {
     username: user.username,
     displayName: user.displayName,
     role: user.role,
+    ...(user.teamId ? { teamId: user.teamId } : {}),
   })
     .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(user.id)
     .setIssuedAt(Math.floor(now / 1000))
     .setExpirationTime(Math.floor((now + SESSION_DURATION_MS) / 1000))
     .sign(getSecret());
@@ -83,7 +86,8 @@ export async function verifySession(token: string): Promise<SessionUser> {
       id: payload.sub as string,
       username: payload['username'] as string,
       displayName: payload['displayName'] as string,
-      role: payload['role'] as 'organizer_admin' | 'organizer_operator',
+      role: payload['role'] as SessionUser['role'],
+      teamId: typeof payload['teamId'] === 'string' ? payload['teamId'] : undefined,
     };
   } catch {
     throw new AppError('UNAUTHENTICATED', 'Session expired or invalid.');

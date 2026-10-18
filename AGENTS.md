@@ -3,10 +3,10 @@
 > Also provided as `AGENTS.md` for other coding tools. Keep the two identical.
 
 ## STATUS (update at the end of every work session)
-- Date/slice: 17 Oct 2026 — P1–P15 implementation and verification substantially complete; P16 Docker Compose adapter implemented and gated; P17 bulk/import remains partial.
-- Done: typecheck, tests, production build, seeded authenticated API smoke flow, lifecycle/audit smoke flow, and authorization boundary smoke flow.
-- Known bugs: Tailwind v4 CSS parser warnings during Turbopack build; 72 non-blocking legacy `no-explicit-any` warnings; Docker one-team smoke test awaits a club compose template/runtime.
-- Decisions made since blueprint: mock remains the default and reports `SIMULATED`; Docker Compose reports `PARTIAL` and is never enabled implicitly.
+- Date/slice: 18 Oct 2026 — P17 complete; production acceptance and runtime verification remain.
+- Done: P1–P17, including ordered CSV import, dry-run preview, one-time credential reveal, and typed-confirmation bulk start/stop.
+- Known bugs: Tailwind v4/Turbopack emits three non-blocking CSS parser warnings; legacy explicit-`any` warnings remain; Docker Compose smoke test still needs the club template/runtime.
+- Decisions made since blueprint: default remains the persistent SQLite `MockAdapter` (`SIMULATED`); Docker Compose remains opt-in and `PARTIAL`; import credentials are cleared when the reveal dialog closes.
 - Deadline: docs assumption — feature freeze 20 Oct 2026, rehearsal 21 Oct, emergency buffer 22 Oct.
 
 ## What this is

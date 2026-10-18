@@ -9,6 +9,18 @@ import { TeamQuery, CreateTeamInput, UpdateTeamInput, TeamDetail, IssuedCredenti
 import { SOFT_TEAM_CAP } from '../../config';
 import { dbHelper } from '../db';
 
+export function validateBulkConfirmation(
+  action: 'start' | 'stop',
+  teamIds: string[],
+  confirm?: string,
+): void {
+  if (teamIds.length < 5) return;
+  const expected = action === 'start' ? 'START ALL' : 'STOP ALL';
+  if (confirm !== expected) {
+    throw new AppError('CONFIRMATION_MISMATCH', `Type "${expected}" to confirm bulk ${action}`);
+  }
+}
+
 export async function listTeams(user: SessionUser, query: TeamQuery) {
   if (!can(user, 'team.read')) {
     appendAudit({
@@ -151,7 +163,10 @@ export async function importTeams(
       continue;
     }
 
-    if (input.dryRun) continue;
+    if (input.dryRun) {
+      skipped.push({ row, reason: 'Valid row; not created in dry-run mode.' });
+      continue;
+    }
 
     try {
       const result = await createTeam(user, {
