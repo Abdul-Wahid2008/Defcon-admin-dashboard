@@ -39,6 +39,9 @@ This is production-grade dashboard infrastructure around a mock/adapter contract
 - Docker adapter unit tests — pass; real smoke test blocked pending club compose template/runtime
 - `/api/teams/import` — validated with dry-run, duplicate, partial-success, ordered-ID, permission, and credential non-leakage tests
 - `/api/environments/bulk` — typed request/response handling, ordered per-team processing, confirmation threshold, and partial result reporting verified
+- Two isolated authenticated sessions (admin/operator) against `next start` — pass; both saw 24 teams, overview/directory totals matched, operator delete returned 403, admin reset completed to `running`, and the requested/completion audit pair shared one correlation ID
+- Bounded two-session lifecycle/polling soak — pass; 3 reset cycles, 81 cross-session polls, 0 errors, 3 complete audit pairs, and 0 MB observed Node working-set growth
+- Docker CLI is installed, but the Docker daemon is unavailable and `teams-template/docker-compose.yml` is not present; Compose smoke remains blocked
 
 ## Honest release state
 
@@ -50,9 +53,10 @@ The default release path is the SQLite-backed `MockAdapter` and is reported as `
 - ESLint reports 72 legacy explicit-`any` warnings; the command exits successfully, but these should be reduced before a strict lint policy is reinstated.
 - The import endpoint returns plaintext credentials only for successfully created rows, matching the one-time credential contract; the teams page clears that response after the reveal dialog closes.
 - Docker one-team smoke testing requires the club-provided `teams-template/docker-compose.yml` and a Docker runtime.
+- Full browser visual/keyboard/console verification remains a manual demo-machine task; this terminal run verified the equivalent HTTP session and polling flows.
 
 ## Next production slice
 
-1. Run the documented two-browser acceptance flow and bounded polling/lifecycle soak check on the demo machine.
-2. Verify the club's compose template/runtime if live-ish control is required; keep the default release on `SIMULATED` until that evidence exists.
+1. Perform the remaining manual browser visual, keyboard, and console checks on the demo machine.
+2. Obtain the club's Compose template and start Docker Desktop before attempting the one-team `PARTIAL` adapter smoke test.
 3. Reduce remaining legacy `any` warnings and resolve the Tailwind v4/Turbopack parser warnings without changing the contract.
