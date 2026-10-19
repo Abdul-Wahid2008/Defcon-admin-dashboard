@@ -1,7 +1,7 @@
 'use client';
 
 import type { ChangeEvent, ReactNode } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Download, Eye, EyeOff, FileUp, Plus, Search, Upload, X } from 'lucide-react';
@@ -58,10 +58,75 @@ function parseCsv(input: string): { rows: ImportRow[]; errors: string[] } {
   return { rows, errors };
 }
 
-function Overlay({ children, onClose }: { children: ReactNode; onClose?: () => void }) {
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true">
+function Overlay({
+  children,
+  onClose,
+  labelledBy,
+  describedBy,
+}: {
+  children: ReactNode;
+  onClose?: () => void;
+  labelledBy: string;
+  describedBy?: string;
+}) {
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const overlay = overlayRef.current;
+    if (!overlay) return undefined;
+    const focusableSelector = [
+      'a[href]',
+      'button:not([disabled])',
+      'input:not([disabled])',
+      'select:not([disabled])',
+      'textarea:not([disabled])',
+      '[tabindex]:not([tabindex="-1"])',
+    ].join(',');
+    const focusFirst = () => {
+      const first = overlay.querySelector<HTMLElement>(focusableSelector);
+      first?.focus();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && onCloseRef.current) {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = Array.from(overlay.querySelectorAll<HTMLElement>(focusableSelector));
+      if (!focusable.length) {
+        event.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    overlay.addEventListener('keydown', onKeyDown);
+    window.requestAnimationFrame(focusFirst);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      overlay.removeEventListener('keydown', onKeyDown);
+      previousFocus?.focus();
+    };
+  }, []);
+
+  return <div ref={overlayRef} className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby={labelledBy} aria-describedby={describedBy}>
     <Card className="max-h-[90vh] w-full max-w-3xl overflow-auto"><CardContent className="p-6">
-      {onClose && <button aria-label="Close" onClick={onClose} className="float-right rounded p-1 text-[var(--muted)] hover:text-[var(--text)]"><X size={18} /></button>}
+      {onClose && <button type="button" aria-label="Close dialog" onClick={onClose} className="float-right rounded p-1 text-[var(--muted)] hover:bg-[var(--panel-2)] hover:text-[var(--text)]"><X size={18} /></button>}
       {children}
     </CardContent></Card>
   </div>;
@@ -79,9 +144,9 @@ function CredentialsReveal({ credentials, onClose }: { credentials: IssuedCreden
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a'); link.href = url; link.download = 'defcon-credentials.csv'; link.click(); URL.revokeObjectURL(url);
   };
-  return <Overlay>
-    <h2 className="mb-2 text-lg font-semibold">Credentials — save these now</h2>
-    <p className="mb-4 text-sm text-[var(--bad)]">Passwords are shown only once and cannot be retrieved later.</p>
+  return <Overlay labelledBy="credentials-dialog-title" describedBy="credentials-dialog-description">
+    <h2 id="credentials-dialog-title" className="mb-2 text-lg font-semibold">Credentials — save these now</h2>
+    <p id="credentials-dialog-description" className="mb-4 text-sm text-[var(--bad)]">Passwords are shown only once and cannot be retrieved later.</p>
     <div className="mb-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => setVisible(allVisible ? [] : credentials.map((item) => item.participantId))}>{allVisible ? <EyeOff size={14} /> : <Eye size={14} />}{allVisible ? 'Hide all' : 'Reveal all'}</Button><Button size="sm" variant="outline" onClick={copyAll}>Copy all</Button><Button size="sm" variant="outline" onClick={() => window.print()}>Print</Button></div><div className="overflow-x-auto rounded border border-[var(--border)]"><Table><TableHeader><TableRow><TableHead>Participant</TableHead><TableHead>Username</TableHead><TableHead>Password</TableHead><TableHead /></TableRow></TableHeader><TableBody>
       {credentials.map((credential) => <TableRow key={credential.participantId}><TableCell>{credential.participantId}</TableCell><TableCell className="font-mono">{credential.username}</TableCell><TableCell><span className="font-mono">{visible.includes(credential.participantId) ? credential.password : '••••••••••••'}</span><button type="button" className="ml-2 rounded p-1 text-[var(--muted)] hover:text-[var(--accent)]" onClick={() => toggleVisible(credential.participantId)} aria-label={`${visible.includes(credential.participantId) ? 'Hide' : 'Reveal'} password for ${credential.username}`}>{visible.includes(credential.participantId) ? <EyeOff size={14} /> : <Eye size={14} />}</button></TableCell><TableCell><Button size="sm" variant="ghost" onClick={() => copy(`${credential.username}\t${credential.password}`)}>Copy</Button></TableCell></TableRow>)}
     </TableBody></Table></div>
@@ -109,9 +174,9 @@ function ImportDialog({ onClose, onCredentials }: { onClose: () => void; onCrede
     const file = event.target.files?.[0];
     if (file) file.text().then(setCsv).catch(() => setParsed({ rows: [], errors: ['Unable to read the selected file.'] }));
   };
-  return <Overlay onClose={onClose}>
-    <h2 className="mb-1 text-lg font-semibold">Import registered teams</h2>
-    <p className="mb-4 text-sm text-[var(--muted)]">CSV columns: <code>team_name,participants</code>. Separate participants with semicolons.</p>
+  return <Overlay onClose={onClose} labelledBy="import-dialog-title" describedBy="import-dialog-description">
+    <h2 id="import-dialog-title" className="mb-1 text-lg font-semibold">Import registered teams</h2>
+    <p id="import-dialog-description" className="mb-4 text-sm text-[var(--muted)]">CSV columns: <code>team_name,participants</code>. Separate participants with semicolons.</p>
     <div className="mb-3 flex items-center gap-2"><label className="inline-flex cursor-pointer items-center gap-2 rounded border border-[var(--border)] px-3 py-1.5 text-sm"><FileUp size={15} />Choose CSV<input type="file" accept=".csv,text/csv" className="hidden" onChange={fileSelected} /></label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={autoProvision} onChange={(event) => setAutoProvision(event.target.checked)} />Provision environments</label></div>
     <textarea value={csv} onChange={(event) => { setCsv(event.target.value); setParsed(null); setPreview(null); }} className="min-h-40 w-full rounded-lg border border-[var(--border)] bg-[var(--panel-2)] p-3 font-mono text-xs" spellCheck={false} />
     {parsed?.errors.length ? <div className="mt-3 space-y-1 text-sm text-[var(--bad)]">{parsed.errors.map((error) => <p key={error}>{error}</p>)}</div> : null}
@@ -129,9 +194,9 @@ function BulkDialog({ action, teams, onClose }: { action: 'start' | 'stop'; team
   const submit = () => bulk.mutate({ action, teamIds: teams.map((team) => team.id), ...(requiresConfirmation ? { confirm: confirmation } : {}) }, {
     onSuccess: (result) => { const accepted = result.results.filter((item) => item.status === 'accepted').length; const rejected = result.results.filter((item) => item.status === 'rejected').length; toast.success(`${accepted} accepted, ${result.results.length - accepted - rejected} no-op, ${rejected} rejected`); onClose(); },
   });
-  return <Overlay onClose={onClose}>
-    <h2 className="mb-2 text-lg font-semibold">{action === 'start' ? 'Start' : 'Stop'} selected environments?</h2>
-    <p className="text-sm text-[var(--muted)]">This will process {teams.length} selected team(s) independently using the same single-team rules.</p>
+  return <Overlay onClose={onClose} labelledBy="bulk-dialog-title" describedBy="bulk-dialog-description">
+    <h2 id="bulk-dialog-title" className="mb-2 text-lg font-semibold">{action === 'start' ? 'Start' : 'Stop'} selected environments?</h2>
+    <p id="bulk-dialog-description" className="text-sm text-[var(--muted)]">This will process {teams.length} selected team(s) independently using the same single-team rules.</p>
     {action === 'stop' && <p className="mt-2 text-sm text-[var(--warn)]">Environments are retained; active terminal sessions will end.</p>}
     {requiresConfirmation && <label className="mt-4 block text-sm">Type <strong>{expected}</strong> to confirm<Input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} className="mt-1" /></label>}
     {bulk.error && <p className="mt-3 text-sm text-[var(--bad)]">{bulk.error.message}</p>}
@@ -196,7 +261,7 @@ export default function TeamsPage() {
       {selectedTeams.length > 0 && <div className="mb-4 flex items-center justify-between rounded border border-[var(--accent)] bg-[var(--panel-2)] p-3 text-sm"><span>{selectedTeams.length} selected</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setBulkAction('start')}>Start selected</Button><Button size="sm" variant="outline" onClick={() => setBulkAction('stop')}>Stop selected</Button><Button size="sm" variant="ghost" onClick={() => setSelected([])}>Clear</Button></div></div>}
       {!page?.items.length ? <div className="py-12 text-center text-sm text-[var(--muted)]">{term || state || healthFilter || accountFilter ? 'No teams match these filters' : 'No teams yet'}</div> : <><Table><TableHeader><TableRow><TableHead><input type="checkbox" aria-label="Select visible teams" checked={allVisibleSelected} onChange={toggleAll} /></TableHead><TableHead>Team</TableHead><TableHead>State</TableHead><TableHead>Health</TableHead><TableHead>Participants</TableHead><TableHead>Account</TableHead><TableHead>Updated</TableHead></TableRow></TableHeader><TableBody>{page.items.map((team) => <TableRow key={team.id}><TableCell><input type="checkbox" aria-label={`Select ${team.id}`} checked={selected.includes(team.id)} onChange={() => toggleTeam(team.id)} /></TableCell><TableCell><Link href={`/teams/${team.id}`} className="block hover:text-[var(--accent)]"><div className="font-mono text-xs text-[var(--muted)]">{team.id}</div><div className="font-medium">{team.name}</div></Link></TableCell><TableCell><StateBadge state={team.lifecycleState} size="sm" /></TableCell><TableCell><HealthBadge health={team.health} size="sm" /></TableCell><TableCell>{team.participantCount}</TableCell><TableCell><span className={team.accountStatus === 'active' ? 'text-[var(--ok)]' : 'text-[var(--warn)]'}>{team.accountStatus === 'active' ? 'Active' : 'Suspended'}</span></TableCell><TableCell><RelativeTime ts={team.updatedAt} className="text-xs text-[var(--muted)]" /></TableCell></TableRow>)}</TableBody></Table><div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-3 text-xs text-[var(--muted)]"><span>Page {page.page} of {Math.max(1, Math.ceil(page.total / page.pageSize))}</span><div className="flex gap-2"><Button size="sm" variant="outline" disabled={page.page <= 1} onClick={() => setPageNumber((value) => Math.max(1, value - 1))}>Previous</Button><Button size="sm" variant="outline" disabled={page.page * page.pageSize >= page.total} onClick={() => setPageNumber((value) => value + 1)}>Next</Button></div></div></>}
     </CardContent></Card>
-    {showCreate && <Overlay onClose={() => setShowCreate(false)}><h2 className="text-lg font-semibold">Create team</h2><p className="mt-1 text-sm text-[var(--muted)]">Credentials are shown once after the team is created.</p><label className="mt-4 block text-sm">Team name<Input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} autoFocus /></label><label className="mt-3 block text-sm">Notes<textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} className="mt-1 min-h-20 w-full rounded-lg border border-[var(--border)] bg-[var(--panel-2)] p-2" /></label><label className="mt-3 block text-sm">Participants <span className="text-xs text-[var(--muted)]">(one name per line, up to 8)</span><textarea value={participantNames} onChange={(e) => setParticipantNames(e.target.value)} className="mt-1 min-h-24 w-full rounded-lg border border-[var(--border)] bg-[var(--panel-2)] p-2 text-sm" /></label><label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={autoProvision} onChange={(e) => setAutoProvision(e.target.checked)} /> Provision environment now</label>{create.error && <p role="alert" className="mt-3 text-sm text-[var(--bad)]">{create.error.message}</p>}<div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button><Button onClick={submit} disabled={!name.trim() || create.isPending}>{create.isPending ? 'Creating…' : 'Create team'}</Button></div></Overlay>}
+    {showCreate && <Overlay onClose={() => setShowCreate(false)} labelledBy="create-dialog-title" describedBy="create-dialog-description"><h2 id="create-dialog-title" className="text-lg font-semibold">Create team</h2><p id="create-dialog-description" className="mt-1 text-sm text-[var(--muted)]">Credentials are shown once after the team is created.</p><label className="mt-4 block text-sm">Team name<Input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} autoFocus /></label><label className="mt-3 block text-sm">Notes<textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} className="mt-1 min-h-20 w-full rounded-lg border border-[var(--border)] bg-[var(--panel-2)] p-2" /></label><label className="mt-3 block text-sm">Participants <span className="text-xs text-[var(--muted)]">(one name per line, up to 8)</span><textarea value={participantNames} onChange={(e) => setParticipantNames(e.target.value)} className="mt-1 min-h-24 w-full rounded-lg border border-[var(--border)] bg-[var(--panel-2)] p-2 text-sm" /></label><label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={autoProvision} onChange={(e) => setAutoProvision(e.target.checked)} /> Provision environment now</label>{create.error && <p role="alert" className="mt-3 text-sm text-[var(--bad)]">{create.error.message}</p>}<div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button><Button onClick={submit} disabled={!name.trim() || create.isPending}>{create.isPending ? 'Creating…' : 'Create team'}</Button></div></Overlay>}
     {showImport && <ImportDialog onClose={() => setShowImport(false)} onCredentials={handleImport} />}
     {bulkAction && <BulkDialog action={bulkAction} teams={selectedTeams} onClose={() => { setBulkAction(null); setSelected([]); }} />}
     {credentials && <CredentialsReveal credentials={credentials} onClose={() => setCredentials(null)} />}
