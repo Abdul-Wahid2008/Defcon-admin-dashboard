@@ -2,7 +2,7 @@ import 'server-only';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DB_PATH } from '../config';
+import { loadConfig } from '../config';
 
 type SqliteValue = string | number | bigint | Buffer | null;
 type SqliteParam = SqliteValue | SqliteValue[];
@@ -12,7 +12,7 @@ function normalizeParams(params: SqliteParam[]): SqliteValue[] {
 }
 
 // Use a single connection throughout the app
-const db = new Database(DB_PATH);
+const db = new Database(loadConfig().dbPath);
 
 // Essential SQLite settings for consistency and performance
 db.pragma('journal_mode = WAL');

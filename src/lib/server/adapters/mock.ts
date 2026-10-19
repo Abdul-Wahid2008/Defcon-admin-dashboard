@@ -21,7 +21,7 @@ import {
   Service,
 } from './types';
 import { SERVICES_MANIFEST, SERVICES_PER_TEAM } from './mock/services.manifest';
-import { MOCK_DURATIONS } from '../../config';
+import { MOCK_DURATIONS, loadConfig } from '../../config';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 
@@ -642,7 +642,7 @@ export class MockAdapter implements EnvironmentAdapter {
     }
 
     const nowTs = this.now();
-    const scale = parseFloat(process.env.MOCK_DURATION_SCALE || '1');
+    const scale = loadConfig().mockDurationScale;
     const duration = Math.round((MOCK_DURATIONS[action] || 3000) * scale);
     const endsAt = new Date(new Date(nowTs).getTime() + duration).toISOString();
 
