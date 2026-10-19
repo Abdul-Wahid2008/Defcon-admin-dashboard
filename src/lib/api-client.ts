@@ -295,7 +295,7 @@ export async function apiUpdateSettings(patch: { competitionStatus?: string }) {
 export async function apiDemoInject(body: {
   teamId: string; serviceKey: string; checkType: string; mode: 'fail' | 'clear'; detail?: string;
 }) {
-  const res = await fetch('/api/_demo/inject', {
+  const res = await fetch('/api/demo/inject', {
     method: 'POST',
     headers: defaultHeaders(),
     body: JSON.stringify(body),
@@ -305,7 +305,7 @@ export async function apiDemoInject(body: {
 }
 
 export async function apiDemoFailNext(body: { teamId: string; action: string }) {
-  const res = await fetch('/api/_demo/fail-next', {
+  const res = await fetch('/api/demo/fail-next', {
     method: 'POST',
     headers: defaultHeaders(),
     body: JSON.stringify(body),
@@ -315,7 +315,7 @@ export async function apiDemoFailNext(body: { teamId: string; action: string }) 
 }
 
 export async function apiDemoReseed() {
-  const res = await fetch('/api/_demo/reseed', {
+  const res = await fetch('/api/demo/reseed', {
     method: 'POST',
     headers: defaultHeaders(),
     body: JSON.stringify({ confirm: 'RESEED' }),

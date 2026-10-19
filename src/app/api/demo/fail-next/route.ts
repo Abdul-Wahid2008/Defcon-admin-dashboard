@@ -4,6 +4,7 @@ import { getAdapter } from '@/lib/server/adapters';
 import { appendAudit } from '@/lib/server/audit';
 import { errorResponse, newRequestId, AppError } from '@/lib/server/errors';
 import { MockAdapter } from '@/lib/server/adapters/mock';
+import { loadConfig } from '@/lib/config';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
       throw new AppError('FORBIDDEN', 'Requires organizer_admin.');
     }
     const adapter = getAdapter();
-    if (process.env.DEMO_CONTROLS !== 'true' || adapter.mode !== 'mock') {
+    if (!loadConfig().demoControls || adapter.mode !== 'mock') {
       throw new AppError('NOT_FOUND', 'Demo controls not available.');
     }
     await sync();

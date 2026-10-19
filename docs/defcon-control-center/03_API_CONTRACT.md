@@ -217,11 +217,13 @@ No `PUT`/`PATCH`/`DELETE` exists for audit. Attempts return 404/405.
 
 Return **404** unless `DEMO_CONTROLS=true`, adapter is `mock`, and caller is `organizer_admin`. All audited.
 
+> Path change 19 Oct 2026 (v1.1): the canonical paths are `/api/demo/*`. They were previously specified as `/api/_demo/*`, but Next.js excludes underscore-prefixed (private) folders from routing, so the old paths were never reachable over HTTP. The folder was renamed and this contract updated in the same commit; request/response shapes are unchanged.
+
 | Method | Path | Body | Effect |
 |---|---|---|---|
-| POST | `/api/_demo/inject` | `{ teamId, serviceKey, checkType, mode: 'fail'|'clear', detail?: string }` | Forces a check to fail/clear → health recomputed, alert opened/resolved |
-| POST | `/api/_demo/fail-next` | `{ teamId, action: LifecycleAction | 'provision' }` | The next such transition ends in `failed` |
-| POST | `/api/_demo/reseed` | `{ teams?: number }` | Wipes mock tables (NOT the audit log) and reseeds; writes `demo.reseed` |
+| POST | `/api/demo/inject` | `{ teamId, serviceKey, checkType, mode: 'fail'|'clear', detail?: string }` | Forces a check to fail/clear → health recomputed, alert opened/resolved |
+| POST | `/api/demo/fail-next` | `{ teamId, action: LifecycleAction | 'provision' }` | The next such transition ends in `failed` |
+| POST | `/api/demo/reseed` | `{ teams?: number }` | Wipes mock tables (NOT the audit log) and reseeds; writes `demo.reseed` |
 
 ## 4. Route handler template (every handler follows this order)
 
@@ -254,6 +256,25 @@ export async function POST(req: Request, ctx: { params: { teamId: string } }) {
 | Checker verdicts | Latest verdict per service per team (OK / OFFLINE / MUMBLE / INTERNAL_ERROR + message) so we can map to reachability/functional checks (`04 §4.1`) |
 
 Anything the orchestrator cannot supply is shown as "not available" in the UI (`null` fields) rather than faked.
+
+## 5.1 Real-adapter handoff and evidence checklist
+
+The dashboard team must not implement a real adapter from prose alone. The club owner must provide sanitized examples and authorization for a disposable one-team test.
+
+| Contract item | Required handoff | Evidence before enabling the operation |
+|---|---|---|
+| Identity | Stable external team ID, display name, registration source | Same team maps consistently across two reads/imports |
+| Authentication | Service account method, scope, TLS/network path, rotation owner | Authenticated request succeeds without secret in logs |
+| Lifecycle | Verb/URL or command, request body, synchronous/asynchronous behavior | One-team success and typed failure fixture |
+| Completion | Job/status response, terminal states, timeout semantics | Poll reaches authoritative final state |
+| Reset | Exact patch/data/flag/score preservation behavior | Written confirmation from owner; otherwise action is unavailable |
+| Delete | Archive/resource semantics and recovery policy | Disposable-team test only; no full-set deletion |
+| Checks | Service key, check type, verdict, timestamp, detail | OK/OFFLINE/MUMBLE/INTERNAL_ERROR and unknown are tested |
+| Credentials | Issuer, one-time response, rotation and revocation | Plaintext redaction and invalidation verified |
+| Terminal | Authenticated team-scoped gateway and URL lifecycle | Cross-team access denied; unauthenticated URL rejected |
+| Resources | Limits, usage units, sampling time and missing-data behavior | Values map correctly or remain visibly unavailable |
+
+The adapter must return typed `ADAPTER_ERROR`/timeout results for unreachable dependencies. It must not convert missing data into healthy, running, successful or live-looking values. A partial mapping is reported as `PARTIAL` in `/api/meta`.
 
 
 ## 6. Change log
