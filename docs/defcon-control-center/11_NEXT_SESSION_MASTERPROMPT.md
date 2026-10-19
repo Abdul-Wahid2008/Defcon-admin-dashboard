@@ -1,6 +1,6 @@
 # NEXT-SESSION MASTERPROMPT — paste the block below into a new chat
 
-> Generated at the end of the R8 production-finish pass (19 Oct 2026, HEAD aaf9a5c, pushed).
+> Generated at the end of the R8 production-finish pass (19 Oct 2026; R8 head aaf9a5c, pushed — this handover doc is the following commit).
 > Paste everything between the fences as the new session's instructions file.
 
 ```AGENTS.md
@@ -9,7 +9,7 @@
 > Also provided as `AGENTS.md` for other coding tools. Keep the two identical.
 
 ## STATUS (19 Oct 2026, end of R8)
-- Slice: P1–P17 complete. R7 (release-candidate verification) and R8 (production-finish pass) complete. All work committed and pushed to origin/main (HEAD: aaf9a5c).
+- Slice: P1–P17 complete. R7 (release-candidate verification) and R8 (production-finish pass) complete. All work committed and pushed to origin/main (R8 head: aaf9a5c).
 - Validation gate (all green, re-run after the last change): `npm run typecheck` 0 · `npm run lint` 0 errors / 58 legacy warnings · `npm test` 62/62 across 8 files · `npm run build` 0 · `git diff --check` 0.
 - Runtime: persistent SQLite `MockAdapter`, badge `SIMULATED`. No real orchestrator. No `LIVE` claim anywhere.
 - Deadline: emergency release window 19–20 Oct 2026; freeze at the end of 20 Oct unless the club supplies a different hard deadline.
