@@ -3,19 +3,21 @@
 > Also provided as `AGENTS.md` for other coding tools. Keep the two identical.
 
 ## STATUS (update at the end of every work session)
-- Date/slice: 18 Oct 2026 — P17 complete; usability/accessibility feature pass complete; authenticated browser QA remains manual.
+- Date/slice: 19 Oct 2026 — P17 complete; R7 verification and R8 production-finish pass complete; emergency two-day release and real-control decision gate active.
 - Done: P1–P17, including ordered CSV import, dry-run preview, one-time credential reveal, and typed-confirmation bulk start/stop.
-- Known bugs: Tailwind v4/Turbopack emits three non-blocking CSS parser warnings; legacy explicit-`any` warnings remain; Docker Compose smoke test still needs the club template/runtime; full authenticated browser visual/keyboard QA is still manual.
-- Security hardening: SESSION_SECRET is required and must be at least 32 characters; login redirects accept same-origin paths only; state-changing API requests require a same-origin Origin header.
+- R7 evidence (19 Oct): typecheck/lint/tests (58)/build green; local production rehearsal on a temporary DB verified 401/403 shapes, same-origin enforcement, operator delete denial audit, idempotent replay, correlation IDs, restart-during-pending lazy completion, and a full SQLite backup/restore drill; runtime remains `SIMULATED`, no orchestrator implemented, no `LIVE` claim.
+- R8 evidence (19 Oct): demo handlers moved to the routable folder `src/app/api/demo/` (endpoints `/api/demo/*`; `docs/03` §3.9 updated in the same pass) with 4 new fail-closed tests (62 total); release-config HTTP probes verified 401 unauthenticated / 403 operator / 404 admin-with-demo-controls-off / 403 cross-origin on all three endpoints; AC-08 failure beat verified end-to-end over HTTP in mock dev mode (fail-next → reset 202 → polled `failed` → `action_failed` alert → `env.reset/failure` audit row); authenticated headless-Chrome QA passed (login → overview → teams, 24 rows, zero console errors/exceptions); hazard found: a local `.env` with `DEMO_CONTROLS=true` makes `next start` fail closed with 500s — release deployments must ship `DEMO_CONTROLS=false`.
+- Known bugs: Tailwind v4/Turbopack emits non-blocking CSS parser warnings (observed in earlier builds; not reproduced in R7's cached builds); legacy explicit-`any` warnings remain; Docker/real smoke needs the club template/runtime and named authorization; keyboard/screen-reader accessibility QA remains manual (authenticated headless-Chrome visual/console QA passed in R8).
+- Security hardening: typed startup configuration now requires SESSION_SECRET (32+ characters), durable production DB_PATH, and supported adapter configuration; login redirects accept same-origin paths only; state-changing API requests require a same-origin Origin header.
 - UI hardening: semantic `--accent` and `--muted` tokens must not be redefined as surface colors; use dedicated surface tokens for Tailwind mappings.
 - Decisions made since blueprint: default remains the persistent SQLite `MockAdapter` (`SIMULATED`); Docker Compose remains opt-in and `PARTIAL`; import credentials are cleared when the reveal dialog closes.
-- Deadline: docs assumption — feature freeze 20 Oct 2026, rehearsal 21 Oct, emergency buffer 22 Oct.
+- Deadline: emergency release window 19–20 Oct 2026; freeze at the end of 20 Oct unless the club supplies a different hard deadline.
 
 ## What this is
-Organizer-facing admin dashboard + team environment control panel for **DEFCON 2.0** (Technozion, NIT Warangal, ham arc club). Manages 20–30 teams: team CRUD, participant credentials, start/stop/reset/delete of environments, service health, alerts, resource usage, append-only audit log, overview. The club's real orchestrator does not exist yet → we run a **persistent mock backend** (SQLite state machine) behind an `EnvironmentAdapter`; the UI always shows a SIMULATED/LIVE badge from `/api/meta`.
+Organizer-facing admin dashboard + team environment control panel for **DEFCON 2.0** (Technozion, NIT Warangal, ham arc club). Manages 20–30 teams: team CRUD, participant credentials, start/stop/reset/delete of environments, service health, alerts, resource usage, append-only audit log, overview. The club's real orchestrator is not verified in this repository → we run a **persistent mock backend** (SQLite state machine) behind an `EnvironmentAdapter`; the UI always shows a SIMULATED/PARTIAL/LIVE badge from `/api/meta`. Real control is enabled only after the one-team evidence gate.
 
 ## Read first, in this order
-`docs/01_BLUEPRINT.md` → `docs/02_SPEC_DIGEST.md` → the doc for your slice: `03` API, `04` data/rules, `05` UI, `06` plan, `07` prompts, `08` tests/demo. The spec PDF is in `docs/`. Spec > club lead's written decisions > blueprint > your ideas.
+`docs/01_BLUEPRINT.md` → `docs/02_SPEC_DIGEST.md` → `docs/10_INTEGRATION_COORDINATION_PLAN.md` → the doc for your slice: `03` API, `04` data/rules, `05` UI, `06` plan, `07` prompts, `08` tests/demo. The spec PDF is in `docs/`. Spec > club lead's written decisions > blueprint > your ideas.
 
 ## Stack
 Next.js (App Router, TypeScript strict), Tailwind + shadcn/ui, TanStack Query, zod, SQLite (`better-sqlite3`), `bcryptjs`, `jose`, Recharts, lucide-react, sonner, Vitest. No other UI kit, ORM, state library, WebSocket, or external service without asking.

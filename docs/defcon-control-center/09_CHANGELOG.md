@@ -44,3 +44,21 @@ Spec newer than v1.2? · One container per team or attackbox + tunnel + services
 ## 6. Observation on the pasted compose snippet
 
 As pasted it is not valid compose (`tunnel:` is not nested under `services:`; `restart` and `command` are mis-indented) — likely a paste artefact. Whoever packages it should run `docker compose config`. Also verify Cloudflare's current limits for quick tunnels before relying on 20–30 of them for four hours; they are documented as a testing feature.
+
+## 7. v1.2 — emergency two-day release and integration gate (19 Oct 2026)
+
+The official PDF was re-read against the current implementation and the requested five-day plan was superseded because P1–P17 are complete and the remaining deadline is approximately two days. The project now separates:
+
+- a guaranteed dashboard release using the persistent SQLite `MockAdapter`;
+- an optional real-control track that requires a club-supplied contract and one-team evidence;
+- external game-server/checker, service, terminal/network and registration responsibilities that this repository must consume, not reimplement.
+
+The new plan is in `06_BUILD_PLAN_5_DAYS.md` despite retaining the historical filename so existing references do not break. The new coordination and handoff contract is in `10_INTEGRATION_COORDINATION_PLAN.md`. `07` now contains R1–R8 master prompts for contract lock, configuration, reconciliation, one-team adapter integration, checker mapping, credential/terminal security, deployment gates and final freeze.
+
+The release badge rules are now explicit:
+
+- `SIMULATED`: no trusted real contract or insufficient evidence;
+- `PARTIAL`: some real operations are proven but critical operations remain unavailable/unverified;
+- `LIVE`: every environment-affecting operation is real, permissioned, observable and recoverable.
+
+No group-chat claim overrides the PDF. In particular, the pasted `attackbox`/`ttyd`/quick-tunnel design cannot be accepted as production-safe without authentication, team scoping, network isolation and confirmation of the PDF's exactly-one-container rule.
