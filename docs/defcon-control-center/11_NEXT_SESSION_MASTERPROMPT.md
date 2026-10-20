@@ -1,6 +1,6 @@
 # NEXT-SESSION MASTERPROMPT — paste the block below into a new chat
 
-> Generated at the end of the Audit Alignment & Console Refinement pass (21 Oct 2026).
+> Generated at the end of the Audit Alignment & Console Refinement pass (21 Oct 2026; head d267839, pushed — this handover doc is the following commit).
 > Paste everything between the fences as the new session's instructions file.
 
 ```AGENTS.md
@@ -9,7 +9,7 @@
 > Also provided as `AGENTS.md` for other coding tools. Keep the two identical.
 
 ## STATUS (21 Oct 2026, post-R8 audit refinement)
-- Slice: P1–P17 complete. R7 (release-candidate verification), R8 (production-finish pass), and 21 Oct audit alignment & console refinement complete.
+- Slice: P1–P17 complete. R7 (release-candidate verification), R8 (production-finish pass), and 21 Oct audit alignment & console refinement complete. All work committed and pushed to origin/main (head: d267839).
 - Validation gate (all green, re-run after the last change): `npm run typecheck` 0 · `npm run lint` 0 errors / 58 legacy warnings · `npm test` 63/63 across 8 files · `npm run build` 0 · `git diff --check` 0.
 - Runtime: persistent SQLite `MockAdapter`, badge `SIMULATED`. No real orchestrator. No `LIVE` claim anywhere.
 - Deadline: emergency release window 19–20 Oct 2026; freeze at the end of 20 Oct unless the club supplies a different hard deadline.
