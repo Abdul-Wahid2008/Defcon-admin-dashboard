@@ -8,12 +8,12 @@ This status uses the canonical P1–P17 slices from `07_CLAUDE_CODE_PLAYBOOK.md 
 
 Files changed in this pass:
 - `src/lib/server/services/audit.ts`: Unified `buildAuditWhere` across `queryAudit` and `exportAuditCsv`. Bare action tokens act as group prefixes (`env` matches `env.*`), while dotted tokens match exact actions (`env.stop`). Team filter matches `target_id = ?` as well as participant targets belonging to that team (`target_id IN (SELECT id FROM participants WHERE team_id = ?)`). Actor filter supports `actor=system` (`actor_role = 'system'`).
-- `src/app/(console)/teams/[teamId]/page.tsx`: Fixed Activity tab query parameter (`useAudit({ team: teamId })` instead of ignored `teamId`).
+- `src/app/(console)/teams/[teamId]/page.tsx`: Fixed Activity tab query parameter (`useAudit({ team: teamId })`); encapsulated `TeamDetailsForm` with controlled name and notes editing, live save validation, and feedback toasts without React cascading renders.
 - `src/app/(console)/audit/page.tsx`: Full interactive audit explorer interface with date range selector, actor filter, team filter, action category chips, outcome chips, "hide requested rows" toggle, clickable team links, friendly action descriptions, and paginated navigation with count summaries.
 - `src/components/console/DashboardPrimitives.tsx`: Added `CopyableId` helper to easily copy Request and Correlation IDs.
 - `docs/defcon-control-center/03_API_CONTRACT.md`: Documented action-filter group prefix semantics, team participant mapping, and CSV export equivalence.
 - `tests/release-gates.test.ts`: Added release-gate test verifying group prefix matching, exact action code matching, participant-to-team mapping, CSV export row and header consistency, and forbidden non-admin/operator role rejection. Total tests: 63 across 8 files.
-- `CLAUDE.md`, `AGENTS.md`: Updated STATUS section with 21 Oct validation records.
+- `CLAUDE.md`, `AGENTS.md`, `docs/defcon-control-center/11_NEXT_SESSION_MASTERPROMPT.md`: Updated STATUS section with 21 Oct validation records and latest commit references.
 
 Validation results:
 - `npm run typecheck`: clean (0 errors)
