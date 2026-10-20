@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type React from 'react';
-import { AlertCircle, CheckCircle2, Clock3, Minus, RefreshCw, XCircle, CircleHelp, CircleX, ShieldCheck } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock3, Copy, Minus, RefreshCw, XCircle, CircleHelp, CircleX, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { HealthBadge } from '@/components/status/HealthBadge';
@@ -71,6 +71,10 @@ export function PageHeader({ title, description, updatedAt, onRefresh, refreshin
   return <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-[var(--border)] pb-5"><div className="min-w-0"><h1 className="text-2xl font-semibold tracking-tight">{title}</h1>{description && <p className="mt-1 text-sm text-[var(--muted)]">{description}</p>}{updatedAt && <p className="mt-2 text-xs text-[var(--muted)]">Last sync <RelativeTime ts={updatedAt} /></p>}</div><div className="flex items-center gap-2">{children}{onRefresh && <Button variant="outline" size="icon" aria-label="Refresh" onClick={onRefresh} disabled={refreshing}><RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} /></Button>}</div></div>;
 }
 
+function CopyableId({ label, value }: { label: string; value: string | null }) {
+  return <span className="inline-flex items-center gap-1">{label}: <code>{value ?? '—'}</code>{value && <button type="button" aria-label={`Copy ${label.toLowerCase()} id`} className="rounded p-1 text-[var(--muted)] hover:text-[var(--accent)]" onClick={() => navigator.clipboard.writeText(value)}><Copy size={11} className="inline" /></button>}</span>;
+}
+
 export function AuditEntryDetails({ entry }: { entry: AuditEntry }) {
-  return <div className="space-y-3 bg-[var(--bg)] p-3 text-xs"><pre className="max-h-48 overflow-auto whitespace-pre-wrap font-mono text-[var(--muted)]">{entry.details ? JSON.stringify(entry.details, null, 2) : 'No details'}</pre><div className="flex flex-wrap gap-4 text-[var(--muted)]"><span>Request: <code>{entry.requestId ?? '—'}</code></span><span>Correlation: <code>{entry.correlationId ?? '—'}</code></span><span title={entry.ts}>ISO: {formatTimestamp(entry.ts)}</span></div></div>;
+  return <div className="space-y-3 bg-[var(--bg)] p-3 text-xs"><pre className="max-h-48 overflow-auto whitespace-pre-wrap font-mono text-[var(--muted)]">{entry.details ? JSON.stringify(entry.details, null, 2) : 'No details'}</pre><div className="flex flex-wrap gap-4 text-[var(--muted)]"><CopyableId label="Request" value={entry.requestId} /><CopyableId label="Correlation" value={entry.correlationId} /><span title={entry.ts}>ISO: {formatTimestamp(entry.ts)}</span></div></div>;
 }

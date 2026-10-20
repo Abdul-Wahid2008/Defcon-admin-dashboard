@@ -205,6 +205,8 @@ Plaintext passwords exist **only** in these create/rotate responses. The UI show
 | Method | Path | Perm | Notes |
 |---|---|---|---|
 | GET | `/api/audit` | `audit.read` | Query: `actor` (user id or `system`), `action` (comma list), `team` (target id), `outcome` (comma list), `from`, `to` (ISO), `q` (substring of message), `page`, `pageSize` (default 50, max 200). Sorted newest first. → `Page<AuditEntry>` |
+
+Action-filter matching (clarified 21 Oct 2026): each `action` token containing a dot is an exact audit code (`env.start`); a bare token is a **group prefix** matching every code in that group (`env` → `env.provision`, `env.start`, …). The UI's grouped multi-select sends bare group names, so this is the primary mode. `team` matches rows whose target is that team **plus** rows whose target is one of its participants (participant/credential actions audit with the participant id as target). `actor=system` matches `actor_role='system'`. `export.csv` applies the identical filter semantics (shared builder in the service).
 | GET | `/api/audit/export.csv` | `audit.read` | P1 (promoted). Same filters, streams CSV, capped at 10 000 rows. |
 
 No `PUT`/`PATCH`/`DELETE` exists for audit. Attempts return 404/405.

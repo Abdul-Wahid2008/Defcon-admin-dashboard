@@ -33,6 +33,7 @@ import {
 } from '../src/lib/server/services/teams';
 import { getOverview } from '../src/lib/server/services/overview';
 import { sync } from '../src/lib/server/services/sync';
+import { queryAudit, exportAuditCsv } from '../src/lib/server/services/audit';
 import { GET as getMeta } from '../src/app/api/meta/route';
 
 const admin: SessionUser = {
@@ -336,4 +337,39 @@ describe('service release gates', () => {
     expect(requested?.correlation_id).toBeTruthy();
     expect(success?.correlation_id).toBe(requested?.correlation_id);
   }, 10_000);
+
+  it('applies group prefix, participant mapping, and CSV consistency to audit queries', async () => {
+    // 1. Group prefix 'env' matches both env.start and env.stop actions
+    const groupResult = queryAudit(admin, { team: teamId, action: ['env'] });
+    expect(groupResult.items.length).toBeGreaterThanOrEqual(2);
+    expect(groupResult.items.every((item) => item.action.startsWith('env.'))).toBe(true);
+
+    // 2. Exact code 'env.stop' matches only stop actions
+    const exactResult = queryAudit(admin, { team: teamId, action: ['env.stop'] });
+    expect(exactResult.items.every((item) => item.action === 'env.stop')).toBe(true);
+    expect(exactResult.items.length).toBe(2); // requested and success
+
+    // 3. Team filter includes actions targeting the team's participants
+    const participant = dbHelper.get<{ id: string }>('SELECT id FROM participants WHERE team_id = ?', teamId);
+    expect(participant?.id).toBeTruthy();
+    if (participant) {
+      dbHelper.run(
+        `INSERT INTO audit_log (ts, actor_name, actor_role, action, target_type, target_id, outcome, message)
+         VALUES (datetime('now'), 'admin', 'organizer_admin', 'credential.rotate', 'participant', ?, 'success', 'Rotated creds')`,
+        participant.id,
+      );
+      const teamAudit = queryAudit(admin, { team: teamId, action: ['credential'] });
+      expect(teamAudit.items.some((item) => item.targetId === participant.id)).toBe(true);
+    }
+
+    // 4. exportAuditCsv mirrors the same filter and row count
+    const csv = exportAuditCsv(admin, { team: teamId, action: ['env.stop'] });
+    const lines = csv.trim().split('\n');
+    expect(lines[0]).toBe('id,ts,actor_name,actor_role,action,target_type,target_id,outcome,message,request_id,correlation_id');
+    expect(lines.length - 1).toBe(exactResult.items.length);
+
+    // 5. Unauthorized role without audit.read is rejected
+    const teamUser: SessionUser = { id: 'u_team', username: 'team', displayName: 'Team', role: 'team' };
+    expect(() => queryAudit(teamUser, {})).toThrow('Insufficient permissions.');
+  });
 });

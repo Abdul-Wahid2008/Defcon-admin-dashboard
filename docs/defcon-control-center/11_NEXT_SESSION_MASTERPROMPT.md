@@ -1,6 +1,6 @@
 # NEXT-SESSION MASTERPROMPT — paste the block below into a new chat
 
-> Generated at the end of the R8 production-finish pass (19 Oct 2026; R8 head aaf9a5c, pushed — this handover doc is the following commit).
+> Generated at the end of the Audit Alignment & Console Refinement pass (21 Oct 2026).
 > Paste everything between the fences as the new session's instructions file.
 
 ```AGENTS.md
@@ -8,9 +8,9 @@
 
 > Also provided as `AGENTS.md` for other coding tools. Keep the two identical.
 
-## STATUS (19 Oct 2026, end of R8)
-- Slice: P1–P17 complete. R7 (release-candidate verification) and R8 (production-finish pass) complete. All work committed and pushed to origin/main (R8 head: aaf9a5c).
-- Validation gate (all green, re-run after the last change): `npm run typecheck` 0 · `npm run lint` 0 errors / 58 legacy warnings · `npm test` 62/62 across 8 files · `npm run build` 0 · `git diff --check` 0.
+## STATUS (21 Oct 2026, post-R8 audit refinement)
+- Slice: P1–P17 complete. R7 (release-candidate verification), R8 (production-finish pass), and 21 Oct audit alignment & console refinement complete.
+- Validation gate (all green, re-run after the last change): `npm run typecheck` 0 · `npm run lint` 0 errors / 58 legacy warnings · `npm test` 63/63 across 8 files · `npm run build` 0 · `git diff --check` 0.
 - Runtime: persistent SQLite `MockAdapter`, badge `SIMULATED`. No real orchestrator. No `LIVE` claim anywhere.
 - Deadline: emergency release window 19–20 Oct 2026; freeze at the end of 20 Oct unless the club supplies a different hard deadline.
 - Decision gate: real control is enabled only after the one-team evidence gate with the club's orchestrator (docs/10).
@@ -19,7 +19,7 @@
 Organizer-facing admin dashboard + team environment control panel for DEFCON 2.0 (Technozion, NIT Warangal, ham arc club). 20–30 teams: team CRUD, participant credentials, start/stop/reset/delete of environments, service health, alerts, resource usage, append-only audit log, overview. The club's real orchestrator is not verified in this repository → we run a persistent mock backend (SQLite state machine) behind an `EnvironmentAdapter`; the UI always shows a SIMULATED/PARTIAL/LIVE badge from `/api/meta`.
 
 ## Read first, in this order
-`docs/01_BLUEPRINT.md` → `docs/02_SPEC_DIGEST.md` → `docs/10_INTEGRATION_COORDINATION_PLAN.md` → the doc for your slice: `03` API, `04` data/rules, `05` UI, `06` plan, `07` prompts, `08` tests/demo. `docs/BUILD_STATUS.md` carries the full R7/R8 verification evidence. Spec PDF is in `docs/`. Spec > club lead's written decisions > blueprint > your ideas.
+`docs/01_BLUEPRINT.md` → `docs/02_SPEC_DIGEST.md` → `docs/10_INTEGRATION_COORDINATION_PLAN.md` → the doc for your slice: `03` API, `04` data/rules, `05` UI, `06` plan, `07` prompts, `08` tests/demo. `docs/BUILD_STATUS.md` carries the full R7/R8 and 21 Oct verification evidence. Spec PDF is in `docs/`. Spec > club lead's written decisions > blueprint > your ideas.
 
 ## Stack
 Next.js 16 (App Router, TypeScript strict), Tailwind v4 + shadcn/ui, TanStack Query, zod, SQLite (`better-sqlite3`), `bcryptjs`, `jose`, Recharts, lucide-react, sonner, Vitest. No other UI kit, ORM, state library, WebSocket, or external service without asking.
@@ -28,7 +28,7 @@ Next.js 16 (App Router, TypeScript strict), Tailwind v4 + shadcn/ui, TanStack Qu
 1. UI → `/api/*` only. Client code never imports `src/lib/server/**` (those files use `import 'server-only'`).
 2. Route handlers are thin: `requireUser` → `assertSameOrigin` → `services.sync()` → zod validate → service call → `errorResponse`. Order is fixed.
 3. Only the service layer touches the adapter; only `MockAdapter` touches mock tables; only `db.ts` opens SQLite.
-4. Canonical names live in `docs/03` (types, endpoints, errors) and `docs/04` (states, permissions, schema). Do not rename enums, states, endpoints or fields; if truly needed, update the doc in the same commit (precedent: `/api/_demo/*` → `/api/demo/*` in R8).
+4. Canonical names live in `docs/03` (types, endpoints, errors) and `docs/04` (states, permissions, schema). Do not rename enums, states, endpoints or fields; if truly needed, update the doc in the same commit.
 5. Lifecycle transitions follow `docs/04 §1` exactly. One pending transition per environment. Async transitions resolve lazily by timestamp (`resolveDue`), never with timers.
 6. Audit is append-only (DB triggers). Async actions write `requested` then a completion row with the same `correlation_id`. Denied requests write `denied` rows.
 7. Reset restores the latest accepted patch and must not touch `accepted_patch_version`, `last_deploy_*`, audit, flags/scores/app data. Stop retains. Delete archives the team and removes environment resources. The three are distinct.
@@ -67,7 +67,8 @@ Dark navy ops-console look (tokens in `docs/05 §1`). Status = colour + icon + t
 ## Verified evidence (do not re-verify blindly; re-run only what your change touches)
 - R7: production rehearsal on a temp DB — 401/403 shapes, same-origin enforcement, operator delete denial audit, idempotent replay, correlation IDs, restart-during-pending lazy completion, SQLite backup/restore drill.
 - R8: `/api/demo/*` renamed to the routable `src/app/api/demo/` (docs/03 §3.9 updated in the same commit); 4 fail-closure tests; release-config HTTP probes 401 unauthenticated / 403 operator / 403 cross-origin / 404 admin-with-demo-controls-off on all three endpoints; AC-08 failure beat end-to-end over HTTP in mock dev mode (fail-next → reset 202 → polled `failed` → `action_failed` alert → `env.reset/failure` audit row); authenticated headless-Chrome QA (login → overview → teams, 24 rows, zero console errors/exceptions).
-- Test totals history: 31 → 42 → 58 (R7) → 62 (R8) across 8 files.
+- 21 Oct: audit filtering unified across paginated query and CSV export (`buildAuditWhere` in `audit.ts`): group prefixes (`env` matches `env.*`), exact dot codes (`env.stop`), team filter matches both team and its participants' targets, `actor=system` matches `actor_role='system'`; team detail page activity tab correctly passes `team: teamId`; audit explorer UI with search, date range, actor, team, action chips, outcome chips, hide requested rows, clickable team links, and copyable IDs; release-gate test verifying the whole matrix passes.
+- Test totals history: 31 → 42 → 58 (R7) → 62 (R8) → 63 (21 Oct audit) across 8 files.
 
 ## Known bugs / limitations (current)
 - Tailwind v4/Turbopack emits non-blocking CSS parser warnings on cold builds (not reproduced on cached builds).
@@ -85,7 +86,7 @@ Dark navy ops-console look (tokens in `docs/05 §1`). Status = colour + icon + t
 - Track B/D (real control): blocked until the club provides the compose template/orchestrator contract + named authorization; then implement the one-team evidence gate and only flip the badge when every environment-affecting call is real and tested.
 
 ## When resuming after a tool/limit switch
-State: "Read AGENTS.md and docs/. We are on slice P<n> after R8. Last commit: <hash/message>." Then check `git status`, run `npm test`, and continue.
+State: "Read AGENTS.md and docs/. We are on slice P<n> after 21 Oct audit alignment. Last commit: <hash/message>." Then check `git status`, run `npm test`, and continue.
 ```
 
 ---

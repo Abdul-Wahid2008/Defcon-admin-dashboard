@@ -31,7 +31,9 @@ export default function TeamDetailPage() {
   const deleteMutation = useDeleteTeam();
   const health = useRunHealthChecks();
   const update = useUpdateTeam();
-  const audit = useAudit({ teamId });
+  // The API reads the `team` query param (docs/03 §3.7); `teamId` was silently
+  // ignored, so the Activity tab previously showed the global log.
+  const audit = useAudit({ team: teamId });
   const [tab, setTab] = useState('overview');
   const [editName, setEditName] = useState('');
   const [actionDialog, setActionDialog] = useState<ActionKind | null>(null);
