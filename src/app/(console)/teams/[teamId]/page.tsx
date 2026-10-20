@@ -19,6 +19,76 @@ import { formatTimestamp } from '@/lib/format';
 
 type ActionKind = 'start' | 'stop' | 'reset';
 
+function TeamDetailsForm({
+  team,
+  onUpdate,
+  isUpdating,
+  onOpenStatus,
+  onOpenDelete,
+}: {
+  team: { id: string; name: string; notes: string; accountStatus: string; createdAt: string; updatedAt: string };
+  onUpdate: (patch: { name?: string; notes?: string }) => void;
+  isUpdating: boolean;
+  onOpenStatus: () => void;
+  onOpenDelete: () => void;
+}) {
+  const [name, setName] = useState(team.name);
+  const [notes, setNotes] = useState(team.notes);
+
+  return (
+    <Card className="console-surface">
+      <CardHeader className="border-b border-[var(--border)]">
+        <CardTitle>Team details</CardTitle>
+      </CardHeader>
+      <CardContent className="max-w-xl space-y-4 pt-5">
+        <label className="block text-sm font-medium" htmlFor="team-name">
+          Team name
+          <Input
+            id="team-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={60}
+          />
+        </label>
+        <label className="block text-sm font-medium" htmlFor="team-notes">
+          Notes
+          <textarea
+            id="team-notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            maxLength={500}
+            className="mt-1 min-h-24 w-full rounded-lg border border-[var(--border)] bg-[var(--panel-2)] p-2 text-sm"
+            placeholder="Add operational notes or team contacts..."
+          />
+        </label>
+        <p className="text-xs text-[var(--muted)]">
+          Created {formatTimestamp(team.createdAt)} · Updated {formatTimestamp(team.updatedAt)}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            onClick={() => onUpdate({ name: name.trim(), notes: notes.trim() })}
+            disabled={!name.trim() || isUpdating || (name.trim() === team.name && notes.trim() === team.notes)}
+          >
+            {isUpdating ? 'Saving…' : 'Save details'}
+          </Button>
+          <Button variant="outline" onClick={onOpenStatus}>
+            {team.accountStatus === 'active' ? 'Suspend account' : 'Reactivate account'}
+          </Button>
+        </div>
+        <div className="rounded-lg border border-[var(--bad)]/30 p-4">
+          <h3 className="font-medium text-[var(--bad)]">Danger zone</h3>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Archive this team and remove its environment resources. Audit history is kept.
+          </p>
+          <Button className="mt-3" variant="destructive" onClick={onOpenDelete}>
+            Delete team
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function TeamDetailPage() {
   const { teamId } = useParams<{ teamId: string }>();
   const router = useRouter();
@@ -35,7 +105,6 @@ export default function TeamDetailPage() {
   // ignored, so the Activity tab previously showed the global log.
   const audit = useAudit({ team: teamId });
   const [tab, setTab] = useState('overview');
-  const [editName, setEditName] = useState('');
   const [actionDialog, setActionDialog] = useState<ActionKind | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmName, setConfirmName] = useState('');
@@ -141,7 +210,14 @@ export default function TeamDetailPage() {
 
       {tab === 'participants' && <Card className="console-surface"><CardHeader className="flex-row items-center justify-between border-b border-[var(--border)]"><CardTitle>Participants</CardTitle><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => rotateCredentials()} disabled={rotate.isPending || !participants.data?.length}><KeyRound size={14} />Rotate all</Button><Button size="sm" onClick={() => setParticipantDialog(true)} disabled={(participants.data?.length ?? 0) >= 8}><UserPlus size={14} />Add participant</Button></div></CardHeader><CardContent className="overflow-x-auto pt-4">{participants.data?.length ? <Table><TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Username</TableHead><TableHead>Credential</TableHead><TableHead>Status</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader><TableBody>{participants.data.map((person) => <TableRow key={person.id}><TableCell>{person.name}</TableCell><TableCell className="font-mono text-xs">{person.username} <button aria-label={`Copy ${person.username}`} className="ml-1 rounded p-1 text-[var(--muted)] hover:text-[var(--accent)]" onClick={() => navigator.clipboard.writeText(person.username)}><Copy size={12} className="inline" /></button></TableCell><TableCell>v{person.credentialVersion} · <RelativeTime ts={person.credentialIssuedAt} /></TableCell><TableCell><span className={person.active ? 'text-[var(--ok)]' : 'text-[var(--muted)]'}>{person.active ? 'Active' : 'Inactive'}</span></TableCell><TableCell><div className="flex gap-1"><Button size="sm" variant="ghost" onClick={() => rotateCredentials(person.id)} disabled={rotate.isPending}>Rotate</Button><Button size="sm" variant="ghost" onClick={() => remove.mutate({ teamId: team.id, participantId: person.id })} disabled={remove.isPending}>Remove</Button></div></TableCell></TableRow>)}</TableBody></Table> : <p className="py-8 text-center text-sm text-[var(--muted)]">No participants have been issued credentials.</p>}</CardContent></Card>}
       {tab === 'activity' && <Card className="console-surface"><CardHeader className="border-b border-[var(--border)]"><CardTitle>Activity</CardTitle></CardHeader><CardContent className="pt-2"><ActivityList entries={audit.data?.items ?? []} /></CardContent></Card>}
-      {tab === 'details' && <Card className="console-surface"><CardHeader className="border-b border-[var(--border)]"><CardTitle>Team details</CardTitle></CardHeader><CardContent className="max-w-xl space-y-4 pt-5"><label className="block text-sm font-medium" htmlFor="team-name">Team name<Input id="team-name" value={editName || team.name} onChange={(e) => setEditName(e.target.value)} /></label><label className="block text-sm font-medium" htmlFor="team-notes">Notes<textarea id="team-notes" defaultValue={team.notes} className="mt-1 min-h-24 w-full rounded-lg border border-[var(--border)] bg-[var(--panel-2)] p-2 text-sm" /></label><p className="text-xs text-[var(--muted)]">Created {formatTimestamp(team.createdAt)} · Updated {formatTimestamp(team.updatedAt)}</p><div className="flex flex-wrap gap-2"><Button onClick={() => update.mutate({ teamId: team.id, patch: { name: editName || team.name } })} disabled={!editName.trim() || update.isPending}>Save name</Button><Button variant="outline" onClick={() => setStatusDialog(team.accountStatus === 'active' ? 'suspended' : 'active')}>{team.accountStatus === 'active' ? 'Suspend account' : 'Reactivate account'}</Button></div><div className="rounded-lg border border-[var(--bad)]/30 p-4"><h3 className="font-medium text-[var(--bad)]">Danger zone</h3><p className="mt-1 text-sm text-[var(--muted)]">Archive this team and remove its environment resources. Audit history is kept.</p><Button className="mt-3" variant="destructive" onClick={() => setDeleteOpen(true)}>Delete team</Button></div></CardContent></Card>}
+      {tab === 'details' && <TeamDetailsForm
+        key={team.id}
+        team={team}
+        onUpdate={(patch) => update.mutate({ teamId: team.id, patch }, { onSuccess: () => toast.success('Team details updated') })}
+        isUpdating={update.isPending}
+        onOpenStatus={() => setStatusDialog(team.accountStatus === 'active' ? 'suspended' : 'active')}
+        onOpenDelete={() => setDeleteOpen(true)}
+      />}
 
       <Dialog open={!!actionDialog} onOpenChange={(open) => !open && setActionDialog(null)}>
         <DialogContent><DialogHeader><DialogTitle>{actionCopy?.title}</DialogTitle><DialogDescription>{actionCopy?.body}</DialogDescription></DialogHeader><DialogFooter><DialogClose render={<Button variant="outline" />}>Cancel</DialogClose><Button onClick={submitAction} disabled={action.isPending}>{action.isPending ? 'Working…' : actionCopy?.button}</Button></DialogFooter></DialogContent>
