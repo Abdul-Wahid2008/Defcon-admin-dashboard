@@ -3,7 +3,7 @@
 > Also provided as `AGENTS.md` for other coding tools. Keep the two identical.
 
 ## STATUS (update at the end of every work session)
-- Date/slice: 21 Oct 2026 — Post-R8 audit query alignment & console refinement pass complete; test suite at 63/63 passing. All work committed and pushed to origin/main (head: ab8f3c4).
+- Date/slice: 21 Oct 2026 — Post-R8 audit query alignment & console refinement pass complete; test suite at 63/63 passing. All work committed and pushed to origin/main (head: 5b61b5d).
 - Done: P1–P17, including ordered CSV import, dry-run preview, one-time credential reveal, typed-confirmation bulk start/stop, unified audit filtering, console audit explorer enhancements, and team details notes/name editing state refinement.
 - Audit unification & UI (21 Oct): `buildAuditWhere` in `audit.ts` unifies paginated queries and CSV export. Action tokens support group prefixes (`env` matches `env.*`) and exact dot codes (`env.stop`). Team filters match both the team target and participant targets belonging to that team. UI `/teams/[teamId]` activity tab correctly passes `team: teamId`. Audit Explorer UI has full filter controls (search, range, actor, team, action chips, outcome chips, hide requested rows), clickable target team links, and copyable Request/Correlation IDs. Team details tab provides controlled editing and saving of team names and operational notes.
 - R7 evidence (19 Oct): typecheck/lint/tests (58)/build green; local production rehearsal on a temporary DB verified 401/403 shapes, same-origin enforcement, operator delete denial audit, idempotent replay, correlation IDs, restart-during-pending lazy completion, and a full SQLite backup/restore drill; runtime remains `SIMULATED`, no orchestrator implemented, no `LIVE` claim.
