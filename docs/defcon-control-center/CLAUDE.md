@@ -3,11 +3,10 @@
 > Also provided as `AGENTS.md` for other coding tools. Keep the two identical.
 
 ## STATUS (update at the end of every work session)
-- Date/slice: 18 Oct 2026 — P17 complete; login visual/security hardening complete; real-browser QA remains.
-- Done: P1–P17, including ordered CSV import, dry-run preview, one-time credential reveal, and typed-confirmation bulk start/stop.
-- Known bugs: Tailwind v4/Turbopack emits three non-blocking CSS parser warnings; legacy explicit-`any` warnings remain; Docker Compose smoke test still needs the club template/runtime; browser visual/keyboard QA remains manual.
-- Security hardening: SESSION_SECRET is required and must be at least 32 characters; login redirects accept same-origin paths only.
-- Decisions made since blueprint: default remains the persistent SQLite `MockAdapter` (`SIMULATED`); Docker Compose remains opt-in and `PARTIAL`; import credentials are cleared when the reveal dialog closes.
+- Date/slice: 17 Oct 2026 — blueprint v1.1. **Done: P1 (schemas/config), P3 (permissions, 9 tests).** **Next: P1b (schema delta v1.1, `docs/09_CHANGELOG.md §2`), then P2 database + migration**, then P4 → P5 → P6. Slice names are those in `docs/07 §4` only (never invent a different roadmap).
+- Done: P1, P3
+- Known bugs: —
+- Decisions made since blueprint: v1.1 adds terminal endpoint, five services per environment (manifest), checker verdict mapping, conditional `DockerComposeAdapter` (gate G1) — see `docs/09_CHANGELOG.md`.
 - Deadline: ~5 days from 17 Oct 2026 (freeze end of Day 4 = 20 Oct). Confirm real date.
 
 ## What this is
@@ -32,6 +31,8 @@ Next.js (App Router, TypeScript strict), Tailwind + shadcn/ui, TanStack Query, z
 10. Time: store UTC ISO strings; adapter and tests use an injectable `now()` clock.
 11. Services per environment come from `adapters/mock/services.manifest.ts` (five by default, D14); never hard-code service names in UI or tests except through the manifest.
 12. Terminal URLs are sensitive: return/show them only in the team-detail response and page — never in lists, tiles, audit details, logs or exports.
+13. Config comes from a memoised `getConfig()` called inside handlers/services — never `loadConfig()` at module top level (an import-time throw escapes every try/catch and becomes a bare 500).
+14. Every route is wrapped in `withApi()`: errors are always JSON `{ error: { code, message, requestId } }` with the right status; unknown/config errors → generic 500 with no internals; detail is logged server-side with the requestId.
 
 ## Honesty rules
 - Badge from `/api/meta`; never hard-code LIVE. `SIMULATED` while mock; `PARTIAL` if mixed; `LIVE` only if every environment-affecting call is real and tested.

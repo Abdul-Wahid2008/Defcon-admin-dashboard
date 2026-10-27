@@ -43,7 +43,6 @@ P1 extras: ☐ credential rotate/revoke · ☐ suspend/reactivate · ☐ per-ser
 | Services | Every non-deleted environment has exactly the manifest services with two checks each; placeholder flags mirror the manifest (invariant 11) |
 | Terminal | `terminal.url` null unless running; fake `.invalid` host in mock; changes on restart; absent from list/overview/audit payloads (invariant 12) |
 | Checker mapping (A17) | Table-driven: OK / OFFLINE / MUMBLE / INTERNAL_ERROR → check statuses, derived health, alert kinds (`04 §4.1`) |
-| Configuration | Missing/short `SESSION_SECRET` fails; valid secret is accepted; unsupported adapter fails; real/docker-compose selection cannot silently fall back; demo controls/default passwords are disabled outside mock development |
 | Bulk / import (only if built) | Per-team rules reused; `START ALL`/`STOP ALL` required for ≥ 5; reset/delete rejected; CSV dry-run reports row errors; partial success |
 
 Inject a fake clock (`now()` provider) in the adapter so tests advance time without sleeping.
@@ -81,8 +80,6 @@ Single happy path mirroring the demo script, run against a freshly seeded DB wit
 
 **Optional failure beat (+30 s):** Settings → demo controls → "Make next reset fail" on a running team → reset → show red failure toast, `failed` state, new alert, failure audit row → reset again to recover. This demonstrates "report failures instead of faking success".
 
-> **Resolved (19 Oct 2026, R8):** the demo-control handlers previously lived under the Next.js private folder `_demo` and were excluded from routing in both `next dev` and `next start` (HTTP probe returned the HTML 404 page even with `DEMO_CONTROLS=true`). The folder is now `src/app/api/demo/`, so the endpoints are `/api/demo/inject`, `/api/demo/fail-next`, and `/api/demo/reseed`; `docs/03_API_CONTRACT.md` §3.9 was updated in the same commit. They remain fail-closed: 401 without a session, 403 for non-admins, and 404 unless `DEMO_CONTROLS=true` with the mock adapter. AC-08's failure beat is now runnable over HTTP and was verified end-to-end in R8: fail-next reset → reset 202 → polled `failed` → `action_failed` alert → `env.reset/failure` audit row.
-
 ## 4. Likely questions and honest answers
 
 | Question | Answer |
@@ -111,53 +108,3 @@ Single happy path mirroring the demo script, run against a freshly seeded DB wit
 ## 6. Pre-demo checklist (night before and 30 min before)
 
 ☐ Laptop charged, charger packed ☐ `.env` secrets changed from defaults ☐ `npm run reset-demo` done ☐ Both logins tested ☐ Browser zoom/window set ☐ Notifications muted ☐ Backup video + screenshots on a USB/phone ☐ Git tag `v1.0-freeze` pushed to a remote ☐ README open in a tab ☐ Contract doc ready to hand to the club ☐ Water.
-
-## 7. Emergency two-track operational gate
-
-### Track A — guaranteed dashboard release
-
-Run from a clean checkout on the target machine:
-
-1. Verify `SESSION_SECRET`, `DB_PATH`, `ADAPTER=mock`, disabled demo controls and durable storage.
-2. Run typecheck, lint, tests, build and `git diff --check`.
-3. Start production mode and verify login, `/api/meta`, overview, teams, audit and settings.
-4. Run the demo twice with an admin and operator session.
-5. Restart during a pending mock action and confirm lazy completion/audit consistency.
-6. Back up and restore the SQLite database.
-7. Leave two overview sessions polling for at least 60 minutes; record memory, browser console and audit growth.
-
-Track A is releasable only when the fallback is repeatable and the operator can explain that it is simulated.
-
-### Track B — real-control gate
-
-Run only with the club owner's authorization and one disposable team:
-
-| Gate | Required evidence |
-|---|---|
-| B1 identity | team ID/name maps to the authoritative registration source |
-| B2 auth | adapter authenticates with bounded timeout and redacted logs |
-| B3 read | detail includes lifecycle status and freshness |
-| B4 lifecycle | one approved action reaches the authoritative final state |
-| B5 failure | timeout/checker failure becomes visible `ADAPTER_ERROR`/failure, not success |
-| B6 permissions | operator cannot perform admin-only action at API level |
-| B7 audit | request/completion rows share correlation ID and correct outcome |
-| B8 health | service checker verdicts map to checks and alerts without unknown-to-healthy conversion |
-| B9 terminal | no unauthenticated or cross-team terminal access is exposed |
-| B10 recovery | restart/retry/backup procedure is documented and tested |
-
-Missing B4, B5, B6 or B9 means the release cannot be `LIVE`. Use `PARTIAL` only when the real subset is clearly documented; otherwise use `SIMULATED`.
-
-### Event-day command card
-
-```text
-1. Verify host, time, disk, process supervisor and network scope.
-2. Verify the release commit and adapter badge.
-3. Verify database backup path and free space.
-4. Log in as admin and operator; confirm role boundaries.
-5. Check overview freshness and open alerts.
-6. Test one harmless read/check operation.
-7. Do not change adapter mode during the competition.
-8. If the real adapter fails, stop claiming live control; follow the documented fallback/escalation path.
-9. Record incident time, team ID, request ID and correlation ID without recording secrets.
-10. After event, preserve audit/database artifacts and do not destroy team data before sign-off.
-```

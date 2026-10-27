@@ -107,7 +107,7 @@ interface AuditEntry {
   details: Record<string, unknown> | null;
 }
 type AuditAction =
-  | 'auth.login' | 'auth.login_failed' | 'auth.logout' | 'audit.access_denied'
+  | 'auth.login' | 'auth.login_failed' | 'auth.logout'
   | 'team.create' | 'team.update' | 'team.suspend' | 'team.reactivate' | 'team.delete'
   | 'env.provision' | 'env.start' | 'env.stop' | 'env.reset' | 'env.delete'
   | 'participant.add' | 'participant.remove' | 'credential.issue' | 'credential.rotate'
@@ -205,8 +205,6 @@ Plaintext passwords exist **only** in these create/rotate responses. The UI show
 | Method | Path | Perm | Notes |
 |---|---|---|---|
 | GET | `/api/audit` | `audit.read` | Query: `actor` (user id or `system`), `action` (comma list), `team` (target id), `outcome` (comma list), `from`, `to` (ISO), `q` (substring of message), `page`, `pageSize` (default 50, max 200). Sorted newest first. → `Page<AuditEntry>` |
-
-Action-filter matching (clarified 21 Oct 2026): each `action` token containing a dot is an exact audit code (`env.start`); a bare token is a **group prefix** matching every code in that group (`env` → `env.provision`, `env.start`, …). The UI's grouped multi-select sends bare group names, so this is the primary mode. `team` matches rows whose target is that team **plus** rows whose target is one of its participants (participant/credential actions audit with the participant id as target). `actor=system` matches `actor_role='system'`. `export.csv` applies the identical filter semantics (shared builder in the service).
 | GET | `/api/audit/export.csv` | `audit.read` | P1 (promoted). Same filters, streams CSV, capped at 10 000 rows. |
 
 No `PUT`/`PATCH`/`DELETE` exists for audit. Attempts return 404/405.
@@ -219,13 +217,11 @@ No `PUT`/`PATCH`/`DELETE` exists for audit. Attempts return 404/405.
 
 Return **404** unless `DEMO_CONTROLS=true`, adapter is `mock`, and caller is `organizer_admin`. All audited.
 
-> Path change 19 Oct 2026 (v1.1): the canonical paths are `/api/demo/*`. They were previously specified as `/api/_demo/*`, but Next.js excludes underscore-prefixed (private) folders from routing, so the old paths were never reachable over HTTP. The folder was renamed and this contract updated in the same commit; request/response shapes are unchanged.
-
 | Method | Path | Body | Effect |
 |---|---|---|---|
-| POST | `/api/demo/inject` | `{ teamId, serviceKey, checkType, mode: 'fail'|'clear', detail?: string }` | Forces a check to fail/clear → health recomputed, alert opened/resolved |
-| POST | `/api/demo/fail-next` | `{ teamId, action: LifecycleAction | 'provision' }` | The next such transition ends in `failed` |
-| POST | `/api/demo/reseed` | `{ teams?: number }` | Wipes mock tables (NOT the audit log) and reseeds; writes `demo.reseed` |
+| POST | `/api/_demo/inject` | `{ teamId, serviceKey, checkType, mode: 'fail'|'clear', detail?: string }` | Forces a check to fail/clear → health recomputed, alert opened/resolved |
+| POST | `/api/_demo/fail-next` | `{ teamId, action: LifecycleAction | 'provision' }` | The next such transition ends in `failed` |
+| POST | `/api/_demo/reseed` | `{ teams?: number }` | Wipes mock tables (NOT the audit log) and reseeds; writes `demo.reseed` |
 
 ## 4. Route handler template (every handler follows this order)
 
@@ -258,25 +254,6 @@ export async function POST(req: Request, ctx: { params: { teamId: string } }) {
 | Checker verdicts | Latest verdict per service per team (OK / OFFLINE / MUMBLE / INTERNAL_ERROR + message) so we can map to reachability/functional checks (`04 §4.1`) |
 
 Anything the orchestrator cannot supply is shown as "not available" in the UI (`null` fields) rather than faked.
-
-## 5.1 Real-adapter handoff and evidence checklist
-
-The dashboard team must not implement a real adapter from prose alone. The club owner must provide sanitized examples and authorization for a disposable one-team test.
-
-| Contract item | Required handoff | Evidence before enabling the operation |
-|---|---|---|
-| Identity | Stable external team ID, display name, registration source | Same team maps consistently across two reads/imports |
-| Authentication | Service account method, scope, TLS/network path, rotation owner | Authenticated request succeeds without secret in logs |
-| Lifecycle | Verb/URL or command, request body, synchronous/asynchronous behavior | One-team success and typed failure fixture |
-| Completion | Job/status response, terminal states, timeout semantics | Poll reaches authoritative final state |
-| Reset | Exact patch/data/flag/score preservation behavior | Written confirmation from owner; otherwise action is unavailable |
-| Delete | Archive/resource semantics and recovery policy | Disposable-team test only; no full-set deletion |
-| Checks | Service key, check type, verdict, timestamp, detail | OK/OFFLINE/MUMBLE/INTERNAL_ERROR and unknown are tested |
-| Credentials | Issuer, one-time response, rotation and revocation | Plaintext redaction and invalidation verified |
-| Terminal | Authenticated team-scoped gateway and URL lifecycle | Cross-team access denied; unauthenticated URL rejected |
-| Resources | Limits, usage units, sampling time and missing-data behavior | Values map correctly or remain visibly unavailable |
-
-The adapter must return typed `ADAPTER_ERROR`/timeout results for unreachable dependencies. It must not convert missing data into healthy, running, successful or live-looking values. A partial mapping is reported as `PARTIAL` in `/api/meta`.
 
 
 ## 6. Change log

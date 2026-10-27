@@ -5,10 +5,10 @@
 | Project | DEFCON Control Center (Admin Dashboard + Team Environment Control Panel) |
 | Event | DEFCON 2.0, Technozion, NIT Warangal (hosted by the ham arc club) |
 | Owner / sole developer | Abdul Wahid |
-| Blueprint version | 1.2 — updated 19 Oct 2026 after reading the v1.2 requirements PDF, current implementation status, registration context and club messages (see `09_CHANGELOG`) |
+| Blueprint version | 1.1 — updated 17 Oct 2026 after reviewing BUILD_STATUS, the registration site and the club group-chat messages (see `09_CHANGELOG`) |
 | Source spec | DEFCON 2.0 System Requirements, Diagram-First Edition, v1.2 (13 Oct 2026) |
-| Deadline | **Emergency two-day release window: 19–20 Oct 2026.** Dashboard feature work is frozen unless it fixes a release blocker. 19 Oct is integration/verification day; 20 Oct is deployment, rehearsal and rollback day. Replace this date if the club gives a different hard deadline. |
-| Status of club backend | The club team is still building the game services/orchestration. No verified orchestrator API or deployment contract has been supplied to this repository. The built-in mock remains the safe default; real control is a separate go/no-go track. |
+| Deadline | Within 5 days of 17 Oct 2026. Planning assumption: **Day 1 = Sat 17 Oct, feature freeze = end of Day 4 (Tue 20 Oct), rehearsal and fixes = Day 5 (Wed 21 Oct), Thu 22 Oct = emergency buffer.** Replace with the real date as soon as it is confirmed. |
+| Status of club backend | Not built yet. This project therefore ships its own mock backend (see §7). |
 
 Read order for any AI session: `00 PROJECT_INSTRUCTIONS` → `BUILD_STATUS.md` (repo `docs/`) → this file → `02_SPEC_DIGEST` → the file relevant to the task (`03` API, `04` data and rules, `05` UI, `06` plan, `07` playbook, `08` tests/demo, `09` changelog for what changed since v1.0).
 
@@ -29,7 +29,7 @@ It must run end-to-end **today** against a built-in, honestly-labelled simulated
 - **This project's slice (spec page 1 and page 2):** "Admin dashboard — Teams • credentials • status • lifecycle" and the Admin + orchestrator responsibility "Create/update/delete teams, manage credentials, provision environments and execute lifecycle actions".
 - **Not this project:** the orchestrator, the browser-terminal gateway, the game server / health-check engine, flag validation and scoring, patch capture and rollback. Other people own those. We *display and trigger* things related to them; we do not implement them.
 - **Team size:** one developer.
-- **Time:** the original five-day build has reached P17; only two days remain for release hardening and integration. Every decision below optimises for "safe, recoverable, testable" over "complete".
+- **Time:** 5 days. Every decision below optimises for "working, honest, demonstrable" over "complete".
 - **Tooling:** Claude Code primary; free fallbacks and local Ollama (RTX 4060 8 GB VRAM, 24 GB RAM) — see `07`.
 - **Machine unknowns:** the club's server capacity is unverified (spec page 2). The dashboard must therefore run comfortably on a laptop and on a modest server.
 
@@ -102,10 +102,6 @@ P1/P2 criteria are tracked in `06`.
 | D13 | No Supabase, no external services, no network calls at runtime | Event Wi-Fi is unreliable; fewer moving parts | n/a |
 | D14 | Services are **data-driven** from a manifest (`src/lib/server/adapters/mock/services.manifest.ts`): key, name, port, `placeholder`. Five entries by default | Group chat says 5–6 services per team; names and ports are not final | n/a |
 | D15 | `DockerComposeAdapter` (F21) is **conditional**: decision gate G1 at the end of Day 3; built on Day 4 only if P0 is green and the club has no orchestrator committed. While it is active the badge reads `PARTIAL` | A 4-hour live event cannot be run from a simulation | The club delivers an orchestrator → use `RealAdapter` instead |
-| D16 | The 19–20 Oct release is split into two tracks: Track A is the dashboard release candidate; Track B is real-control integration. Track B may not change the dashboard’s core semantics or default adapter until a one-team smoke test, failure recovery test, permission test and operator handoff pass | A live event needs a usable control plane even if integration slips | Club supplies a tested orchestrator contract and verified deployment environment |
-| D17 | The game server is authoritative for flags, scoring, challenge state, checker execution and patch/deployment behavior. The dashboard consumes read-only projections or adapter results and never reimplements these systems | The PDF assigns these responsibilities outside the admin dashboard | Club explicitly transfers a responsibility with a written contract |
-| D18 | Team registration data is imported from the club’s authoritative source only after the owner confirms the export/API shape. Until then, seeded teams and CSV import are rehearsal mechanisms, not production registration truth | The registration site and game server ownership are not yet confirmed | Club provides an authenticated export/API and reconciliation rules |
-| D19 | A real adapter must report `PARTIAL` unless every environment-affecting operation is real, tested and observable. A dashboard that can list real teams but cannot safely reset/delete them is not `LIVE` | Prevents a misleading live-control claim during a rushed integration | All required operations and recovery semantics pass the release gate |
 
 ## 6. Assumptions (must be confirmed with the club — label them wherever used)
 
@@ -297,13 +293,12 @@ defcon-control-center/
 
 ```
 # Adapter
-ADAPTER=mock                       # mock | real | docker-compose
-ORCHESTRATOR_BASE_URL=             # only when ADAPTER=real
-ORCHESTRATOR_TOKEN=                # only when ADAPTER=real; never logged
-ORCHESTRATOR_TIMEOUT_MS=10000      # only when ADAPTER=real
+ADAPTER=mock                       # mock | real
+REAL_ORCHESTRATOR_URL=             # only when ADAPTER=real
+REAL_ORCHESTRATOR_TOKEN=
 
 # Auth
-SESSION_SECRET=change-me-32+chars
+SESSION_SECRET=                    # REQUIRED, 32+ chars. Generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ORGANIZER_ADMIN_USERNAME=admin
 ORGANIZER_ADMIN_PASSWORD=change-me
 ORGANIZER_OPERATOR_USERNAME=operator
@@ -311,10 +306,9 @@ ORGANIZER_OPERATOR_PASSWORD=change-me
 
 # Mock behaviour
 SEED_TEAMS=24
-DEMO_CONTROLS=false                # development mock rehearsal only; never enable in release
+DEMO_CONTROLS=true                 # enables /api/_demo/* and the demo panel (admin only, mock only)
 MOCK_DURATION_SCALE=1              # multiply all simulated durations (use 0.5 to speed up)
 DB_PATH=./data/defcon.sqlite
-ALLOW_DEFAULT_PASSWORDS=false      # development mock rehearsal only
 ```
 
 Production/demo hardening: the seed script refuses to run with default passwords unless `ALLOW_DEFAULT_PASSWORDS=true`; secrets are never committed (`.env*` in `.gitignore`).
@@ -333,6 +327,7 @@ Production/demo hardening: the seed script refuses to run with default passwords
 - Session cookie: `httpOnly`, `SameSite=Lax`, `Secure` when served over HTTPS, 8 h lifetime.
 - All mutating routes require `Content-Type: application/json` and a same-origin `Origin` header (basic CSRF defence).
 - Login rate limit: 5 failures per 5 min per IP+username → 429 for 60 s. Failed logins are audited (`auth.login_failed`).
+- Configuration is read lazily (memoised `getConfig()`) **inside** the handler's error boundary — never at module import time — so a missing or short `.env` value yields a structured JSON error with a request id instead of a bare 500 (found 24 Oct: `db.ts` called `loadConfig()` at import).
 - Every route: authenticate → authorize → validate (zod) → act → audit. No exceptions.
 - Audit table is append-only via SQLite triggers; no API exposes update/delete.
 - Never log request bodies containing passwords; scrub `password`, `plaintext`, `token` keys in any logger.
@@ -403,51 +398,3 @@ Loading (skeleton), empty (explain + primary action), error (message, retry, req
 ## 20. Definition of done for each Claude/AI task
 
 Code compiles with `tsc --noEmit`; lint clean; related Vitest tests pass; no new dependency without a reason in the commit message; no TODO left in P0 paths; the changed screen checked in the browser at 1280 px; a git commit with a message in the form `feat(teams): …`.
-
-## 21. Emergency two-day release strategy (19–20 Oct)
-
-### 21.1 Release tracks
-
-| Track | Owner | Must deliver | Can ship without the other? |
-|---|---|---|---|
-| A — Dashboard release candidate | Abdul / dashboard owner | Authenticated console, team directory, detail, lifecycle UX, audit, permissions, health projection, deployment/runbook, seeded fallback | Yes, as `SIMULATED` |
-| B — Real environment control | Club orchestrator owner + dashboard owner | Adapter contract, authenticated connectivity, team reconciliation, one-team lifecycle smoke, failure/retry evidence, operator handoff | No; if incomplete, keep Track A and do not claim `LIVE` |
-| C — Game services/checkers | Vulnerability/service owners | Service images, checker verdict shape, service manifest, health endpoint/checker access, deployment notes | Independently, but Track B cannot be trusted without the required projection |
-| D — Terminal/network/security | Gateway/network owner | Team-scoped authenticated terminal, network isolation, resource limits, tunnel/access policy | Independently, but dashboard must show unavailable instead of inventing access |
-
-### 21.2 Integration contract required before real control
-
-The club team must provide one written handoff containing:
-
-1. Authoritative team identifier, registration source, and reconciliation behavior for missing/renamed/duplicate teams.
-2. Environment lifecycle endpoints or commands for create, start, stop, reset, delete, status and job completion.
-3. Authentication method, service account scope, TLS/network location, timeout and retry rules.
-4. One-team response examples with secrets removed.
-5. Health/checker projection: team, service key, check type, verdict, detail, timestamp and checker-error semantics.
-6. Credential ownership: whether the dashboard issues credentials or consumes one-time credentials from the gateway.
-7. Exact meaning of reset in the real system, including accepted patch and five persistent categories from the PDF.
-8. Deployment/topology proof for the PDF's exactly-one-container rule.
-
-### 21.3 Two-day go/no-go
-
-- **GO-LIVE:** only if all required environment-affecting operations pass against one real team, a failure is visible and recoverable, permissions are enforced by the backend, and the operator runbook can restart the service without data loss.
-- **PARTIAL:** some real read/lifecycle operations work, but reset/delete/health/credentials/recovery are incomplete. Badge must say `PARTIAL`; unsupported actions are disabled or explicitly unavailable.
-- **SIMULATED RELEASE:** no trusted real contract or smoke evidence. Use seeded/imported data, keep the mock persistent, and state the limitation to organizers.
-
-### 21.4 Production environment variables
-
-The release must use an explicit `.env.example` and a secret handoff, never copied `.env` files:
-
-| Variable | Required | Purpose |
-|---|---:|---|
-| `SESSION_SECRET` | Yes | ≥32-character session signing secret |
-| `DB_PATH` | Yes | Persistent SQLite path on durable disk |
-| `ADAPTER` | Yes | `mock`, `real`, or `docker-compose`; default `mock` |
-| `ORCHESTRATOR_BASE_URL` | Track B | Private URL for the club orchestrator |
-| `ORCHESTRATOR_TOKEN` | Track B | Secret service credential; never logged or exposed to clients |
-| `ORCHESTRATOR_TIMEOUT_MS` | Track B | Bounded request timeout |
-| `DEMO_CONTROLS` | No | Must be `false` in the live release |
-| `ALLOW_DEFAULT_PASSWORDS` | No | Must be `false` in the live release |
-| `MOCK_DURATION_SCALE` | No | Rehearsal-only mock timing control |
-
-Any real-adapter variable remains unset in the simulated release. The dashboard must fail closed with a clear startup/configuration error rather than silently falling back from a requested real adapter to mock.

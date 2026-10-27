@@ -1,270 +1,120 @@
-# 06 — TWO-DAY RELEASE, INTEGRATION AND REHEARSAL PLAN
+# 06 — FIVE-DAY BUILD PLAN
 
-**Effective date:** 19 Oct 2026
-**Target freeze:** end of 20 Oct 2026
-**Current state:** P1–P17 are implemented in the repository. The default release is a persistent SQLite `MockAdapter` reported as `SIMULATED`. Real control is not proven until the club provides and passes the Track B gate in this document.
+**Assumed calendar** (replace with the real deadline the moment you know it): Day 1 Sat 17 Oct · Day 2 Sun 18 · Day 3 Mon 19 · Day 4 Tue 20 (**feature freeze at end of day**) · Day 5 Wed 21 (rehearsal + fixes only) · Thu 22 Oct emergency buffer.
 
-This is not a feature-development schedule. It is a release-control schedule for a live four-hour attack-defense event. The dashboard can ship safely in simulated mode; actual team control is a separate, evidence-based integration outcome.
+**Capacity assumption:** about 6–8 productive hours per day with AI doing most typing. Each day has an **exit check** — if it fails at day's end, apply the cut list (§4) immediately rather than carrying debt forward.
 
-## 1. Release objectives
+**Working loop (every task):** read the relevant doc → ask the AI for a short plan → implement one vertical slice → run `tsc`, lint, tests → look at it in the browser → commit. Never stack two unfinished slices.
 
-### Objective A — Dashboard release candidate
+---
 
-- Runs from a clean checkout on the target machine.
-- Persists state and audit history across restart.
-- Allows organizers to find teams, inspect health, manage credentials, and perform lifecycle actions with server-side permissions.
-- Has no fake success, no leaked credentials, and no ambiguous runtime badge.
-- Has a cold-start runbook and a seeded fallback.
+### Status reconciliation (17 Oct 2026, from BUILD_STATUS.md)
 
-### Objective B — Real-control decision
+Done: **P1** schemas/config and **P3** permissions (9 tests reported green). Not done: **P2** database + migration, **P4** mock adapter, **P5** services (audit/idempotency/errors/auth), **P6** seed. Slice numbers follow `07 §4` only — the earlier BUILD_STATUS.md used a different list and pointed at `§5`; use the corrected `BUILD_STATUS.md`. P1 must also absorb the v1.1 schema delta (`09 §2`, prompt **P1b**) before P4. The Day-1 exit check needs P1–P6, so Day 1 is at risk: catch-up rule — slip task 2.2 (API integration tests) and the Day-4 polish sweep, never P4/P5.
 
-- Integrate only the operations the club actually exposes.
-- Reconcile registered teams from the authoritative source.
-- Prove one real environment before touching the full team set.
-- Prove failure, retry, permission, audit and recovery behavior.
-- Keep `PARTIAL` or `SIMULATED` if any critical operation remains unverified.
+## Day 1 — Foundation, contract, mock engine (backend-first)
 
-### Objective C — Cross-team handoff
-
-- Service owners provide the service manifest and checker projection.
-- Orchestrator owner provides lifecycle/status/auth contract.
-- Terminal/network owner proves team-scoped access and isolation.
-- Dashboard owner maps these contracts without duplicating their systems.
-
-## 2. Non-negotiable freeze rules
-
-1. Do not add a leaderboard, participant UI, vulnerability UI, scoring engine, flag engine, patch engine, terminal gateway or new telemetry system.
-2. Do not replace the adapter architecture with direct UI-to-Docker or UI-to-game-server calls.
-3. Do not change canonical lifecycle states, permission names, audit semantics or reset preservation rules without a written contract update.
-4. Do not enable `DEMO_CONTROLS=true`, `ALLOW_DEFAULT_PASSWORDS=true` or public free-host deployment in the release environment.
-5. Do not import live registration data until the source owner confirms format, authority and reconciliation behavior.
-6. Do not claim `LIVE` based on a successful list or start call alone.
-7. If integration becomes uncertain, stop integration work and finish Track A release verification.
-
-## 3. Day 1 — 19 Oct: contract, integration and release-candidate verification
-
-### 3.1 First 30 minutes — coordination lock
-
-Send one message to the club technical lead and create a shared response thread. Ask for:
-
-- orchestrator owner and availability window;
-- actual event/deployment deadline;
-- target server address/network and access method;
-- authoritative team-registration source;
-- lifecycle API/command examples;
-- checker result projection;
-- terminal/gateway owner and authentication model;
-- resource limits and one-team test target.
-
-Do not wait for replies before continuing Track A.
-
-### 3.2 Morning — freeze the dashboard contract
-
-Run and record:
-
-```powershell
-git status
-git log -5 --oneline
-npm run typecheck
-npm run lint
-npm test
-npm run build
-git diff --check
-```
-
-Then verify:
-
-- `.env.example` contains every required variable and no secret.
-- production `.env` has a 32+ character `SESSION_SECRET`;
-- `DB_PATH` is on durable storage;
-- `ADAPTER=mock` is explicit for fallback;
-- demo controls and default passwords are disabled;
-- no client import reaches `src/lib/server/**`;
-- no logs contain passwords, hashes, tokens or terminal URLs.
-
-### 3.3 Midday — target-environment rehearsal
-
-On the actual deployment machine:
-
-1. install/use the locked Node version;
-2. install dependencies from the lockfile;
-3. run `npm run reset-demo`;
-4. run `npm run build && npm start`;
-5. verify `/login`, `/api/meta`, unauthenticated redirect and authenticated API paths;
-6. test two organizer sessions;
-7. run the 3-minute demo twice;
-8. leave `/overview` polling for at least 30 minutes while performing lifecycle actions;
-9. record CPU, memory, SQLite file growth and browser console errors.
-
-### 3.4 Afternoon — one-team real-control gate
-
-Only if the club supplies a usable contract:
-
-1. configure the real adapter in a separate environment file;
-2. select one disposable test team;
-3. verify list/detail mapping;
-4. verify status freshness and timeout behavior;
-5. verify start or provision;
-6. verify stop;
-7. verify reset semantics or explicitly mark reset unavailable;
-8. verify delete only if the club authorizes a disposable environment;
-9. verify checker health mapping;
-10. verify audit correlation and error mapping;
-11. revert to `ADAPTER=mock` after the test unless the full gate passes.
-
-Never test destructive real actions on all teams during the first integration run.
-
-### 3.5 Day 1 exit check
-
-Track A passes when:
-
-- all automated gates pass;
-- the target machine can cold-start;
-- the demo repeats twice;
-- credentials, permissions and audit behavior are verified;
-- fallback mode is documented.
-
-Track B passes Day 1 only when:
-
-- the contract is written;
-- one-team read and at least one lifecycle action are proven;
-- failures are observable;
-- no secret or terminal URL is exposed in logs or list responses.
-
-## 4. Day 2 — 20 Oct: deployment, recovery, rehearsal and freeze
-
-### 4.1 Morning — integration decision
-
-Choose exactly one release mode and record it in `BUILD_STATUS.md`:
-
-| Mode | Condition | Required UI badge |
-|---|---|---|
-| `SIMULATED` | No trusted real contract or insufficient smoke evidence | SIMULATED |
-| `PARTIAL` | Some real operations work, but one or more environment-affecting operations remain unavailable/unverified | PARTIAL |
-| `LIVE` | Every environment-affecting operation is real, tested, permissioned, observable and recoverable | LIVE |
-
-The default expectation is `SIMULATED` or `PARTIAL` unless the club proves otherwise.
-
-### 4.2 Morning — deployment hardening
-
-- deploy only from a clean commit/tag;
-- persist SQLite on durable storage;
-- configure a process supervisor or documented restart command;
-- bind only to the intended organizer network;
-- keep the dashboard off public free hosts and quick tunnels;
-- back up the database before rehearsal;
-- verify system time and UTC handling;
-- verify firewall rules and inbound exposure;
-- verify logs redact secrets;
-- verify graceful restart during a mock pending transition.
-
-The dashboard is not a replacement for the club’s container/network security. It must not be given Docker socket or host privileges unless the club explicitly accepts and secures that design outside this repository.
-
-### 4.3 Midday — recovery and concurrency checks
-
-Run:
-
-- two-admin/operator sessions;
-- duplicate lifecycle request with the same idempotency key;
-- different request with the same key must not silently replay;
-- pending action collision;
-- adapter timeout;
-- checker error;
-- team missing from registration source;
-- stale team or renamed team;
-- server restart during a pending mock action;
-- database backup and restore rehearsal;
-- one failure followed by recovery.
-
-### 4.4 Afternoon — final rehearsal
-
-Run the exact scenario from `08` twice from a clean seeded state. A teammate must follow the runbook without verbal rescue.
-
-The rehearsal must show:
-
-1. runtime badge and honest boundary;
-2. overview counts;
-3. team search/detail;
-4. service health and checker detail;
-5. a safe lifecycle action;
-6. final state after polling;
-7. audit correlation;
-8. permission denial;
-9. recovery/fallback behavior.
-
-### 4.5 Freeze and handoff
-
-At freeze:
-
-- tag the release;
-- save the commit hash;
-- export the runbook and contract;
-- record release mode;
-- record known blockers;
-- record the responsible person for each external dependency;
-- stop all demo controls;
-- take a database backup;
-- keep a known-good simulated release package.
-
-No feature work after freeze. Only release-blocking fixes are allowed.
-
-## 5. External-team coordination matrix
-
-| Partner | They must provide | Dashboard consumes | Acceptance evidence |
+| # | Task | Output | Time |
 |---|---|---|---|
-| Orchestrator owner | lifecycle/status/auth/job contract | adapter responses and job state | one-team lifecycle matrix |
-| Game server/checker owner | service IDs, verdict schema, timestamps, checker errors | health projection | table-driven verdict mapping |
-| Vulnerability service owners | image/version, port, readiness, reset expectations | service manifest/readiness | one team with every service checked |
-| Terminal/network owner | gateway auth, team scope, URL lifecycle, isolation | terminal metadata only | unauthorized cross-team access denied |
-| Registration owner | authoritative export/API, stable IDs, duplicate policy | import/reconciliation input | dry-run and mismatch report |
-| Infrastructure owner | host capacity, firewall, backup, restart process | deployment environment | cold-start and restore run |
-| Organizer lead | permissions and operational policy | role mapping and runbook | admin/operator sign-off |
+| 1.1 | Send the Day-1 message to the club lead (open questions `01 §18`, attach `03` as the proposed contract) | Message sent | 0:15 |
+| 1.2 | Scaffold: `create-next-app`, shadcn init + components, install deps (`07 §2`) | App boots at `/` | 0:45 |
+| 1.3 | Put `CLAUDE.md`, `AGENTS.md`, `docs/` (all 8 files + spec PDF) into the repo; first commit | Repo with docs | 0:15 |
+| 1.4 | `lib/schemas` (zod from `03 §2`), `lib/config.ts`, `.env.example` | Types compile | 0:45 |
+| 1.5 | `lib/server/db.ts` + migration `001_init.sql` + audit triggers | DB creates itself | 0:45 |
+| 1.6 | `permissions.ts` (`can()`) + tests | Tests green | 0:30 |
+| 1.7 | `MockAdapter`: transition table, `requestAction`, `resolveDue`, health derivation, credentials, team creation | Unit-testable engine | 2:00 |
+| 1.8 | State-machine tests (all rows of `04 §1`, invariants 1–3, 10) | Tests green | 0:45 |
+| 1.9 | `audit.ts`, `idempotency.ts`, `errors.ts`, `auth.ts` (login, session, rate limit) | Services ready | 1:00 |
+| 1.10 | Seed + `reset-demo` scripts per `04 §7` | `npm run seed` works | 0:45 |
 
-## 6. Reconciliation rules for registered teams
+**Exit check D1:** with `curl`/REST client, log in, list teams, reset a team, wait 5 s, see it back to `running` and two audit rows with one correlation ID; `npm test` green.
 
-Until the club confirms otherwise:
+## Day 2 — API surface + shell + team directory + create flow
 
-- the registration source is authoritative for prospective team membership;
-- the environment/orchestrator source is authoritative for runtime state;
-- the dashboard’s local database is authoritative only for organizer actions, local audit and adapter cache/state;
-- matching must use an immutable external team identifier if available, not display name;
-- duplicate external IDs stop the import and produce a report;
-- missing external teams are not silently deleted;
-- renamed teams require an explicit mapping/audit event;
-- partial imports report row-level errors and do not claim all teams were synchronized.
+| # | Task | Output | Time |
+|---|---|---|---|
+| 2.1 | All route handlers per `03` (teams, lifecycle, participants/credentials, audit, overview, alerts, meta, demo) using the handler template | API complete | 2:00 |
+| 2.2 | API integration tests: 401/403/404/409/422, idempotent replay, denied audit row | Tests green | 1:00 |
+| 2.3 | Layout shell: sidebar, topbar, AdapterBadge, simulation banner, providers, login page, auth gate | Navigable shell | 1:30 |
+| 2.4 | `api-client.ts`, `queries.ts` (TanStack hooks), `format.ts` | Typed data layer | 0:45 |
+| 2.5 | Teams directory: table, search, filters, sort, pagination, URL state, StateBadge/HealthBadge | `/teams` functional | 1:45 |
+| 2.6 | Create-team dialog + CredentialsRevealDialog (+ CSV) | Create works end-to-end | 1:15 |
 
-## 7. Cut order under pressure
+**Exit check D2:** log in via UI, create a team, see it provision to `running`, copy credentials once; filter/search works on 24 seeded teams.
 
-Cut first:
+## Day 3 — Team detail, lifecycle actions, audit
 
-1. charts and resource visual polish;
-2. demo controls UI;
-3. bulk actions;
-4. CSV import UI if the registration owner cannot provide a stable export;
-5. credential rotation UI, while retaining secure initial issue;
-6. nonessential settings labels.
+| # | Task | Output | Time |
+|---|---|---|---|
+| 3.1 | Team detail page skeleton + Overview tab (environment, services, resources cards) | Page renders real data | 1:45 |
+| 3.2 | ActionBar + ConfirmActionDialog (stop/start/reset) + DeleteTeamDialog (typed name) + pending state + toast logic per `05 §5` | Lifecycle works in UI | 2:30 |
+| 3.3 | Permission-aware disabling (tooltips with reasons); verify operator vs admin | AC-09 UI half | 0:45 |
+| 3.4 | Audit page: table, filters, expand row, append-only banner; team Activity tab reuses it | `/audit` functional | 1:45 |
+| 3.5 | Edit team (sheet), account status with confirm | AC-04 | 0:45 |
 
-Never cut:
+**Exit check D3:** run the **full demo scenario** (`08 §3`) manually, once, start to finish.
 
-- authentication and server-side permissions;
-- append-only audit;
-- lifecycle confirmations;
-- idempotency and pending-action protection;
-- honest adapter badge;
-- final-state polling;
-- one-time credential handling;
-- backup/restart runbook;
-- simulated fallback.
+**Decision gate G1 (end of Day 3).** The event is a live 4-hour competition, so decide now what Day 4 afternoon buys: (a) the club has a working orchestrator or a firm delivery date → map `RealAdapter` to the 3–4 endpoints they have; (b) the club has none and P0 is green → build `DockerComposeAdapter` (`01 §7.5`) *instead of* the polish sweep 4.6; (c) otherwise ship simulated and say so. Record the decision in `BUILD_STATUS.md`.
 
-## 8. Required artifacts at handoff
+## Day 4 — Overview, participants, health/alerts, demo controls, deploy, FREEZE
 
-- release commit/tag;
-- `README.md` and operator runbook;
-- `.env.example`;
-- sanitized API contract;
-- one-team integration evidence;
-- test output;
-- browser/rehearsal checklist;
-- database backup and restore instructions;
-- list of unresolved club questions;
-- explicit `SIMULATED`/`PARTIAL`/`LIVE` decision.
+| # | Task | Output | Time |
+|---|---|---|---|
+| 4.1 | Overview: stat cards, donut, environment grid, alerts feed, recent activity, polling | `/overview` complete | 2:30 |
+| 4.2 | Participants tab: add/remove/rotate, one-time reveal reuse | F10 | 1:15 |
+| 4.3 | Health detail polish, "Run health checks", alerts open/resolve verification | F12/F13 | 0:45 |
+| 4.3b | Audit CSV export (promoted to P1: post-event record of a 4-hour run) | F18 | 0:30 |
+| 4.4 | Demo controls (inject failure, fail-next, reseed) + AC-08 verification | F16 | 1:15 |
+| 4.4b | **Conditional on gate G1:** `DockerComposeAdapter` per `01 §7.5` (experimental, badge `PARTIAL`); time-box 3:00; abandon at freeze if not working end-to-end | F21 | 3:00 |
+| 4.5 | Production build, run on the demo machine, `.env` secrets, LAN bind, smoke test | `next build && next start` OK | 1:00 |
+| 4.6 | Empty/loading/error states sweep per `05 §7`; accessibility pass | UX bar | 1:00 |
+| 4.7 | **FREEZE:** tag `v1.0-freeze`; no new features after this | Git tag | — |
+
+**Exit check D4:** all P0 acceptance criteria AC-01…AC-17 ticked in `08 §1`.
+
+## Day 5 — Rehearse, harden, record
+
+| # | Task | Output | Time |
+|---|---|---|---|
+| 5.1 | Fix list from the AC run (bugs only) | Clean AC pass | 2:00 |
+| 5.2 | Rehearse the demo script twice from `npm run reset-demo`; time it | Smooth 3-minute run | 1:00 |
+| 5.3 | Record a screen capture of the whole demo (backup) + 6 screenshots | `demo-backup/` | 0:45 |
+| 5.4 | Write `README.md` (run instructions, honesty statement, how to plug real adapter) and hand the club the contract + adapter docs | README | 0:45 |
+| 5.5 | Optional stretch if all green: P2 items in §3 order | Extras | rest |
+
+**Exit check D5:** a teammate (or you from a cold start) runs the demo from `git clone` + README steps without help.
+
+---
+
+## 3. P1/P2 stretch order (only after P0 is green)
+
+1. Bulk start/stop with typed confirmation `START ALL` / `STOP ALL` (F17) — 1:30 (how a real event is opened and closed)
+2. CSV import of registered teams (F23) — 1:15 (needs the registration export format; ask the club)
+3. Competition status label (F19) — 30 min
+4. Global `/` search (F22 light) — 30 min
+5. Playwright happy-path test (F20) — 1:00
+6. `DockerComposeAdapter` (F21) if it was not built under gate G1 — see `01 §7.5`; always experimental, never default, badge `PARTIAL`
+(Audit CSV export is now P1, task 4.3b.)
+
+## 4. Cut list (apply in this order when behind)
+
+1. Resource usage bars (F14) → show "not available".
+2. Demo controls UI (F16) → keep API only, trigger via curl during demo.
+3. Credentials rotate/remove (keep issue-on-create only).
+4. Account status suspend UI (F11).
+5. Donut chart → plain numbers.
+6. Alerts feed → rely on recent activity.
+7. Edit-team sheet → inline name edit only.
+
+**Never cut:** auth, audit append-only, confirmations, permission checks, SIMULATED badge, state machine tests, honest final-state toasts.
+
+## 5. Daily checkpoint ritual (5 minutes, end of each day)
+
+1. `npm run lint && npx tsc --noEmit && npm test` all green.
+2. Commit + tag `dayN`.
+3. Update the "Status" block at the top of `CLAUDE.md` (what's done, what's next, known bugs) — this is what lets another AI tool continue seamlessly.
+4. Re-estimate: if tomorrow's exit check looks at risk, apply the cut list now.
+
+## 6. If the club's backend appears early
+
+Do **not** pause the plan. Day 4 afternoon only: implement `RealAdapter` for the 3–4 endpoints they actually have working (list teams, one lifecycle action, status), leave the rest on mock via a composite adapter flagged `mixed` — and then the badge must say **`PARTIAL`** (amber, tooltip lists what is real). Never show `LIVE` unless every environment-affecting call is real.

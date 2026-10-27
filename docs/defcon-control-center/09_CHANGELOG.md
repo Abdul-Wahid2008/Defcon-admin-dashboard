@@ -45,20 +45,14 @@ Spec newer than v1.2? · One container per team or attackbox + tunnel + services
 
 As pasted it is not valid compose (`tunnel:` is not nested under `services:`; `restart` and `command` are mis-indented) — likely a paste artefact. Whoever packages it should run `docker compose config`. Also verify Cloudflare's current limits for quick tunnels before relying on 20–30 of them for four hours; they are documented as a testing feature.
 
-## 7. v1.2 — emergency two-day release and integration gate (19 Oct 2026)
 
-The official PDF was re-read against the current implementation and the requested five-day plan was superseded because P1–P17 are complete and the remaining deadline is approximately two days. The project now separates:
+## 7. v1.1.1 (24 Oct 2026)
 
-- a guaranteed dashboard release using the persistent SQLite `MockAdapter`;
-- an optional real-control track that requires a club-supplied contract and one-team evidence;
-- external game-server/checker, service, terminal/network and registration responsibilities that this repository must consume, not reimplement.
+- **Bug in the blueprint's own example:** `.env.example` showed `SESSION_SECRET=change-me-32+chars`, which is only 18 characters and fails the 32-character check, so copying it unchanged made `POST /api/auth/login` return a bare 500. Replaced with an empty value plus a generator command.
+- **Root cause of the bare 500:** config validation ran at module import (`db.ts` → `loadConfig()`), outside every handler's try/catch. New rule (`01 §13`, `CLAUDE.md` rules 13–14) and new slice **P5b** (`07 §4`).
+- If your repo's `docs/BUILD_STATUS.md` is ahead of the copy in the zip, **keep yours** and only add the P5b line.
 
-The new plan is in `06_BUILD_PLAN_5_DAYS.md` despite retaining the historical filename so existing references do not break. The new coordination and handoff contract is in `10_INTEGRATION_COORDINATION_PLAN.md`. `07` now contains R1–R8 master prompts for contract lock, configuration, reconciliation, one-team adapter integration, checker mapping, credential/terminal security, deployment gates and final freeze.
 
-The release badge rules are now explicit:
+## 8. v1.1.2 (24 Oct 2026) — session handoff
 
-- `SIMULATED`: no trusted real contract or insufficient evidence;
-- `PARTIAL`: some real operations are proven but critical operations remain unavailable/unverified;
-- `LIVE`: every environment-affecting operation is real, permissioned, observable and recoverable.
-
-No group-chat claim overrides the PDF. In particular, the pasted `attackbox`/`ttyd`/quick-tunnel design cannot be accepted as production-safe without authentication, team scoping, network isolation and confirmation of the PDF's exactly-one-container rule.
+Added `10_SESSION_HANDOFF.md` and `11_FIRST_MESSAGE.md` for continuing in a fresh Claude account/chat; updated `00_PROJECT_INSTRUCTIONS.md` (no-memory rule, unconfirmed deadline, repo snapshot rule). **Proposed, not yet in the contract:** a token-protected `POST /api/ingest/check-results` endpoint so the club's checker can push per-service verdicts, with a stale-result rule (design in `10 §7`). It stays out of `03` until the club decides push vs poll.
