@@ -24,6 +24,7 @@ import {
 } from './types';
 import { getEventConfig, servicePort, ttydPort, teamCapWarning } from '../../event-config';
 import { MOCK_DURATIONS, loadConfig } from '../../config';
+import { getHealthSourceStatus, isStale, pullIfDue } from '../health/source';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 
@@ -37,6 +38,11 @@ export class MockAdapter implements EnvironmentAdapter {
 
   private now(): string {
     return this.nowFn();
+  }
+
+  /** True when checks come from a real source: mock writers below must then leave them alone. */
+  private realHealth(): boolean {
+    return loadConfig().healthSource !== 'mock';
   }
 
   private generatePassword(): string {
@@ -203,7 +209,17 @@ export class MockAdapter implements EnvironmentAdapter {
         key: f.flagstore, verdict: f.verdict, message: f.message, round: f.round, checkedAt: f.checked_at,
       });
     }
-    return Array.from(serviceMap.values());
+    const services = Array.from(serviceMap.values());
+    if (this.realHealth()) {
+      const nowMs = Date.parse(this.now());
+      for (const svc of services) {
+        const lastChecked = svc.checks.map(c => c.lastCheckedAt).filter((t): t is string => !!t).sort().pop() ?? null;
+        if (!isStale(lastChecked, nowMs)) continue;
+        svc.stale = true;
+        svc.checks = svc.checks.map(c => ({ ...c, status: 'unknown', detail: 'stale' }));
+      }
+    }
+    return services;
   }
 
   /** Resolve any due transitions for a specific team (synchronous, called inside transactions) */
@@ -270,12 +286,12 @@ export class MockAdapter implements EnvironmentAdapter {
     if (toState === 'deleted') {
       dbHelper.run(`UPDATE teams SET archived_at = ? WHERE id = ?`, endsAt, teamId);
       dbHelper.run(`UPDATE participants SET active = 0 WHERE team_id = ?`, teamId);
-      dbHelper.run(
+      if (!this.realHealth()) dbHelper.run(
         `UPDATE checks SET status = 'unknown', last_checked_at = ? WHERE team_id = ?`,
         endsAt, teamId
       );
     } else if (toState === 'stopped') {
-      dbHelper.run(
+      if (!this.realHealth()) dbHelper.run(
         `UPDATE checks SET status = 'unknown', last_checked_at = ? WHERE team_id = ?`,
         endsAt, teamId
       );
@@ -284,8 +300,8 @@ export class MockAdapter implements EnvironmentAdapter {
         teamId
       );
     } else if (toState === 'running') {
-      // Restore checks to pass (respecting forced_fail)
-      dbHelper.run(
+      // Restore checks to pass (respecting forced_fail) — mock health only; a real source owns the checks.
+      if (!this.realHealth()) dbHelper.run(
         `UPDATE checks SET
           status = CASE WHEN forced_fail = 1 THEN 'fail' ELSE 'pass' END,
           detail = CASE WHEN forced_fail = 1 THEN forced_detail ELSE NULL END,
@@ -297,12 +313,12 @@ export class MockAdapter implements EnvironmentAdapter {
       const hex4 = crypto.randomBytes(2).toString('hex');
       const terminalUrl = `https://${teamId}-${hex4}.terminal.invalid/`;
       dbHelper.run(
-        `UPDATE environments SET terminal_url = ?, last_health_check_at = ? WHERE team_id = ?`,
-        terminalUrl, endsAt, teamId
+        `UPDATE environments SET terminal_url = ?, last_health_check_at = CASE WHEN ? THEN last_health_check_at ELSE ? END WHERE team_id = ?`,
+        terminalUrl, this.realHealth() ? 1 : 0, endsAt, teamId
       );
 
       // Resolve open alerts for this team's services (if all checks now pass)
-      dbHelper.run(
+      if (!this.realHealth()) dbHelper.run(
         `UPDATE alerts SET resolved_at = ?
          WHERE team_id = ? AND resolved_at IS NULL
            AND kind IN ('service_down', 'service_degraded')`,
@@ -705,6 +721,14 @@ export class MockAdapter implements EnvironmentAdapter {
       (err as any).message = 'Health checks require environment to be running'; throw err;
     }
 
+    if (this.realHealth()) {
+      // A real source owns the checks: refresh it on demand (scoreboard) and report what is stored. Never overwrite.
+      await pullIfDue({ force: true });
+      const services = this.loadServicesForTeam(teamId);
+      const last = dbHelper.get<{ last_health_check_at: string | null }>(`SELECT last_health_check_at FROM environments WHERE team_id = ?`, teamId);
+      return { health: this.deriveHealth(env.lifecycle_state, services), services, lastHealthCheckAt: last?.last_health_check_at ?? null };
+    }
+
     // Re-evaluate checks respecting forced_fail
     dbHelper.run(
       `UPDATE checks SET
@@ -840,6 +864,7 @@ export class MockAdapter implements EnvironmentAdapter {
       activeSessions: sessionsRow?.total || 0,
       competitionStatus: compStatus?.value || null,
       grid,
+      healthSource: getHealthSourceStatus(Date.parse(nowTs)),
       recentAlerts: recentAlerts.map(a => ({
         id: a.id,
         teamId: a.team_id,
@@ -890,6 +915,11 @@ export class MockAdapter implements EnvironmentAdapter {
 
   // Demo controls
   async injectFault(teamId: string, serviceKey: string, checkType: string, mode: 'fail' | 'clear', detail?: string): Promise<void> {
+    if (this.realHealth()) {
+      const err = new Error('Fault injection is unavailable while HEALTH_SOURCE is not mock.');
+      (err as Error & { code?: string }).code = 'VALIDATION_ERROR';
+      throw err;
+    }
     const nowTs = this.now();
     if (mode === 'fail') {
       dbHelper.run(

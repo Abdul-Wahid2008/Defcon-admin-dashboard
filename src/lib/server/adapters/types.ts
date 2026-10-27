@@ -47,6 +47,8 @@ export interface Service {
   placeholder: boolean;
   checks: Check[];
   flagstores?: FlagstoreResult[];
+  /** True when a real health source is configured and no result is newer than stale_after_sec. */
+  stale?: boolean;
 }
 
 export interface ResourceUsage {
@@ -230,6 +232,18 @@ export interface OverviewData {
   }[];
   recentAlerts: Alert[];
   recentActivity: AuditEntry[];
+  healthSource: HealthSourceStatusDto;
+}
+
+export interface HealthSourceStatusDto {
+  source: 'mock' | 'scoreboard' | 'ingest';
+  state: 'mock' | 'disabled' | 'never' | 'ok' | 'error' | 'stale' | 'frozen';
+  lastRound: number | null;
+  lastFetchAt: string | null;
+  lastOkAt: string | null;
+  lastError: string | null;
+  staleAfterSec: number;
+  roundSec: number;
 }
 
 export interface EnvironmentAdapter {

@@ -6,6 +6,7 @@ import { useOverview } from '@/lib/queries';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ActivityList, EnvironmentTile, PageHeader, QueryState, StatCard } from '@/components/console/DashboardPrimitives';
 import { RelativeTime } from '@/components/ui/relative-time';
+import { SourceFreshness } from '@/components/status/SourceFreshness';
 
 export default function OverviewPage() {
   const query = useOverview();
@@ -26,6 +27,8 @@ export default function OverviewPage() {
               <Link href="/teams?state=failed" className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-[var(--bad)]/40 px-2.5 text-sm font-medium text-[var(--bad)] transition-colors hover:bg-[var(--bad)]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"><TriangleAlert size={15} />Review failures</Link>
             )}
           </PageHeader>
+
+          <div className="mb-4 rounded-lg border border-[var(--border)] px-3 py-2" aria-label="Health data source"><SourceFreshness source={data.healthSource} /></div>
 
           <section aria-labelledby="overview-metrics" className="mb-5">
             <h2 id="overview-metrics" className="sr-only">Operational metrics</h2>

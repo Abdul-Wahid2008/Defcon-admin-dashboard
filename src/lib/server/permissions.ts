@@ -61,3 +61,15 @@ export function can(user: User, permission: Permission, resource?: Resource): bo
 
   return true;
 }
+
+/** Machine principals are not roles: they authenticate with a bearer token and hold exactly one capability. */
+export type MachinePrincipal = 'ingest';
+export type MachinePermission = 'ingest.write';
+
+const MACHINE_PERMISSIONS: Record<MachinePrincipal, ReadonlySet<MachinePermission>> = {
+  ingest: new Set<MachinePermission>(['ingest.write']),
+};
+
+export function machineCan(principal: MachinePrincipal, permission: MachinePermission): boolean {
+  return MACHINE_PERMISSIONS[principal].has(permission);
+}

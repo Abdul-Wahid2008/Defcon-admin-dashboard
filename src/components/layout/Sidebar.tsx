@@ -79,7 +79,7 @@ export function Sidebar({ role }: SidebarProps) {
       {/* Adapter info */}
       <div className="border-t px-4 py-3 text-[10px] font-mono text-[var(--muted)]" style={{ borderColor: 'var(--border)' }}>
         <span className="uppercase tracking-wide">
-          {meta?.adapter === 'mock' ? 'SIMULATED' : meta?.adapter === 'real' ? 'LIVE' : 'PARTIAL'}
+          {meta?.badge ?? 'SIMULATED'}
         </span>
         {' · '}
         <span className="capitalize">{role.replace('organizer_', '')}</span>

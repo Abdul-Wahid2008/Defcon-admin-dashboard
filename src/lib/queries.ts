@@ -31,6 +31,8 @@ export function useMeta() {
     queryKey: ['meta'],
     queryFn: apiMeta,
     staleTime: 30_000,
+    refetchInterval: 10_000, // source freshness in the banner
+    refetchIntervalInBackground: false,
   });
 }
 

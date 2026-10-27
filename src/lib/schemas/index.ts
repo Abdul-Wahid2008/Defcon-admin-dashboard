@@ -75,6 +75,7 @@ export const ServiceSchema = z.object({
   placeholder: z.boolean(),
   checks: z.array(CheckSchema),
   flagstores: z.array(FlagstoreResultSchema).optional(),
+  stale: z.boolean().optional(),
 });
 export type Service = z.infer<typeof ServiceSchema>;
 
@@ -221,6 +222,16 @@ export const OverviewDataSchema = z.object({
   })),
   recentAlerts: z.array(AlertSchema),
   recentActivity: z.array(AuditEntrySchema),
+  healthSource: z.object({
+    source: z.enum(['mock', 'scoreboard', 'ingest']),
+    state: z.enum(['mock', 'disabled', 'never', 'ok', 'error', 'stale', 'frozen']),
+    lastRound: z.number().int().nullable(),
+    lastFetchAt: z.string().nullable(),
+    lastOkAt: z.string().nullable(),
+    lastError: z.string().nullable(),
+    staleAfterSec: z.number(),
+    roundSec: z.number(),
+  }),
 });
 export type OverviewData = z.infer<typeof OverviewDataSchema>;
 
@@ -234,6 +245,26 @@ export const MetaResponseSchema = z.object({
   limits: z.object({
     softTeamCap: z.number().int(),
   }),
+  badge: z.enum(['SIMULATED', 'PARTIAL', 'LIVE']),
+  sources: z.object({
+    health: z.enum(['mock', 'scoreboard', 'ingest']),
+    lifecycle: z.enum(['mock', 'real', 'docker-compose']),
+    roster: z.string(),
+  }),
+  health: z.object({
+    state: z.enum(['mock', 'disabled', 'never', 'ok', 'error', 'stale', 'frozen']),
+    lastRound: z.number().int().nullable(),
+    lastOkAt: z.string().nullable(),
+    lastError: z.string().nullable(),
+    staleAfterSec: z.number(),
+  }),
+  capabilities: z.object({
+    resetKind: z.enum(['restore_patch', 'recreate_pristine', 'restart']),
+    serviceLevelReset: z.boolean(),
+    terminalMode: z.enum(['per_team', 'shared']),
+    flagstores: z.number().int(),
+  }),
+  frozen: z.boolean(),
 });
 export type MetaResponse = z.infer<typeof MetaResponseSchema>;
 

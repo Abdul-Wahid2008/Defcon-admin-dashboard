@@ -28,5 +28,12 @@ export function checkEnv(env: Record<string, string | undefined>): string[] {
   const adapter = get('ADAPTER') || 'mock';
   if (!ADAPTERS.includes(adapter)) problems.push(`ADAPTER must be one of: ${ADAPTERS.join(', ')}.`);
 
+  const health = get('HEALTH_SOURCE') || 'mock';
+  if (!['mock', 'scoreboard', 'ingest'].includes(health)) problems.push('HEALTH_SOURCE must be one of: mock, scoreboard, ingest.');
+  if (get('CHECK_RELEASE') === '1' && env.HEALTH_SOURCE?.trim() === 'mock') problems.push('HEALTH_SOURCE=mock is not allowed in a release.');
+  if (health === 'scoreboard' && !get('HEALTH_SCOREBOARD_URL')) problems.push('HEALTH_SOURCE=scoreboard requires HEALTH_SCOREBOARD_URL.');
+  if (health === 'ingest' && get('INGEST_TOKEN').length < 32) problems.push('HEALTH_SOURCE=ingest requires INGEST_TOKEN of at least 32 characters.');
+  if (get('INGEST_TOKEN') && get('INGEST_TOKEN').length < 32) problems.push('INGEST_TOKEN must be at least 32 characters.');
+
   return problems;
 }

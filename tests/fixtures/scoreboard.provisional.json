@@ -1,0 +1,10 @@
+{
+  "_note": "PROVISIONAL fixture for the PROVISIONAL parser. Not a real EnoEngine file. Replace with docs/club-inputs/scoreboard.sample.json when the club sends one.",
+  "currentRound": 41,
+  "teams": [
+    { "teamId": "1", "services": [
+      { "key": "docuvault", "flagstores": [
+        { "key": "flag0", "verdict": "OK" }, { "key": "flag1", "verdict": "OK" }, { "key": "flag2", "verdict": "OK" } ] }
+    ] }
+  ]
+}

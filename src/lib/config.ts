@@ -1,7 +1,14 @@
 export type AdapterMode = 'mock' | 'real' | 'docker-compose';
 
+export type HealthSourceMode = 'mock' | 'scoreboard' | 'ingest';
+
 export interface AppConfig {
   adapter: AdapterMode;
+  healthSource: HealthSourceMode;
+  healthScoreboardUrl: string | undefined;
+  healthAllowedHosts: string[];
+  healthPollSec: number;
+  ingestToken: string | undefined;
   dbPath: string;
   sessionSecret: string | undefined;
   demoControls: boolean;
@@ -78,8 +85,45 @@ export function loadConfig(
     );
   }
 
+  const healthValue = (env.HEALTH_SOURCE || 'mock').trim();
+  if (healthValue !== 'mock' && healthValue !== 'scoreboard' && healthValue !== 'ingest') {
+    throw new Error('HEALTH_SOURCE must be one of: mock, scoreboard, ingest.');
+  }
+  const healthSource = healthValue as HealthSourceMode;
+  // Release mode (check-env sets CHECK_RELEASE=1) refuses an explicitly configured mock health source.
+  if (env.CHECK_RELEASE === '1' && env.HEALTH_SOURCE?.trim() === 'mock') {
+    throw new Error('HEALTH_SOURCE=mock is not allowed in a release.');
+  }
+
+  const healthScoreboardUrl = env.HEALTH_SCOREBOARD_URL?.trim() || undefined;
+  let healthAllowedHosts: string[] = [];
+  if (healthSource === 'scoreboard') {
+    if (!healthScoreboardUrl) throw new Error('HEALTH_SOURCE=scoreboard requires HEALTH_SCOREBOARD_URL.');
+    let parsed: URL;
+    try { parsed = new URL(healthScoreboardUrl); } catch { throw new Error('HEALTH_SCOREBOARD_URL must be a valid URL.'); }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error('HEALTH_SCOREBOARD_URL must use http or https.');
+    }
+    healthAllowedHosts = (env.HEALTH_ALLOWED_HOSTS ?? '').split(',').map(h => h.trim().toLowerCase()).filter(Boolean);
+    if (healthAllowedHosts.length === 0) healthAllowedHosts = [parsed.host.toLowerCase()];
+    if (!healthAllowedHosts.includes(parsed.host.toLowerCase())) {
+      throw new Error('HEALTH_SCOREBOARD_URL host is not in HEALTH_ALLOWED_HOSTS.');
+    }
+  }
+  const healthPollSec = parsePositiveNumber(env.HEALTH_POLL_SEC, 'HEALTH_POLL_SEC', 15);
+
+  const ingestToken = env.INGEST_TOKEN?.trim() || undefined;
+  if (ingestToken && ingestToken.length < 32) {
+    throw new Error('INGEST_TOKEN must be at least 32 characters.');
+  }
+
   return {
     adapter,
+    healthSource,
+    healthScoreboardUrl,
+    healthAllowedHosts,
+    healthPollSec,
+    ingestToken,
     dbPath,
     sessionSecret,
     demoControls,

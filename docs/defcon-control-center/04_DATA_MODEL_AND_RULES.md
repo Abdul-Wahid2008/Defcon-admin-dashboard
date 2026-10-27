@@ -318,3 +318,11 @@ Runner: `src/lib/migrate.ts` (`PRAGMA user_version`; used by `db.ts`, `scripts/s
 - `health_source_state(source PK, last_round, last_fetch_at, last_ok_at, last_error, last_etag)`.
 - `settings` defaults (INSERT OR IGNORE): `stale_after_sec=270`, `round_sec=90`, `mutations_frozen='0'`.
 - Audit triggers are untouched; `tests/w1-manifest.test.ts` asserts UPDATE/DELETE on `audit_log` still abort after migration.
+
+## 10. Health source rules (v1.2 W2)
+- Verdict → checks per service, worst-of over its 3 flagstores: reachability = `fail` if any OFFLINE, else `pass` if any OK/MUMBLE, else `unknown`; functional = `fail` if any MUMBLE, `pass` only if all three are OK, else `unknown`. `INTERNAL_ERROR` and any unrecognised string → `UNKNOWN`/unknown plus an info alert `checker_error` (dedupe `team-NN:service:checker_error`); never `pass`. Alerts for failures use `team-NN:service:reachability|functional`.
+- Monotonic: a row with a lower round (or an older `checkedAt` when rounds are not comparable) than stored is rejected `older_than_stored`. A repeated round without `checkedAt` is `unchanged` and keeps the original `checked_at`, so a frozen source ages into stale.
+- Batches apply in one SQLite transaction (flagstore upsert → checks → alerts → `last_health_check_at`).
+- First batch from a real source clears simulated results (`flagstore_results`, `checks`) and closes simulated `service_down/degraded` alerts once (audited as `health.run`), so seeded rounds cannot outrank real ones.
+- Staleness is applied at read time (`stale_after_sec`, default 270). Frozen = scoreboard reachable but round unchanged > 2 × `round_sec`.
+- Scoreboard parser is PROVISIONAL (docs/12 A21); unknown shape → `SOURCE_SHAPE_UNKNOWN`.

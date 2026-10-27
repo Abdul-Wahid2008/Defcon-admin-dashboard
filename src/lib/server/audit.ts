@@ -7,7 +7,7 @@ export type AuditAction =
   | 'team.create' | 'team.update' | 'team.suspend' | 'team.reactivate' | 'team.delete'
   | 'env.provision' | 'env.start' | 'env.stop' | 'env.reset' | 'env.delete'
   | 'participant.add' | 'participant.remove' | 'credential.issue' | 'credential.rotate'
-  | 'health.run' | 'settings.update' | 'demo.inject' | 'demo.fail_next' | 'demo.reseed';
+  | 'health.run' | 'alert.open' | 'alert.resolve' | 'ingest.rejected' | 'settings.update' | 'demo.inject' | 'demo.fail_next' | 'demo.reseed';
 
 export type AuditOutcome = 'requested' | 'success' | 'failure' | 'denied' | 'noop';
 export type TargetType = 'team' | 'participant' | 'session' | 'settings' | 'system';

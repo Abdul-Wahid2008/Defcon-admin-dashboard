@@ -1,6 +1,7 @@
 import 'server-only';
 import { getAdapter } from '../adapters';
 import { appendCompletionAudits } from '../audit';
+import { pullIfDue } from '../health/source';
 
 /**
  * Must be called at the start of every request handler.
@@ -12,4 +13,5 @@ export async function sync(): Promise<void> {
   if (completions.length > 0) {
     appendCompletionAudits(completions);
   }
+  await pullIfDue(); // no-op unless HEALTH_SOURCE=scoreboard and the poll interval has elapsed
 }

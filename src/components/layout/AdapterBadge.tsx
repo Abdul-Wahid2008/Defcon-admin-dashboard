@@ -11,30 +11,27 @@ import {
 } from '@/components/ui/tooltip';
 
 const BADGE_CONFIG = {
-  mock: {
-    label: 'SIMULATED',
+  SIMULATED: {
     icon: FlaskConical,
     className: 'text-[var(--warn)] border-[var(--warn)] bg-[var(--warn)]/10',
-    tooltip: 'Data and actions are simulated by the built-in mock backend. No real containers are controlled.',
+    tooltip: 'Health data and lifecycle actions are both simulated by the built-in mock backend. No real containers are controlled.',
   },
-  real: {
-    label: 'LIVE',
-    icon: Radio,
-    className: 'text-[var(--ok)] border-[var(--ok)] bg-[var(--ok)]/10',
-    tooltip: 'Connected to the DEFCON orchestrator.',
-  },
-  'docker-compose': {
-    label: 'PARTIAL',
+  PARTIAL: {
     icon: CircleDashed,
     className: 'text-[var(--warn)] border-[var(--warn)] bg-[var(--warn)]/10',
-    tooltip: 'Partial real control via docker-compose. Start/stop/delete and reachability are real. Patch restore and functional checks are not.',
+    tooltip: 'Mixed: at least one source is real and at least one is simulated. See the banner for which.',
+  },
+  LIVE: {
+    icon: Radio,
+    className: 'text-[var(--ok)] border-[var(--ok)] bg-[var(--ok)]/10',
+    tooltip: 'Health and lifecycle are both real.',
   },
 } as const;
 
 export function AdapterBadge() {
   const { data } = useMeta();
-  const adapter = data?.adapter ?? 'mock';
-  const config = BADGE_CONFIG[adapter] ?? BADGE_CONFIG.mock;
+  const badge = data?.badge ?? 'SIMULATED';
+  const config = BADGE_CONFIG[badge];
   const Icon = config.icon;
 
   return (
@@ -46,10 +43,10 @@ export function AdapterBadge() {
               'inline-flex items-center gap-1.5 rounded border px-2 py-1 text-xs font-mono font-semibold cursor-default select-none',
               config.className,
             )}
-            aria-label={`Adapter mode: ${config.label}`}
+            aria-label={`Data mode: ${badge}`}
           >
             <Icon size={12} aria-hidden="true" />
-            {config.label}
+            {badge}
           </span>
         </TooltipTrigger>
         <TooltipContent side="bottom" className="max-w-xs text-xs">

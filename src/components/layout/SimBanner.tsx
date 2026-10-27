@@ -3,12 +3,22 @@
 import { useState } from 'react';
 import { X, FlaskConical } from 'lucide-react';
 import { useMeta } from '@/lib/queries';
+import { RelativeTime } from '@/components/ui/relative-time';
+import { describeSourceError } from '@/components/status/SourceFreshness';
 
 export function SimBanner() {
   const { data } = useMeta();
   const [dismissed, setDismissed] = useState(false);
 
-  if (dismissed || !data || data.adapter !== 'mock') return null;
+  if (dismissed || !data || data.badge === 'LIVE') return null;
+
+  const { health, sources } = data;
+  const lifecycle = sources.lifecycle === 'mock' ? 'simulated' : sources.lifecycle === 'docker-compose' ? 'partly real (docker-compose)' : 'real';
+  const healthText = sources.health === 'mock'
+    ? 'simulated'
+    : health.state === 'ok'
+      ? <>live ({sources.health}{health.lastRound !== null ? `, round ${health.lastRound}` : ''}, updated <RelativeTime ts={health.lastOkAt} />)</>
+      : <>{sources.health}: {health.state === 'error' ? `error, ${describeSourceError(health.lastError)}` : health.state}</>;
 
   return (
     <div
@@ -22,13 +32,11 @@ export function SimBanner() {
     >
       <span className="flex items-center gap-2">
         <FlaskConical size={12} aria-hidden="true" />
-        <strong>Simulation mode</strong>
-        {' — '}
-        actions change demo data only. No real containers are controlled.
+        <span>Health: {healthText} · Lifecycle: {lifecycle}.{sources.lifecycle === 'mock' && ' Start, stop and reset change demo data only.'}</span>
       </span>
       <button
         onClick={() => setDismissed(true)}
-        aria-label="Dismiss simulation banner"
+        aria-label="Dismiss data source banner"
         className="shrink-0 rounded p-0.5 hover:bg-[var(--warn)]/20 transition-colors"
       >
         <X size={14} aria-hidden="true" />
