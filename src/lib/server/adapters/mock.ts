@@ -331,6 +331,7 @@ export class MockAdapter implements EnvironmentAdapter {
     dbHelper.run(
       `UPDATE environments SET
         lifecycle_state = ?,
+        failure_reason = NULL,
         pending_action = NULL,
         pending_correlation_id = NULL,
         pending_from_state = NULL,

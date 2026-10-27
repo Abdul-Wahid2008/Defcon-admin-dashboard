@@ -183,6 +183,26 @@ describe('MockAdapter State Machine', () => {
       expect(detail?.environment.failureReason).toContain('stop failed');
     });
 
+    it('clears the failure reason once a later action succeeds', async () => {
+      const team = await setupTeam();
+      const teamId = team.id;
+      advanceClock(7000);
+      await adapter.resolveDue();
+
+      dbHelper.run(`UPDATE environments SET fail_next_action = 'stop' WHERE team_id = ?`, teamId);
+      await adapter.requestAction(teamId, 'stop', { correlationId: 'c1' });
+      advanceClock(3000);
+      await adapter.resolveDue();
+      expect((await adapter.getTeam(teamId))?.environment.failureReason).toContain('stop failed');
+
+      await adapter.requestAction(teamId, 'reset', { correlationId: 'c2' });
+      advanceClock(60000);
+      await adapter.resolveDue();
+      const detail = await adapter.getTeam(teamId);
+      expect(detail?.environment.lifecycleState).toBe('running');
+      expect(detail?.environment.failureReason).toBeNull();
+    });
+
     it('should maintain accepted_patch_version during lifecycle actions', async () => {
       const team = await setupTeam();
       const teamId = team.id;
