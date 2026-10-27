@@ -1,3 +1,4 @@
+import { readJson } from '@/lib/server/limits';
 import { assertNotFrozen } from '@/lib/server/freeze';
 import { requireUser, assertSameOrigin } from '@/lib/server/auth';
 import { getAdapter } from '@/lib/server/adapters';
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
     }
     assertNotFrozen(user, { action: 'demo.reseed', targetType: 'system', requestId });
 
-    const body = await req.json().catch(() => null);
+    const body = await readJson(req, null);
     const parsed = ReseedBody.safeParse(body);
     if (!parsed.success) {
       throw new AppError('CONFIRMATION_MISMATCH', 'Type "RESEED" to confirm.');

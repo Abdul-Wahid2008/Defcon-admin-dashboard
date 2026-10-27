@@ -28,6 +28,8 @@ async function post<T>(url: string, body?: unknown): Promise<T> {
 export const apiSetFrozen = (frozen: boolean, confirm?: string) =>
   post<{ frozen: boolean }>('/api/settings/freeze', { frozen, confirm });
 
+export const apiResetHealthBaseline = () => post<{ armed: true }>('/api/settings/health-baseline');
+
 export async function apiListUsers() {
   return handleResponse<{ items: OrganizerUser[] }>(await fetch('/api/users', { credentials: 'same-origin' }));
 }

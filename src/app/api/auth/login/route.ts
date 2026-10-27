@@ -1,3 +1,4 @@
+import { readJson } from '@/lib/server/limits';
 import { assertSameOrigin, login, checkLoginRateLimit, recordLoginFailure, clearLoginAttempts, setSessionCookie, getClientIp } from '@/lib/server/auth';
 import { appendAudit } from '@/lib/server/audit';
 import { errorResponse, newRequestId, AppError } from '@/lib/server/errors';
@@ -16,7 +17,7 @@ export async function POST(req: Request) {
   let username = '';
   try {
     assertSameOrigin(req); // login CSRF: a cross-site POST must not be able to set the session cookie
-    const body = await req.json().catch(() => ({}));
+    const body = await readJson(req, ({}));
     const parsed = LoginBody.safeParse(body);
     if (!parsed.success) {
       return errorResponse(

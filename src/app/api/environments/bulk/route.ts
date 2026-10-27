@@ -1,3 +1,4 @@
+import { readJson } from '@/lib/server/limits';
 import { requireUser, assertSameOrigin } from '@/lib/server/auth';
 import { sync } from '@/lib/server/services/sync';
 import { requestLifecycleAction, validateBulkConfirmation } from '@/lib/server/services/teams';
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
     const user = await requireUser(req);
     assertSameOrigin(req);
     await sync();
-    const body = await req.json().catch(() => null);
+    const body = await readJson(req, null);
     const parsed = BulkEnvActionRequestSchema.safeParse(body);
     if (!parsed.success) {
       throw new AppError('VALIDATION_ERROR', 'Invalid bulk request', {

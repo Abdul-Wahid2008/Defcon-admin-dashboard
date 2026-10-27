@@ -1,3 +1,4 @@
+import { readJson } from '@/lib/server/limits';
 import { z } from 'zod';
 import { requireUser, assertSameOrigin, createSession, setSessionCookie } from '@/lib/server/auth';
 import { changeOwnPassword } from '@/lib/server/services/users';
@@ -16,7 +17,7 @@ export async function POST(req: Request) {
     const user = await requireUser(req);
     assertSameOrigin(req);
     if (user.role === 'team') throw new AppError('FORBIDDEN', 'Not available for this account.');
-    const parsed = Body.safeParse(await req.json().catch(() => null));
+    const parsed = Body.safeParse(await readJson(req, null));
     if (!parsed.success) {
       throw new AppError('VALIDATION_ERROR', 'Invalid password change', { fieldErrors: parsed.error.flatten().fieldErrors });
     }

@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { PageHeader, QueryState } from '@/components/console/DashboardPrimitives';
 import { Input } from '@/components/ui/input';
 import { apiMe } from '@/lib/api-client';
-import { apiSetFrozen } from '@/lib/api-admin';
+import { apiResetHealthBaseline, apiSetFrozen } from '@/lib/api-admin';
 import { OrganizerAccounts } from '@/components/settings/OrganizerAccounts';
 
 const STATUS_OPTIONS = [
@@ -37,12 +37,17 @@ export default function SettingsPage() {
   const me = useQuery({ queryKey: ['me'], queryFn: apiMe, staleTime: 60_000 });
   const isAdmin = me.data?.user.role === 'organizer_admin';
   const [freezeText, setFreezeText] = useState('');
+  const [baselineText, setBaselineText] = useState('');
   const [eventStart, setEventStart] = useState<string | null>(null); // datetime-local value, null = untouched
   const savedStart = settings.data?.eventStartIso ? settings.data.eventStartIso.slice(0, 16) : '';
   const startValue = eventStart ?? savedStart;
   const freeze = useMutation({
     mutationFn: (frozen: boolean) => apiSetFrozen(frozen, frozen ? freezeText : undefined),
     onSuccess: (r) => { setFreezeText(''); toast.success(r.frozen ? 'Mutations frozen' : 'Mutations unfrozen'); void qc.invalidateQueries({ queryKey: ['meta'] }); },
+  });
+  const baseline = useMutation({
+    mutationFn: apiResetHealthBaseline,
+    onSuccess: () => { setBaselineText(''); toast.success('Health baseline reset armed: the next batch from the health source is accepted'); void qc.invalidateQueries({ queryKey: ['meta'] }); },
   });
   const selectedStatus = status ?? settings.data?.competitionStatus ?? 'not_started';
 
@@ -97,6 +102,17 @@ export default function SettingsPage() {
                     </div>
                   )}
                   {freeze.error && <p role="alert" className="text-[var(--bad)]">{freeze.error.message}</p>}
+                </CardContent>
+              </Card>}
+              {isAdmin && <Card className="console-surface">
+                <CardHeader className="border-b border-[var(--border)]"><CardTitle>Health source baseline</CardTitle></CardHeader>
+                <CardContent className="space-y-3 pt-4 text-sm">
+                  <p className="text-[var(--muted)]">Use this only after the checker or scoreboard restarted and its round numbers went back to a lower value, so every row is rejected as older than stored. The next batch from the source is accepted even though its rounds are lower; then this switches itself off. Verdicts already shown keep their check time, so old results still go stale.</p>
+                  <div className="flex items-end gap-2">
+                    <label className="grid flex-1 gap-1 text-xs font-medium" htmlFor="baseline-confirm">Type RESET to confirm<Input id="baseline-confirm" value={baselineText} onChange={(e) => setBaselineText(e.target.value)} autoComplete="off" /></label>
+                    <Button variant="outline" disabled={baselineText !== 'RESET' || baseline.isPending} onClick={() => baseline.mutate()}>{baseline.isPending ? 'Resetting…' : 'Reset baseline'}</Button>
+                  </div>
+                  {baseline.error && <p role="alert" className="text-[var(--bad)]">{baseline.error.message}</p>}
                 </CardContent>
               </Card>}
               <Card className="console-surface">

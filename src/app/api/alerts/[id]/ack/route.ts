@@ -1,3 +1,4 @@
+import { readJson } from '@/lib/server/limits';
 import { z } from 'zod';
 import { requireUser, assertSameOrigin } from '@/lib/server/auth';
 import { sync } from '@/lib/server/services/sync';
@@ -15,7 +16,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     assertSameOrigin(req);
     await sync();
     const { id } = await params;
-    const parsed = Body.safeParse(await req.json().catch(() => ({})));
+    const parsed = Body.safeParse(await readJson(req, ({})));
     if (!parsed.success) throw new AppError('VALIDATION_ERROR', 'Invalid acknowledgement');
     return Response.json(acknowledgeAlert(user, id, parsed.data, { requestId }), { headers: { 'X-Request-Id': requestId } });
   } catch (e) {

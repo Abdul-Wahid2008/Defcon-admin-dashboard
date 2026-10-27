@@ -1,3 +1,4 @@
+import { readJson } from '@/lib/server/limits';
 import { assertNotFrozen } from '@/lib/server/freeze';
 import { requireUser, assertSameOrigin } from '@/lib/server/auth';
 import { sync } from '@/lib/server/services/sync';
@@ -29,7 +30,7 @@ export async function POST(req: Request) {
     }
     assertNotFrozen(user, { action: 'demo.fail_next', targetType: 'system', requestId });
     await sync();
-    const body = await req.json().catch(() => null);
+    const body = await readJson(req, null);
     const parsed = FailNextBody.safeParse(body);
     if (!parsed.success) {
       throw new AppError('VALIDATION_ERROR', 'Invalid body', {

@@ -2,6 +2,9 @@ import type { Metadata } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 
+// Every response is rendered per request so the proxy's CSP nonce reaches Next's inline scripts (static pages cannot carry one).
+export const dynamic = 'force-dynamic';
+
 const inter = Inter({
   variable: '--font-inter',
   subsets: ['latin'],

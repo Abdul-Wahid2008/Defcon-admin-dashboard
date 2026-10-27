@@ -1,3 +1,4 @@
+import { idempotencyKeyFrom, readJson } from '@/lib/server/limits';
 import { requireUser, assertSameOrigin } from '@/lib/server/auth';
 import { sync } from '@/lib/server/services/sync';
 import { requestLifecycleAction } from '@/lib/server/services/teams';
@@ -15,8 +16,8 @@ export async function POST(
     assertSameOrigin(req);
     await sync();
     const { teamId } = await params;
-    const idempotencyKey = req.headers.get('Idempotency-Key');
-    const body = (await req.json().catch(() => null)) as { reason?: unknown; confirmTeamId?: unknown } | null;
+    const idempotencyKey = idempotencyKeyFrom(req);
+    const body = (await readJson(req, null)) as { reason?: unknown; confirmTeamId?: unknown } | null;
     const result = await requestLifecycleAction(user, teamId, 'reset', {
       requestId,
       idempotencyKey,

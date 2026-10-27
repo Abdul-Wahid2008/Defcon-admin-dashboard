@@ -1,3 +1,4 @@
+import { readJson } from '@/lib/server/limits';
 import { z } from 'zod';
 import { requireUser, assertSameOrigin } from '@/lib/server/auth';
 import { sync } from '@/lib/server/services/sync';
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
     const user = await requireUser(req);
     assertSameOrigin(req);
     await sync();
-    const parsed = CreateBody.safeParse(await req.json().catch(() => null));
+    const parsed = CreateBody.safeParse(await readJson(req, null));
     if (!parsed.success) {
       throw new AppError('VALIDATION_ERROR', 'Invalid user', { fieldErrors: parsed.error.flatten().fieldErrors });
     }

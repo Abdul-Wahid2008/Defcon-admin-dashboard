@@ -66,6 +66,7 @@ export const AUTHZ: Record<string, AuthzCase[]> = {
     { method: 'GET', ...organizerOnly },
     { method: 'PATCH', body: { competitionStatus: 'running' }, ...adminOnly },
   ],
+  '/api/settings/health-baseline': [{ method: 'POST', ...adminOnly }],
   '/api/settings/freeze': [{ method: 'POST', body: { frozen: false }, ...adminOnly, frozen: 'exempt' }], // must work to unfreeze
 
   '/api/teams': [

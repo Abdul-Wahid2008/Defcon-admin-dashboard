@@ -1,4 +1,4 @@
-# BUILD STATUS (27 Oct 2026, verified on the real repo; W7, W8 and W9 added at the end of the session)
+# BUILD STATUS (27–28 Oct 2026, verified on the real repo; W7–W9 and a hardening pass added after the first write-up)
 
 Previous version (W1 only) is in git history (`c3fda66`). This file covers W2–W9. W2–W6 were written after those five slices were built, reviewed and committed; W7–W9 were added later the same day.
 
@@ -6,7 +6,7 @@ Previous version (W1 only) is in git history (`c3fda66`). This file covers W2–
 - Branch `release/v1.2`, version `1.2.0-rc.1`. **Not pushed.** Working tree is clean after the final commit of this session.
 - Done: P1–P17 (v1.1), W0, W1, **W2 health source, W3 security/roles/freeze/accounts, W4 lifecycle capabilities + service actions + agent client, W5 overview matrix + UI copy, W6 operator workflows**. **W7 perf/backup/soak tools (the 60-minute soak was not run; 10 + 20 minutes were), W9 final hardening, runbook and tag.** **W8 (club evidence gate) was NOT executed: it is blocked on club inputs.** The tonight dry-run (doc 12 §11) has not been done: it needs the club's real `scoreboard.json` URL and a roster.
 - Runtime default is unchanged: `ADAPTER=mock` + `HEALTH_SOURCE=mock` → badge **SIMULATED**. `HEALTH_SOURCE=scoreboard|ingest` or `ADAPTER=real|docker-compose` → **PARTIAL**. **LIVE cannot be shown today**: it needs `EVIDENCE_GATE_PASSED=true` and an adapter reporting `capabilities.fullyReal`, and none does.
-- Gates at the end of the session (final code, tag `v1.2.0-rc.1`): `npm run typecheck` 0 · `npm run lint` 0 errors, 64 warnings · `npm test` **389/389 in 18 files** (authz matrix 185) · `npm run build` exit 0 · `npm audit --omit=dev` 0 vulnerabilities · fresh-clone rehearsal passed (details under W9).
+- Gates at the end of the session (final code, tag `v1.2.0-rc.2`): `npm run typecheck` 0 · `npm run lint` 0 errors, 64 warnings · `npm test` **403/403 in 19 files** (authz matrix 191) · `npm run build` exit 0 · `npm audit --omit=dev` 0 vulnerabilities · 60-minute soak passed (overview p95 21.8 ms, 0 errors, memory −4.6%) · fresh-clone rehearsal and black-box attack probes passed (details under W9 and the hardening pass).
 - Commits since `c3fda66` (oldest first):
   - `7b01967` feat(health): scoreboard/ingest health source with staleness (W2)
   - `b108ca8` fix(health): apply W2 review findings
@@ -20,7 +20,8 @@ Previous version (W1 only) is in git history (`c3fda66`). This file covers W2–
   - `51eaab7` chore(release): W8 status, runbook, README v1.2, `shadcn` to devDependencies (W8/W9)
   - `2b32acd` fix(ui): Delete disabled for non-admin
   - `fe991c8` fix(lifecycle): clear `failure_reason` on a later success
-  - final commit `chore(release): v1.2.0-rc.1 hardening and runbook` (review fixes, docs, this file), tagged `v1.2.0-rc.1`.
+  - `a945b7e` chore(release): v1.2.0-rc.1 hardening and runbook, tagged `v1.2.0-rc.1`
+  - final commit `feat(security): hardening and performance pass (rc.2)` (this pass, docs, this file), tagged `v1.2.0-rc.2`.
 - Size of the change: 124+ files, about 5.9k lines added. 10 new API routes (route files: 24 → 34), 3 new migrations (003, 004 plus W2 had none beyond 002), 7 new test files.
 
 ---
@@ -114,7 +115,7 @@ Note: W5 and W6 got one combined review, not one each as doc 13 asks.
 | After pragmas (10 min soak, 244 polls each) | 12.5 / 17.3 / 21.0 ms | 10.5 / 15.7 / 17.9 ms | 23.7 KB | 0 / 0 |
 
 Targets (p95 < 150 ms, payload < 60 KB, zero 5xx): all met with about 8x headroom. Lifecycle actions during the soak: 29 stop + 29 start, all 2xx, p95 11.0 / 8.0 ms.
-**Memory:** RSS 117 MB -> 126 MB (+8.3%) over 10.2 min (22 samples). The target is < 15% over 60 min. **The 60-minute soak was NOT run**; only 10 minutes. The 8.3% includes warm-up, so it neither proves nor disproves stability at 60 min. Run `npm run soak` with `LT_PID` set on the demo machine.
+**Memory:** RSS 117 MB -> 126 MB (+8.3%) over 10.2 min (22 samples). The target is < 15% over 60 min. **The 60-minute soak was NOT run at this point (it was run later and passed, see the hardening pass below)**; only 10 minutes. The 8.3% includes warm-up, so it neither proves nor disproves stability at 60 min. Run `npm run soak` with `LT_PID` set on the demo machine.
 
 **Not done, deliberately (numbers did not justify it).** The N+1 in `listTeams`/`getOverviewData` (`loadServicesForTeam` once per team, 2 queries each) was not batched: 30 teams cost about 13 ms end to end. Revisit only if team count or per-request latency grows. `EXPLAIN QUERY PLAN` on the hot queries: services, checks, flagstore, participants and environments lookups all use primary-key or existing indexes; `audit_log` recent uses `ix_audit_ts`. Full scans exist only on `environments` (due-pending check, 30 rows), `alerts` (recent/open count) and `idempotency_keys` (expiry delete) — all tiny, so no index was added.
 
@@ -188,7 +189,70 @@ What was done instead (all recorded, nothing invented):
 - `docs/EVENT_RUNBOOK.md`: start order, who holds which secret, freeze procedure, what to say when health is stale, backup cadence, rollback to the last tag, incident table, escalation placeholders (names and phones left blank on purpose), honest limits.
 - README: v1.2 section (sources, capabilities, roles, freeze, ingest, release gate, Windows start), online backup with the Task Scheduler line (written, **not registered** on any machine), restore, load tools, `npm ci --ignore-scripts`.
 - `09_CHANGELOG.md` v1.2.0-rc.1 entry; `01_BLUEPRINT` A20–A31 (UNCONFIRMED); `05_UI_SPEC` v1.2 additions; `06` and `07` marked as superseded by the W0–W9 prompt pack; `10_INTEGRATION_COORDINATION_PLAN` §6 filled. Docs 02, 03, 04 and 08 already carried v1.2 content from earlier slices (grep-checked, not re-audited line by line).
-- Tag `v1.2.0-rc.1` created on the final commit; **not pushed**.
+- Tag `v1.2.0-rc.1` created on the W9 commit; superseded by `v1.2.0-rc.2` (hardening pass below). Both are pushed with the branch.
+
+---
+
+## Hardening and performance pass (27 Oct 2026, after W9), version 1.2.0-rc.2
+
+Requested scope: verify everything, find bugs and security holes, finish anything left from the nine prompts, make it production grade and fast. Method: attack the running production build black-box (two probe scripts, about 70 cases), read the auth/limits/proxy code, measure speed in a real browser, fix, re-probe, re-measure.
+
+### What was found and fixed
+
+| # | Finding (how it was found) | Severity | Fix |
+|---|---|---|---|
+| 1 | **Logout did not revoke the token**: a copied session cookie kept working for up to 8 h after logout (probe: `token reuse AFTER logout` → 200) | High | Tokens carry a `jti`; logout writes it to `revoked_sessions` (migration 005); `resolveSession` rejects listed `jti`s. Other sessions of the same user keep working; epoch revocation (password change, admin revoke) is unchanged. Probe now 401. |
+| 2 | **No request size limit on any JSON route**: `req.json()` buffered whatever was sent (20 MB to the unauthenticated login route was read in full) | High (memory/CPU DoS) | `readJson()` in `limits.ts`: 64 KB default, checks `Content-Length` and caps the stream so a missing/false length does not bypass it; replaced all 17 `req.json()` calls. 413 `VALIDATION_ERROR`. Import (128 KB) and ingest (256 KB) keep their own caps. |
+| 3 | **Login CPU flood**: every attempt (any username) costs a bcrypt hash; the limiters only counted failures per username/pair, and per-IP is off without `TRUST_PROXY` | Medium | Global ceiling of 120 login attempts per minute (429). Existing sessions are unaffected. |
+| 4 | **Inline scripts allowed by CSP** (`script-src 'unsafe-inline'`), the one hole listed since W3 | Medium (XSS blast radius) | Per-request nonce CSP from `src/proxy.ts` (`'self' 'nonce-…' 'strict-dynamic'`), root layout forced dynamic so every page, incl. login and 404, carries a nonce; the static CSP in `next.config.ts` removed (two policies would intersect). Verified in the browser: login/overview/team/settings hydrate, all inline scripts carry the nonce, zero CSP violations. Styles keep `unsafe-inline` (React/UI-kit style attributes cannot carry a nonce). |
+| 5 | `GET /api/teams?page=99999999999999999999` → **500** | Medium (crash path) | `intParam()` clamps `page` 1..100000 and `pageSize`/`limit` 1..100 on teams, audit and alerts. |
+| 6 | Path with a malformed percent-escape (`/api/teams/%E0%A4%A`) → bare **500** | Low | Proxy answers 400 before routing. |
+| 7 | `Idempotency-Key` of 5000 characters accepted and stored | Low (table bloat) | `idempotencyKeyFrom()`: 1–128 printable ASCII, else 400, on all 7 routes that read it. |
+| 8 | `X-Powered-By: Next.js` exposed | Low | `poweredByHeader: false`. Added `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy: same-origin`. |
+| 9 | Organizer passwords were only checked for "not default" | Low | `check-env` also requires 12+ characters. |
+| 10 | Server config parser (`config.ts`) was bundled into the **browser** because the client imported a polling constant from it (only env var names, no values, were present; verified by grepping the build output) | Low (footgun) | `POLLING_INTERVALS` moved to `src/lib/polling.ts`; `config.ts` re-exports it. |
+| 11 | Unused dependencies `recharts`, `tw-animate-css` (never imported) | Low (supply chain) | Removed, lockfile regenerated. `npm audit --omit=dev`: 0. (`npm audit` including dev still lists 2 findings in the `shadcn` CLI tree, not shipped.) |
+
+**Left as is, on purpose (documented):**
+- **Username lockout is a denial-of-service lever**: 10 failures for a name from any address lock that name for 5 minutes (demonstrated: my own probe locked `admin`). Raising the limits would only help brute force and not help the DoS. Mitigation is network-level (organizer network only, assumption A27) plus the runbook recovery (restart clears the in-memory limiter; signed-in sessions are unaffected).
+- Audit `requested` row is written after the adapter call (crash window); `POST /health/run` allowed while frozen (decision); team-role sessions have no epoch (team logins off); three routes parse bodies by hand instead of a zod schema (not exploitable).
+- Cookie is `Secure` only behind HTTPS (`X-Forwarded-Proto`) or `COOKIE_SECURE=true`; on a plain-HTTP LAN it is not. Runbook says serve HTTPS or set the flag.
+- `Math.random()` is used for request ids only (not a secret). The opt-in, deprecated Docker adapter uses `execFile` (no shell) and was not extended.
+- No Supabase or other hosted backend was added. Rule from the repo ("no external hosted service in the request path") and the masterprompt still holds, and nothing in the nine prompts needs more than the SQLite state: a hosted database would add a network dependency and a new place for secrets to the event-day path. If you later want an off-site audit copy, that is a separate, explicit decision.
+
+### Verified safe (attacked, held)
+Unauthenticated sweep of 10 API routes (all 401), demo routes closed, cross-origin / missing / `null` Origin POSTs (403), `alg=none`, forged role, bad signature (401), operator on admin routes (403), SQL injection strings in `q`, `sort`, ids and audit filters (no effect, parameterised), `LIKE` wildcards, path traversal and NUL in ids (404), stored markup in team names and notes (rendered as text on 4 pages, no execution, no injected nodes), CSV export formula cells (none leading), error bodies (no stack, no paths), CORS (no `Access-Control-Allow-Origin`), 405 for wrong methods, same-origin enforcement on login/logout, 12 parallel stops on one team (exactly one accepted, 11 × 409, one `requested` audit row), 6 parallel creates of one name (one 201), 6 parallel requests with one idempotency key, forced password change gate, weak password rejection, case-insensitive duplicate usernames, admin cannot disable themselves, `revoke-sessions` kills that user's token, freeze returns 423 on mutations.
+
+### Left over from the nine prompts, now finished
+- **W3 CSP** without inline scripts (above). **W5** screenshots at 1440×900 and 1920×1080 (plus 1280×800 and 1024×768): no horizontal scroll, layout checked; ARIA tabs pattern (roving tabindex, arrows/Home/End, `tabpanel` with `aria-labelledby`) on the team page; keyboard path through tabs verified. **W7/W9** the full 60-minute soak (below, passed). Admin action to reset the health baseline (open limitation #6 since W2): new route, service, authz-matrix row, Settings card, tests (one-shot design, see the review below).
+- Still open and honest: W8 with the club (blocked on club inputs), a screen-reader pass (not possible here), component tests for dialogs, the audit-before-adapter ordering, the Task Scheduler backup registration on the demo machine, and a Lighthouse score (the tool available here excludes performance; speed was measured directly instead).
+
+### Speed (production build, this laptop, 30 teams)
+Measured in headless Chrome with cache disabled. First contentful paint 144 ms (login), 180 ms (overview), 316 ms (teams), 180 ms (team detail), 252 ms (audit); largest contentful paint 296–448 ms; TTFB 24–74 ms; about 285 KB of gzipped JS per console page (200 KB on login); page load events complete in 227–314 ms. **During 22 s of normal 5 s polling on overview and teams: zero long tasks, 60 fps (p95 frame 17 ms, max 18 ms, zero frames over 50 ms).** Interactions: tab switch 157 ms, Reset dialog open 82 ms, Ctrl+K palette 96 ms, server-side search 362 ms (includes the debounce and a request). Layout shift per page 0.03–0.09 (under the 0.1 threshold); the one real source (the source banner appearing after `/api/meta` loads and pushing the page 35 px) now has reserved space. API: overview p95 about 13–17 ms, teams p95 about 11–16 ms at 24–30 teams. No change to the data layer was needed.
+
+### 60-minute soak (the one that was missing since W7)
+Production build rc.2 code, 30-team seed, 3 simulated organizers polling overview and teams every 5 s, one stop/start per minute each, server memory sampled every 30 s, run on the same laptop while nothing else heavy ran.
+
+| Endpoint | polls | p50 | p95 | p99 | max payload | 2xx | 4xx | 5xx | network errors |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `/api/overview` | 1437 | 15.6 ms | 21.8 ms | 28.6 ms | 24.5 KB | 1437 | 0 | 0 | 0 |
+| `/api/teams` | 1437 | 13.0 ms | 20.8 ms | 29.4 ms | 6.0 KB | 1437 | 0 | 0 | 0 |
+| stop (mock lifecycle) | 178 | 5.7 ms | 16.2 ms | 20.1 ms | 0.2 KB | 178 | 0 | 0 | 0 |
+| start (mock lifecycle) | 178 | 6.8 ms | 9.8 ms | 14.6 ms | 0.2 KB | 178 | 0 | 0 | 0 |
+
+**Memory: 130 MB to 124 MB (−4.6%) over 60.2 minutes, 122 samples** (target was growth under 15%). All targets met with about 7× headroom on latency. The soak ran on the build made before two late review fixes (baseline reset design, global-login-ceiling ordering); those paths are not on the polled endpoints and are covered by unit tests plus the final HTTP smoke below.
+
+### Gates after this pass
+Final code (rc.2), after the last change: `npm run typecheck` 0 errors · `npm run lint` 0 errors, 64 warnings (unchanged) · `npm test` **403/403 in 19 files** (389 before this pass; +14: hardening, logout revocation, nonce CSP, baseline reset, global login ceiling, body caps, pagination, idempotency key, malformed path) · authz matrix **191/191** (was 185; new route listed; matrix logout case now mints a throwaway token because logout really revokes) · `npm run build` exit 0 · `npm audit --omit=dev` 0 vulnerabilities · final HTTP smoke on the rebuilt server: version 1.2.0-rc.2, badge SIMULATED, no `X-Powered-By`, COOP/CORP and a nonce CSP present, login 200, `POST /api/settings/health-baseline` 200 `{armed:true}`, logout 204, the same token then 401.
+Existing tests changed (none weakened): migration tests expect `user_version` 5; the freeze test re-issues the admin token after its logout step; the header test now reads the CSP from the proxy and additionally asserts no `unsafe-inline` for scripts, a fresh nonce per request and no second static policy.
+
+### Review of this pass (fresh subagent, static; 2 medium, 4 low, no high)
+- **Applied:** (1) The baseline reset first NULLed stored rounds, which made a replayed or frozen batch look freshly checked, reset the round-changed timer (blinding stuck-source detection) and erased `last_error`. It is now a one-shot flag (`settings.health_baseline_reset`) that only lets the next accepted batch pass the "older round" check; nothing stored is rewritten, `last_error` and the timer are untouched, and the flag clears itself (test asserts stored rounds/times are identical after arming and that going backwards is rejected again afterwards). (2) The global login ceiling is now counted after the per-name and per-address locks, so requests already refused do not eat the budget.
+- **Accepted, documented:** the page proxy only verifies the token signature (a logged-out cookie still gets the HTML shell; every data call returns 401); tokens without a `jti` (issued before this pass) cannot be revoked individually and expire within 8 h; revoked rows are purged only on logout; the 400, redirects and JSON responses carry no CSP (harmless).
+- **Confirmed fine by the reviewer:** the body cap cannot be bypassed (no `req.json()`/`req.text()` left; ingest and import use the capped reader), revocation order (jti before user lookup, epoch still applies, change-password re-issues), nonce plus `strict-dynamic` is correct and fresh per request, no weaker policy replaced the old one, the malformed-percent guard cannot break legitimate routes, baseline route order/authz/freeze/audit.
+
+### Contract changes (additive; docs 03 and 04 updated in the same commit)
+`POST /api/settings/health-baseline` (`{armed:true}`); request-size, pagination-clamp and `Idempotency-Key` rules; malformed-path 400; logout revokes the token; global login ceiling; session `jti`; migration 005 (`revoked_sessions`, `user_version` 5); per-request CSP, COOP/CORP headers; `check-env` 12-character password rule.
 
 ---
 
@@ -224,16 +288,16 @@ What was done instead (all recorded, nothing invented):
 5. Pre-existing hazard: nothing has run against the club's real EnoEngine, nginx, compose template or EC2 host.
 
 **Product gaps**
-6. No admin action to reset the health baseline when a source restarts at a lower round (all rows then reject as `older_than_stored`; the overview shows `all_rows_rejected`; workaround: restart the dashboard DB's flagstore rows manually).
+6. ~~No admin action to reset the health baseline~~ Done in the hardening pass (Settings, "Health source baseline", one-shot).
 7. Operators can reset a single service; doc 12's matrix says "configurable off", which is not built.
 8. Team-detail tabs lack the full ARIA tabs pattern; the notes compare-and-set is not a single SQL statement; the orphan-agent-job window after an accepted job whose DB write fails is not closed.
 9. Mock health never refreshes flagstore results, so under `HEALTH_SOURCE=mock` the flagstore chips are seed data (labelled via the SIMULATED banner).
 10. `/api/meta` is public for the badge; `terminal.url` is still in the authenticated team payload.
 11. Roster arrives only by CSV/JSON import (no Supabase/TeamSource); the per-IP login bucket is disabled without `TRUST_PROXY`, so brute-force protection there rests on the pair and username limits.
-12. Soak and backup: the 60-minute soak was not run (10 + 20 minutes were; memory plateaued), the Task Scheduler backup line is documented but not registered anywhere, and no 30-team full-event load test was run beyond 10 minutes. W8 (club evidence gate) is not executed. The audit `requested` row is written after the adapter call, so a crash in between would leave an action without it (known, not changed at freeze). `POST /health/run` is allowed while frozen by decision. Team-role sessions skip the epoch check (team logins are off).
+12. Not done: the Task Scheduler backup line is documented but not registered on any machine; W8 (club evidence gate) is not executed; the audit `requested` row is written after the adapter call (crash window); `POST /health/run` is allowed while frozen by decision; team-role sessions have no epoch (team logins off). The 60-minute soak passed (hardening pass).
 
 **Tooling and test**
-13. 64 lint warnings (0 errors). CSP keeps `'unsafe-inline'` scripts (Next inline hydration + a statically prerendered login page).
+13. 64 lint warnings (0 errors). The CSP no longer allows inline scripts (per-request nonce, hardening pass); styles still allow inline. The username lockout (10 failures, 5 minutes, any address) can be used to lock an organizer out; mitigation is the organizer-network-only deployment and the restart recovery in the runbook.
 14. `npm audit --omit=dev`: 0 vulnerabilities after `shadcn` moved to devDependencies (W9). A plain `npm ci` fails on Windows without Visual Studio C++ build tools (better-sqlite3 compiles instead of using its prebuilt binary); use `npm ci --ignore-scripts`. `npm install` needs `--legacy-peer-deps` (vitest peer range).
 15. UI flows covered only by browser runs, not component tests: ack dialog, notes conflict UI, bulk dialog, palette selection. The browser checks were run by me through scripted DOM events and screenshots; **keyboard-only and screen-reader passes were not done**, and no real-key presses beyond the `/` and Ctrl+K dispatches.
 16. Lighthouse not run; 1440×900 screenshots not taken.
@@ -277,6 +341,6 @@ What was done instead (all recorded, nothing invented):
 ## Next step
 1. Get the club inputs (questions 1–2, 5–6) and do the dry-run (doc 12 §11): import the real roster with `external_team_id`, point `HEALTH_SCOREBOARD_URL` at the real file, fix the parser, compare 3 teams against the club's scoreboard, record `docs/club-evidence/2026-10-27-dryrun.md`.
 2. Run **W8** with the club (steps in `docs/club-evidence/2026-10-27-w8-status.md`); only then consider `EVIDENCE_GATE_PASSED=true`.
-3. On the demo machine: run the full 60-minute `npm run soak` (with `LT_PID`), register the Task Scheduler backup, fill the escalation table in `docs/EVENT_RUNBOOK.md`, do one rehearsal from the runbook.
+3. On the demo machine: register the Task Scheduler backup, fill the escalation table in `docs/EVENT_RUNBOOK.md`, do one rehearsal from the runbook (the 60-minute soak is done).
 4. Decide whether to push `release/v1.2` and `v1.2.0-rc.1` (nothing has been pushed), and whether the freeze/deadline is known yet.
-To resume: `git status`; `npm run typecheck && npm test` (expect 389/389); read this file, `docs/EVENT_RUNBOOK.md` and docs 12–15; QA on ports 3100/3101 only, on a production build; install with `npm ci --ignore-scripts`.
+To resume: `git status`; `npm run typecheck && npm test` (expect 403/403); read this file, `docs/EVENT_RUNBOOK.md` and docs 12–15; QA on ports 3100/3101 only, on a production build; install with `npm ci --ignore-scripts`.

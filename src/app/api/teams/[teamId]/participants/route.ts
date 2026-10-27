@@ -1,3 +1,4 @@
+import { readJson } from '@/lib/server/limits';
 import { requireUser, assertSameOrigin } from '@/lib/server/auth';
 import { sync } from '@/lib/server/services/sync';
 import { listParticipants, addParticipant } from '@/lib/server/services/participants';
@@ -34,7 +35,7 @@ export async function POST(
     assertSameOrigin(req);
     await sync();
     const { teamId } = await params;
-    const body = await req.json().catch(() => null);
+    const body = await readJson(req, null);
     const parsed = AddParticipantBody.safeParse(body);
     if (!parsed.success) {
       throw new AppError('VALIDATION_ERROR', 'name is required', {

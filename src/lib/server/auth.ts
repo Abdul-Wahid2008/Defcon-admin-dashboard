@@ -3,6 +3,7 @@ import { dbHelper } from './db';
 import { AppError } from './errors';
 import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
+import crypto from 'node:crypto';
 import { cookies } from 'next/headers';
 import { getSessionSecret } from '../session-secret';
 import { loadConfig } from '../config';
@@ -19,6 +20,9 @@ export interface SessionUser {
   /** Copy of users.session_epoch at login; a token with a lower epoch than the row is revoked. */
   epoch?: number;
   mustChangePassword?: boolean;
+  /** Random per-token id and expiry (unix seconds); used to revoke one session on logout. */
+  jti?: string;
+  exp?: number;
 }
 
 // ── Login limiter (in memory; resets on restart) ─────────────────────────────
@@ -33,6 +37,11 @@ const userAttempts = new Map<string, Bucket>();
 const PAIR = { max: 5, window: 5 * 60_000, lock: 60_000 };
 const IP = { max: 30, window: 10 * 60_000 };
 const USER = { max: 10, window: 10 * 60_000, lock: 5 * 60_000 };
+
+// Every attempt (not just failures) costs a bcrypt hash, so a flood of attempts for many different usernames would
+// saturate the CPU and slow the whole console. One global ceiling; existing sessions are unaffected when it trips.
+const GLOBAL_LOGIN = { max: 120, window: 60_000 };
+const globalAttempts: Bucket = { count: 0, resetAt: 0 };
 
 const MAX_TRACKED = 5000;
 
@@ -71,6 +80,12 @@ export function checkLoginRateLimit(ip: string, username: string, now = Date.now
   if (retryAfter > 0) {
     throw new AppError('RATE_LIMITED', `Too many login attempts. Retry after ${retryAfter}s.`, { retryAfter });
   }
+  // Counted last: a request already refused by a per-name or per-address lock never reaches bcrypt and must not eat the budget.
+  if (now >= globalAttempts.resetAt) { globalAttempts.count = 0; globalAttempts.resetAt = now + GLOBAL_LOGIN.window; }
+  if (++globalAttempts.count > GLOBAL_LOGIN.max) {
+    const globalRetry = Math.ceil((globalAttempts.resetAt - now) / 1000);
+    throw new AppError('RATE_LIMITED', `Too many login attempts. Retry after ${globalRetry}s.`, { retryAfter: globalRetry });
+  }
 }
 
 export function recordLoginFailure(ip: string, username: string, now = Date.now()): void {
@@ -89,6 +104,8 @@ export function clearLoginAttempts(ip: string, username: string): void {
 }
 
 export function resetLoginLimiterForTests(): void {
+  globalAttempts.count = 0;
+  globalAttempts.resetAt = 0;
   pairAttempts.clear();
   ipAttempts.clear();
   userAttempts.clear();
@@ -117,6 +134,7 @@ export async function createSession(user: SessionUser): Promise<string> {
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(user.id)
+    .setJti(crypto.randomUUID())
     .setIssuedAt(Math.floor(now / 1000))
     .setExpirationTime(Math.floor((now + SESSION_DURATION_MS) / 1000))
     .sign(getSessionSecret());
@@ -133,6 +151,8 @@ export async function verifySession(token: string): Promise<SessionUser> {
       role: payload['role'] as SessionUser['role'],
       teamId: typeof payload['teamId'] === 'string' ? payload['teamId'] : undefined,
       epoch: typeof payload['epoch'] === 'number' ? payload['epoch'] : 0,
+      jti: typeof payload.jti === 'string' ? payload.jti : undefined,
+      exp: typeof payload.exp === 'number' ? payload.exp : undefined,
     };
   } catch {
     throw new AppError('UNAUTHENTICATED', 'Session expired or invalid.');
@@ -142,6 +162,9 @@ export async function verifySession(token: string): Promise<SessionUser> {
 /** Verifies a token and checks the account is still active and the session not revoked (session_epoch). */
 export async function resolveSession(token: string): Promise<SessionUser> {
   const user = await verifySession(token);
+  if (user.jti && dbHelper.get(`SELECT 1 AS x FROM revoked_sessions WHERE jti = ?`, user.jti)) {
+    throw new AppError('UNAUTHENTICATED', 'Session expired or invalid.');
+  }
   if (user.role === 'team') return user; // team sessions have no users row
   const row = dbHelper.get<{ active: number; session_epoch: number; must_change_password: number }>(
     `SELECT active, session_epoch, must_change_password FROM users WHERE id = ?`, user.id);
@@ -149,6 +172,14 @@ export async function resolveSession(token: string): Promise<SessionUser> {
     throw new AppError('UNAUTHENTICATED', 'Session expired or invalid.');
   }
   return { ...user, mustChangePassword: row.must_change_password === 1 };
+}
+
+/** Logout: this token stops working now, on every request, until it would have expired anyway. */
+export function revokeSession(user: SessionUser): void {
+  if (!user.jti || !user.exp) return; // tokens issued before this hardening have no jti; they expire within 8 h
+  const nowSec = Math.floor(Date.now() / 1000);
+  dbHelper.run(`DELETE FROM revoked_sessions WHERE expires_at < ?`, nowSec);
+  dbHelper.run(`INSERT OR IGNORE INTO revoked_sessions (jti, expires_at) VALUES (?, ?)`, user.jti, user.exp);
 }
 
 // Paths a user with must_change_password may still call.

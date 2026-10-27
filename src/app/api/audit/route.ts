@@ -1,3 +1,4 @@
+import { intParam } from '@/lib/server/limits';
 import { requireUser } from '@/lib/server/auth';
 import { queryAudit } from '@/lib/server/services/audit';
 import { errorResponse, newRequestId } from '@/lib/server/errors';
@@ -17,8 +18,8 @@ export async function GET(req: Request) {
       from: url.searchParams.get('from') ?? undefined,
       to: url.searchParams.get('to') ?? undefined,
       q: url.searchParams.get('q') ?? undefined,
-      page: parseInt(url.searchParams.get('page') ?? '1', 10),
-      pageSize: parseInt(url.searchParams.get('pageSize') ?? '50', 10),
+      page: intParam(url.searchParams.get('page'), 1, 1, 100000),
+      pageSize: intParam(url.searchParams.get('pageSize'), 50, 1, 100),
     };
     const result = queryAudit(user, query);
     return Response.json(result, { headers: { 'X-Request-Id': requestId } });

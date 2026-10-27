@@ -36,6 +36,9 @@ export function applyHealthBatch(rows: HealthRow[], source: HealthSourceName, no
     const teams = new Map<string, { id: string; archived: boolean } | null>();
     const services = new Map<string, boolean>();
     const touched = new Map<string, { teamId: string; serviceKey: string }>();
+    // Armed by an admin after the checker restarted at a lower round: the next accepted batch may go below the stored
+    // rounds. Verdicts, check times and the round-changed timer are untouched, so staleness stays honest.
+    const baselineReset = dbHelper.get<{ value: string }>(`SELECT value FROM settings WHERE key = 'health_baseline_reset'`)?.value === '1';
 
     rows.forEach((row, index) => {
       const reject = (reason: string) => { result.rejected.push({ index, reason }); };
@@ -69,7 +72,7 @@ export function applyHealthBatch(rows: HealthRow[], source: HealthSourceName, no
 
       if (stored && stored.checked_at !== null) {
         if (round !== null && stored.round !== null && round !== stored.round) {
-          if (round < stored.round) return reject('older_than_stored');
+          if (round < stored.round && !baselineReset) return reject('older_than_stored');
         } else if (checkedAtGiven !== null) {
           if (checkedAtGiven < stored.checked_at) return reject('older_than_stored');
           if (checkedAtGiven === stored.checked_at && round === stored.round) { result.unchanged++; return; }
@@ -100,6 +103,7 @@ export function applyHealthBatch(rows: HealthRow[], source: HealthSourceName, no
     for (const teamId of touchedTeams) {
       dbHelper.run(`UPDATE environments SET last_health_check_at = ? WHERE team_id = ?`, now, teamId);
     }
+    if (baselineReset && result.accepted > 0) dbHelper.run(`DELETE FROM settings WHERE key = 'health_baseline_reset'`);
     return result;
   });
 }

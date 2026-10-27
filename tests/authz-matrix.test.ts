@@ -37,6 +37,12 @@ const HOST = 'localhost';
 
 async function call(route: (typeof routes)[number], c: AuthzCase, opts: { token?: string; teamId?: string; origin?: string | null }) {
   cookieState.token = opts.token;
+  if (route.key === '/api/auth/logout' && opts.token) {
+    // logout revokes the presented token for real, so give it a throwaway copy of the same principal
+    const sub = JSON.parse(Buffer.from(opts.token.split('.')[1], 'base64url').toString()).sub;
+    const who = [admin, operator, team].find(u => u.id === sub);
+    if (who) cookieState.token = await createSession(who);
+  }
   const mod = await import(/* @vite-ignore */ route.file.split(path.sep).join('/'));
   let url = 'http://' + HOST + route.key;
   const params: Record<string, string> = { ...(c.params ?? {}) };

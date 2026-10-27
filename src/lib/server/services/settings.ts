@@ -60,6 +60,33 @@ export function updateSettings(
   return getSettings(user);
 }
 
+/**
+ * Admin-only. A checker or scoreboard that restarts at a lower round has every row rejected as older_than_stored.
+ * This arms a one-shot flag: the next batch that is accepted may go below the stored rounds, and the flag clears itself.
+ * Nothing is rewritten: verdicts, check times, the source error and the round-changed timer stay as they are, so
+ * staleness and frozen-source detection are unaffected. Audited.
+ */
+export function resetHealthBaseline(user: SessionUser, opts: { requestId: string }) {
+  if (!can(user, 'settings.update')) {
+    appendAudit({
+      actorId: user.id, actorName: user.displayName, actorRole: user.role,
+      action: 'settings.update', targetType: 'settings', outcome: 'denied',
+      message: 'Unauthorized health baseline reset', requestId: opts.requestId,
+    });
+    throw new AppError('FORBIDDEN', 'Insufficient permissions.', { required: 'settings.update' });
+  }
+  assertNotFrozen(user, { action: 'settings.update', targetType: 'settings', requestId: opts.requestId });
+  dbHelper.run(`INSERT INTO settings (key, value) VALUES ('health_baseline_reset', '1') ON CONFLICT(key) DO UPDATE SET value = '1'`);
+  appendAudit({
+    actorId: user.id, actorName: user.displayName, actorRole: user.role,
+    action: 'settings.update', targetType: 'settings', outcome: 'success',
+    message: 'Health baseline reset armed: the next accepted batch may use lower round numbers',
+    requestId: opts.requestId,
+    details: { kind: 'health_baseline_reset' },
+  });
+  return { armed: true as const };
+}
+
 /** Admin-only toggle. Freezing needs the typed word FREEZE; unfreezing never needs a mutation to be allowed. */
 export function setFrozen(
   user: SessionUser,

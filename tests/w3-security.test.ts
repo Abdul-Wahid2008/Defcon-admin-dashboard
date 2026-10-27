@@ -82,6 +82,7 @@ describe('mutation freeze', () => {
     expect((await teamsGet(req('/api/teams'))).status).toBe(200);
     expect((await auditGet(req('/api/audit'))).status).toBe(200);
     expect((await logoutRoute(req('/api/auth/logout', { method: 'POST' }))).status).toBe(204);
+    await as(admin); // logout revoked that token for real
 
     expect((await freeze({ frozen: false })).status).toBe(200);
     expect((await teamsPost(req('/api/teams', { method: 'POST', json: { name: 'Thawed Team' } }))).status).toBeLessThan(300);
@@ -302,14 +303,25 @@ describe('security headers', () => {
     const list = await cfg.headers!();
     const all = Object.fromEntries(list.find(h => h.source === '/:path*')!.headers.map(h => [h.key, h.value]));
     const api = list.find(h => h.source === '/api/:path*')!.headers;
-    return { all, api };
+    // the CSP is per request (nonce) and comes from the proxy
+    const { NextRequest } = await import('next/server');
+    const { proxy } = await import('../src/proxy');
+    const res = await proxy(new NextRequest('http://localhost/login'));
+    const csp = res.headers.get('Content-Security-Policy') ?? '';
+    const again = (await proxy(new NextRequest('http://localhost/login'))).headers.get('Content-Security-Policy') ?? '';
+    return { all, api, csp, again, poweredBy: cfg.poweredByHeader };
   }
 
   it('production: CSP without unsafe-eval, frame-ancestors none, nosniff, no-referrer, no-store on /api', async () => {
-    const { all, api } = await headersFor('production');
-    expect(all['Content-Security-Policy']).toContain("frame-ancestors 'none'");
-    expect(all['Content-Security-Policy']).not.toContain('unsafe-eval');
-    expect(all['Content-Security-Policy']).toContain("object-src 'none'");
+    const { all, api, csp, again, poweredBy } = await headersFor('production');
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).not.toContain('unsafe-eval');
+    expect(csp).toContain("object-src 'none'");
+    expect(csp).not.toMatch(/script-src[^;]*'unsafe-inline'/); // inline scripts only with this request's nonce
+    expect(csp).toMatch(/script-src 'self' 'nonce-[A-Za-z0-9+/=]{20,}' 'strict-dynamic'/);
+    expect(again).not.toBe(csp); // a fresh nonce per request
+    expect(all['Content-Security-Policy']).toBeUndefined(); // no second, weaker static policy
+    expect(poweredBy).toBe(false);
     expect(all['X-Content-Type-Options']).toBe('nosniff');
     expect(all['Referrer-Policy']).toBe('no-referrer');
     expect(all['X-Frame-Options']).toBe('DENY');
@@ -318,7 +330,7 @@ describe('security headers', () => {
   });
 
   it('development allows unsafe-eval for React refresh only', async () => {
-    const { all } = await headersFor('development');
-    expect(all['Content-Security-Policy']).toContain("'unsafe-eval'");
+    const { csp } = await headersFor('development');
+    expect(csp).toContain("'unsafe-eval'");
   });
 });

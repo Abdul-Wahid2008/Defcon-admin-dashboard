@@ -1,4 +1,4 @@
-import { requireUser, clearSessionCookie, assertSameOrigin } from '@/lib/server/auth';
+import { requireUser, clearSessionCookie, assertSameOrigin, revokeSession } from '@/lib/server/auth';
 import { errorResponse } from '@/lib/server/errors';
 import { appendAudit } from '@/lib/server/audit';
 import { newRequestId } from '@/lib/server/errors';
@@ -15,6 +15,7 @@ export async function POST(req: Request) {
   try {
     const user = await requireUser(req).catch(() => null);
     if (user) {
+      revokeSession(user);
       appendAudit({
         actorId: user.id, actorName: user.displayName, actorRole: user.role,
         action: 'auth.logout', targetType: 'session', outcome: 'success',

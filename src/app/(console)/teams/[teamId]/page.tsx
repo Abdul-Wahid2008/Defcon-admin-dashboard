@@ -88,6 +88,8 @@ function NotesCard({ teamId, serverNotes }: { teamId: string; serverNotes: strin
 }
 
 /** Failing services first: reachability fail, then functional fail, then unknown/stale. */
+const TABS = ['overview', 'services', 'participants', 'activity', 'settings'] as const;
+
 function serviceRank(service: { stale?: boolean; checks: { type: string; status: string }[] }): number {
   if (service.stale) return 1;
   if (service.checks.some((c) => c.type === 'reachability' && c.status === 'fail')) return 3;
@@ -169,7 +171,16 @@ export default function TeamDetailPage() {
   // The API reads the `team` query param (docs/03 §3.7); `teamId` was silently
   // ignored, so the Activity tab previously showed the global log.
   const audit = useAudit({ team: teamId });
-  const [tab, setTab] = useState('overview');
+  const [tab, setTab] = useState<(typeof TABS)[number]>('overview');
+  // ARIA tabs pattern: arrow keys, Home and End move between tabs (roving tabindex), focus follows the selection
+  const onTabKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const i = TABS.indexOf(tab);
+    const next = e.key === 'ArrowRight' ? (i + 1) % TABS.length : e.key === 'ArrowLeft' ? (i + TABS.length - 1) % TABS.length : e.key === 'Home' ? 0 : e.key === 'End' ? TABS.length - 1 : -1;
+    if (next < 0) return;
+    e.preventDefault();
+    setTab(TABS[next]);
+    document.getElementById(`tab-${TABS[next]}`)?.focus();
+  };
   const [showTerminal, setShowTerminal] = useState(false); // the link is not in the DOM until an organizer asks for it
   const [actionDialog, setActionDialog] = useState<ActionKind | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -317,8 +328,9 @@ export default function TeamDetailPage() {
       {team.environment.pending && <div role="status" className="mb-5 flex items-center gap-3 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/10 p-3 text-sm text-[var(--warn)]"><ShieldAlert size={16} /><span><strong>{team.environment.pending.action.replace('service_', 'service ')}{team.environment.pending.serviceKey ? ` (${team.environment.pending.serviceKey})` : ''}</strong> is in progress. The final state will be confirmed by polling.</span></div>}
       {team.environment.failureReason && <div className="mb-5 flex items-start gap-3 rounded-lg border border-[var(--bad)]/40 bg-[var(--bad)]/10 p-3 text-sm text-[var(--bad)]"><ShieldAlert size={17} className="mt-0.5" /><div><strong>Environment needs attention.</strong><p className="mt-1">{team.environment.failureReason}</p></div></div>}
 
-      <div className="mb-5 flex gap-1 overflow-x-auto border-b border-[var(--border)]" role="tablist" aria-label="Team detail sections">{['overview', 'services', 'participants', 'activity', 'settings'].map((name) => <button key={name} role="tab" aria-selected={tab === name} onClick={() => setTab(name)} className={`border-b-2 px-3 py-2.5 text-sm capitalize ${tab === name ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--muted)] hover:text-[var(--text)]'}`}>{name}</button>)}</div>
+      <div className="mb-5 flex gap-1 overflow-x-auto border-b border-[var(--border)]" role="tablist" aria-label="Team detail sections" onKeyDown={onTabKey}>{TABS.map((name) => <button key={name} id={`tab-${name}`} role="tab" aria-selected={tab === name} aria-controls={`panel-${name}`} tabIndex={tab === name ? 0 : -1} onClick={() => setTab(name)} className={`border-b-2 px-3 py-2.5 text-sm capitalize ${tab === name ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--muted)] hover:text-[var(--text)]'}`}>{name}</button>)}</div>
 
+      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} tabIndex={0} className="outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50 rounded-lg">
       {tab === 'overview' && <div className="grid gap-4 xl:grid-cols-3">
         <Card className="console-surface"><CardHeader className="border-b border-[var(--border)]"><CardTitle>Environment</CardTitle></CardHeader><CardContent className="space-y-3 pt-4 text-sm">
           <div className="flex justify-between"><span className="text-[var(--muted)]">Lifecycle</span><StateBadge state={team.environment.lifecycleState} size="sm" /></div>
@@ -342,6 +354,7 @@ export default function TeamDetailPage() {
         onOpenStatus={() => setStatusDialog(team.accountStatus === 'active' ? 'suspended' : 'active')}
         onOpenDelete={() => setDeleteOpen(true)}
       />}
+      </div>
 
       <Dialog open={!!actionDialog} onOpenChange={(open) => !open && setActionDialog(null)}>
         <DialogContent><DialogHeader><DialogTitle>{actionCopy?.title}</DialogTitle><DialogDescription>{actionCopy?.body}</DialogDescription></DialogHeader>{needsResetConfirmation && <ResetFields idPrefix="env-reset" teamId={team.id} reason={resetReason} typedTeamId={resetTyped} onReason={setResetReason} onTypedTeamId={setResetTyped} />}{action.error && <p role="alert" className="text-sm text-[var(--bad)]">{action.error.message}</p>}<DialogFooter><DialogClose render={<Button variant="outline" />}>Cancel</DialogClose><Button onClick={submitAction} disabled={action.isPending || (actionDialog === 'reset' && !isResetConfirmed(resetInfo, resetReason, resetTyped, team.id))}>{action.isPending ? 'Working…' : actionCopy?.button}</Button></DialogFooter></DialogContent>

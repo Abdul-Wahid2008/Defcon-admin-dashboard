@@ -326,3 +326,6 @@ Runner: `src/lib/migrate.ts` (`PRAGMA user_version`; used by `db.ts`, `scripts/s
 - First batch from a real source clears simulated results (`flagstore_results`, `checks`) and closes simulated `service_down/degraded` alerts once (audited as `health.run`), so seeded rounds cannot outrank real ones.
 - Staleness is applied at read time (`stale_after_sec`, default 270). Frozen = scoreboard reachable but round unchanged > 2 × `round_sec`.
 - Scoreboard parser is PROVISIONAL (docs/12 A21); unknown shape → `SOURCE_SHAPE_UNKNOWN`.
+
+## 11. Migration 005 (v1.2 hardening, `migrations/005_revoked_sessions.sql`)
+`revoked_sessions(jti TEXT PRIMARY KEY, expires_at INTEGER NOT NULL)` + index on `expires_at`. Logout inserts the token's `jti` with its expiry (unix seconds); `resolveSession` rejects a token whose `jti` is listed; rows past their expiry are deleted on the next logout. Additive; `user_version` becomes 5. Session epoch (`users.session_epoch`) still revokes every session of an account at once (password change, admin revoke).

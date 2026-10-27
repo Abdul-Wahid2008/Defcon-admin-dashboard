@@ -1,3 +1,4 @@
+import { intParam } from '@/lib/server/limits';
 import { requireUser } from '@/lib/server/auth';
 import { sync } from '@/lib/server/services/sync';
 import { listAlerts } from '@/lib/server/services/overview';
@@ -12,7 +13,7 @@ export async function GET(req: Request) {
     await sync();
     const url = new URL(req.url);
     const status = url.searchParams.get('status') as 'open' | 'resolved' | undefined;
-    const limit = parseInt(url.searchParams.get('limit') ?? '20', 10);
+    const limit = intParam(url.searchParams.get('limit'), 20, 1, 100);
     const alerts = await listAlerts(user, { status, limit });
     return Response.json(alerts, { headers: { 'X-Request-Id': requestId } });
   } catch (e) {

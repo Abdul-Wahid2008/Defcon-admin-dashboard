@@ -1,3 +1,4 @@
+import { idempotencyKeyFrom } from '@/lib/server/limits';
 import { requireUser, assertSameOrigin } from '@/lib/server/auth';
 import { sync } from '@/lib/server/services/sync';
 import { requestLifecycleAction } from '@/lib/server/services/teams';
@@ -15,7 +16,7 @@ export async function POST(
     assertSameOrigin(req);
     await sync();
     const { teamId } = await params;
-    const idempotencyKey = req.headers.get('Idempotency-Key');
+    const idempotencyKey = idempotencyKeyFrom(req);
     const result = await requestLifecycleAction(user, teamId, 'stop', { requestId, idempotencyKey });
     const headers: Record<string, string> = { 'X-Request-Id': requestId };
     if (result.replay) headers['Idempotent-Replay'] = 'true';

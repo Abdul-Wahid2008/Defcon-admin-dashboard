@@ -1,3 +1,4 @@
+import { readJson } from '@/lib/server/limits';
 import { requireUser, assertSameOrigin } from '@/lib/server/auth';
 import { getSettings, updateSettings } from '@/lib/server/services/settings';
 import { errorResponse, newRequestId, AppError } from '@/lib/server/errors';
@@ -26,7 +27,7 @@ export async function PATCH(req: Request) {
   try {
     const user = await requireUser(req);
     assertSameOrigin(req);
-    const body = await req.json().catch(() => null);
+    const body = await readJson(req, null);
     const parsed = PatchSettingsBody.safeParse(body);
     if (!parsed.success) {
       throw new AppError('VALIDATION_ERROR', 'Invalid settings', {

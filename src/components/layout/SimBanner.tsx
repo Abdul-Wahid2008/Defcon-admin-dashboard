@@ -10,6 +10,8 @@ export function SimBanner() {
   const { data } = useMeta();
   const [dismissed, setDismissed] = useState(false);
 
+  // Reserve the banner's height while the meta request is in flight so the page does not jump when it arrives.
+  if (!data && !dismissed) return <div aria-hidden="true" className="h-[35px] border-b border-transparent" />;
   if (dismissed || !data || data.badge === 'LIVE') return null;
 
   const { health, sources } = data;

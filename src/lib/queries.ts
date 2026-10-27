@@ -23,7 +23,7 @@ import {
   apiUpdateSettings, apiDemoInject, apiDemoFailNext, apiDemoReseed,
   apiImportTeams, apiBulkEnvironmentAction,
 } from './api-client';
-import { POLLING_INTERVALS } from './config';
+import { POLLING_INTERVALS } from './polling';
 
 // ── Meta ──────────────────────────────────────────────────────────────────────
 

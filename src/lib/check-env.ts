@@ -23,6 +23,7 @@ export function checkEnv(env: Record<string, string | undefined>): string[] {
   for (const name of ['ORGANIZER_ADMIN_PASSWORD', 'ORGANIZER_OPERATOR_PASSWORD']) {
     const value = get(name);
     if (!value || EXAMPLE_VALUES.has(value)) problems.push(`${name} is unset or a default value.`);
+    else if (value.length < 12) problems.push(`${name} must be at least 12 characters.`);
   }
 
   const adapter = get('ADAPTER') || 'mock';

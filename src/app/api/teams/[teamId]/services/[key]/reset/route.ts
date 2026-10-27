@@ -1,3 +1,4 @@
+import { idempotencyKeyFrom, readJson } from '@/lib/server/limits';
 import { z } from 'zod';
 import { requireUser, assertSameOrigin } from '@/lib/server/auth';
 import { sync } from '@/lib/server/services/sync';
@@ -19,10 +20,10 @@ export async function POST(
     assertSameOrigin(req);
     await sync();
     const { teamId, key } = await params;
-    const raw = await req.json().catch(() => ({}));
+    const raw = await readJson(req, ({}));
     const parsed = Body.safeParse(raw ?? {});
     if (!parsed.success) throw new AppError('VALIDATION_ERROR', 'Invalid service action body');
-    const idempotencyKey = req.headers.get('Idempotency-Key');
+    const idempotencyKey = idempotencyKeyFrom(req);
     const result = await requestServiceAction(user, teamId, key, 'reset', parsed.data, { requestId, idempotencyKey });
     const headers: Record<string, string> = { 'X-Request-Id': requestId };
     if (result.replay) headers['Idempotent-Replay'] = 'true';

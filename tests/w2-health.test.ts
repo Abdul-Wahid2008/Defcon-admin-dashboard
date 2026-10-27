@@ -562,3 +562,27 @@ describe('config and /api/meta', () => {
     expect(text).not.toContain('score.example');
   });
 });
+
+describe('health baseline reset (restarted source)', () => {
+  const admin = { id: 'u_w2_admin', username: 'w2admin', displayName: 'Admin', role: 'organizer_admin' as const };
+  const operator = { id: 'u_w2_op', username: 'w2op', displayName: 'Operator', role: 'organizer_operator' as const };
+
+  it('a source that restarts at a lower round is rejected until an admin resets the baseline', async () => {
+    const { resetHealthBaseline } = await import('../src/lib/server/services/settings');
+    applyHealthBatch(allFlags('OK', { round: 50 }), 'scoreboard');
+    const stuck = applyHealthBatch(allFlags('OK', { round: 3 }), 'scoreboard');
+    expect(stuck.accepted).toBe(0);
+    expect(stuck.rejected.every(r => r.reason === 'older_than_stored')).toBe(true);
+
+    expect(() => resetHealthBaseline(operator, { requestId: 'r1' })).toThrow(/Insufficient permissions/);
+    expect(auditCount('settings.update')).toBeGreaterThanOrEqual(1); // the denied attempt is audited
+
+    const before = dbHelper.all<{ round: number; checked_at: string }>(`SELECT round, checked_at FROM flagstore_results ORDER BY flagstore`);
+    expect(resetHealthBaseline(admin, { requestId: 'r2' })).toEqual({ armed: true });
+    // arming rewrites nothing: stored rounds and check times (so staleness) are exactly as they were
+    expect(dbHelper.all(`SELECT round, checked_at FROM flagstore_results ORDER BY flagstore`)).toEqual(before);
+    expect(applyHealthBatch(allFlags('OK', { round: 3 }), 'scoreboard').accepted).toBe(3);
+    // one-shot: it switched itself off, so going backwards is rejected again
+    expect(applyHealthBatch(allFlags('OK', { round: 2 }), 'scoreboard').rejected.length).toBe(3);
+  });
+});

@@ -1,5 +1,12 @@
 # 09 — CHANGELOG
 
+## v1.2.0-rc.2 (27 Oct 2026): hardening and performance pass
+
+- **Security**: nonce-based CSP (scripts no longer allow `unsafe-inline`), server-side logout (`revoked_sessions`, migration 005), 64 KB JSON body cap, clamped pagination (an absurd `page` was a 500), `Idempotency-Key` validation, 400 for malformed percent-escapes, global login ceiling, 12-character minimum for organizer passwords in `check-env`, `X-Powered-By` removed, COOP/CORP headers, server config no longer bundled into the browser.
+- **Product**: admin "Reset health baseline" action (`POST /api/settings/health-baseline`), ARIA tabs with arrow keys on the team page, no layout jump when the source banner loads.
+- **Dependencies**: removed unused `recharts` and `tw-animate-css`.
+- **Evidence**: 60-minute soak, black-box attack probes, browser checks at four viewport sizes. Details in `BUILD_STATUS.md`.
+
 ## v1.2.0-rc.1 (27 Oct 2026)
 
 Reconciliation after the club decisions (D16–D23) and slices W0–W9, details in `BUILD_STATUS.md`.

@@ -172,10 +172,7 @@ export const MOCK_DURATIONS = {
   service: 2 * 1000,
 };
 
-export const POLLING_INTERVALS = {
-  DEFAULT: 5 * 1000,
-  PENDING: 2 * 1000,
-};
+export { POLLING_INTERVALS } from './polling';
 
 export const SOFT_TEAM_CAP = 30;
 
