@@ -34,7 +34,7 @@ export function describeProblems(team: Team): string[] {
   return lines;
 }
 
-const Row = memo(function Row({ team, canRestart, onRefresh }: { team: Team; canRestart: boolean; onRefresh: () => void }) {
+const Row = memo(function Row({ team, canRestart, simulated, onRefresh }: { team: Team; canRestart: boolean; simulated: boolean; onRefresh: () => void }) {
   const [busy, setBusy] = useState<string | null>(null);
   const failing: Svc[] = team.services.filter(s => !s.stale && (s.reachability === 'fail' || s.functional === 'fail'));
 
@@ -42,7 +42,7 @@ const Row = memo(function Row({ team, canRestart, onRefresh }: { team: Team; can
     setBusy('check');
     try {
       const r = await apiRunCheck(team.teamId);
-      toast(`${team.teamId}: check finished, health ${r.health}`);
+      toast(`${team.teamId}: ${simulated ? 'simulated check' : 'check'} finished, health ${r.health}`);
     } catch (e) {
       toast.error(`${team.teamId}: check failed. ${(e as Error).message}`, { duration: Infinity });
     } finally { setBusy(null); onRefresh(); }
@@ -68,7 +68,7 @@ const Row = memo(function Row({ team, canRestart, onRefresh }: { team: Team; can
           {team.pending && <span className="text-xs text-[var(--warn)]">action in progress</span>}
         </div>
         <ul className="mt-1 text-sm text-[var(--muted)]">
-          {describeProblems(team).map(l => <li key={l}>{l}</li>)}
+          {describeProblems(team).map((l, i) => <li key={`${i}-${l}`}>{l}</li>)}
         </ul>
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -85,7 +85,7 @@ const Row = memo(function Row({ team, canRestart, onRefresh }: { team: Team; can
 });
 
 /** Only teams with a problem, worst first, each with the actions an operator reaches for first. */
-export function IncidentList({ grid, serviceActions }: { grid: Team[]; serviceActions: boolean }) {
+export function IncidentList({ grid, serviceActions, simulated = false }: { grid: Team[]; serviceActions: boolean; simulated?: boolean }) {
   const qc = useQueryClient();
   const incidents = useMemo(
     () => grid.filter(t => teamSeverity(t) > 0).sort((a, b) => teamSeverity(b) - teamSeverity(a) || a.teamId.localeCompare(b.teamId)),
@@ -93,5 +93,5 @@ export function IncidentList({ grid, serviceActions }: { grid: Team[]; serviceAc
   );
   const refresh = useMemo(() => () => { void qc.invalidateQueries({ queryKey: ['overview'] }); }, [qc]);
   if (!incidents.length) return <p className="py-8 text-center text-sm text-[var(--muted)]">No team has a failing, stale or failed service.</p>;
-  return <ul aria-label="Teams with problems" className="rounded-lg border border-[var(--border)]">{incidents.map(t => <Row key={t.teamId} team={t} canRestart={serviceActions} onRefresh={refresh} />)}</ul>;
+  return <ul aria-label="Teams with problems" className="rounded-lg border border-[var(--border)]">{incidents.map(t => <Row key={t.teamId} team={t} canRestart={serviceActions} simulated={simulated} onRefresh={refresh} />)}</ul>;
 }

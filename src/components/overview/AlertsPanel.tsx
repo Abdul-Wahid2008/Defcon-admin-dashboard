@@ -21,7 +21,9 @@ export function AlertsPanel({ alerts }: { alerts: Alert[] }) {
   const ack = useMutation({
     mutationFn: (resolve: boolean) => apiAckAlert(target!.id, { note: note.trim() || undefined, resolve }),
     onSuccess: (r) => {
-      toast.success(r.status === 'resolved' ? 'Alert resolved' : 'Alert acknowledged');
+      if (r.status === 'resolved') toast.success('Alert resolved');
+      else if (r.status === 'acknowledged') toast.success('Alert acknowledged');
+      else toast(r.status === 'already_resolved' ? 'Already resolved by a health update; nothing changed' : 'Already acknowledged; nothing changed');
       setTarget(null); setNote('');
       void qc.invalidateQueries({ queryKey: ['overview'] });
       void qc.invalidateQueries({ queryKey: ['alerts'] });
@@ -32,7 +34,7 @@ export function AlertsPanel({ alerts }: { alerts: Alert[] }) {
   return (
     <>
       <ul className="divide-y divide-[var(--border)]">
-        {alerts.slice(0, 10).map((alert) => (
+        {alerts.map((alert) => (
           <li key={alert.id} className="flex gap-3 py-2.5">
             <AlertCircle size={16} className={`mt-0.5 shrink-0 ${tone(alert)}`} aria-hidden="true" />
             <div className="min-w-0 flex-1">
@@ -56,7 +58,7 @@ export function AlertsPanel({ alerts }: { alerts: Alert[] }) {
             <DialogTitle>{target?.ackedAt ? 'Resolve alert?' : 'Acknowledge alert?'}</DialogTitle>
             <DialogDescription>
               Acknowledging keeps the alert open and removes it from the unacknowledged count; repeats of the same failure do not create a new alert.
-              Resolving closes it by hand; if the failure is still there the next health update opens it again. Either action is recorded in the audit log.
+              Resolving closes it by hand; if the failure is still present when the next health result arrives, a new alert opens (with simulated health, results never arrive, so it stays closed). Either action is recorded in the audit log.
             </DialogDescription>
           </DialogHeader>
           <p className="text-sm">{target?.message}</p>

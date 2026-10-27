@@ -79,7 +79,7 @@ export default function SettingsPage() {
                   <p className="text-[var(--muted)]">Start time in UTC. The overview derives the phase from it (peace 45, battle 165, freeze 30 minutes; these lengths come from the event-flow draft and are not confirmed). Leave empty to show &quot;Event clock not set&quot;.</p>
                   <label className="grid gap-1 text-xs font-medium" htmlFor="event-start">Start (UTC)<Input id="event-start" type="datetime-local" value={startValue} onChange={(e) => setEventStart(e.target.value)} className="border-[var(--border-strong)] bg-[var(--surface-inset)]" /></label>
                   <div className="flex gap-2">
-                    <Button disabled={update.isPending || startValue === savedStart || !startValue} onClick={() => update.mutate({ eventStartIso: new Date(`${startValue}:00Z`).toISOString() }, { onSuccess: () => { setEventStart(null); toast.success('Event start saved'); } })}>{update.isPending ? 'Saving…' : 'Save start time'}</Button>
+                    <Button disabled={update.isPending || startValue === savedStart || !startValue} onClick={() => update.mutate({ eventStartIso: new Date(`${startValue.slice(0, 16)}:00Z`).toISOString() }, { onSuccess: () => { setEventStart(null); toast.success('Event start saved'); } })}>{update.isPending ? 'Saving…' : 'Save start time'}</Button>
                     <Button variant="outline" disabled={update.isPending || !savedStart} onClick={() => update.mutate({ eventStartIso: null }, { onSuccess: () => { setEventStart(null); toast.success('Event clock cleared'); } })}>Clear</Button>
                   </div>
                 </CardContent>

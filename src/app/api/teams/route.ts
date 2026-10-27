@@ -11,6 +11,7 @@ const CreateTeamBody = z.object({
   notes: z.string().max(500).optional(),
   participantNames: z.array(z.string().min(1)).min(0).max(8).optional(),
   autoProvision: z.boolean().optional(),
+  externalTeamId: z.string().trim().min(1).max(64).optional(),
 });
 
 export async function GET(req: Request) {

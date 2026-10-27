@@ -50,7 +50,8 @@ function NotesCard({ teamId, serverNotes }: { teamId: string; serverNotes: strin
     setState('saving'); setMessage(null);
     try {
       await apiSaveNotes(teamId, value.trim(), expected);
-      setBase(value.trim()); setText(value.trim()); setConflict(null); setState('saved');
+      setBase(value.trim()); setConflict(null); setState('saved');
+      setText((current) => (current === value ? value.trim() : current)); // keep anything typed while the request was in flight
       void qc.invalidateQueries({ queryKey: ['team', teamId] });
       void qc.invalidateQueries({ queryKey: ['audit'] });
     } catch (e) {

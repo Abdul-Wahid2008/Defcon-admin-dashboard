@@ -302,6 +302,7 @@ export const TeamImportRequestSchema = z.object({
   rows: z.array(z.object({
     name: z.string().trim().min(2).max(60),
     participantNames: z.array(z.string().trim().min(1)).max(8).optional(),
+    externalTeamId: z.string().trim().min(1).max(64).optional(),
   })).min(1).max(40),
   autoProvision: z.boolean().optional(),
   dryRun: z.boolean().optional(),

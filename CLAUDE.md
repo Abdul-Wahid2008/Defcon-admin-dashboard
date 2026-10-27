@@ -3,17 +3,17 @@
 > Also provided as `AGENTS.md` for other coding tools. Keep the two identical.
 
 ## STATUS (update at the end of every work session)
-- Date/slice: 27 Oct 2026 — v1.2 in progress on branch `release/v1.2`; slice W1 (config-driven manifest, flagstores, migration 002, seed) done after W0. Head: see `git log`.
-- Done: P1–P17 (v1.1) plus W0, W1. Manifest = `config/services.json` via `src/lib/event-config.ts` (names UNCONFIRMED); migrations run through `src/lib/migrate.ts` (001, 002). Teams pages share `src/components/teams/CredentialsReveal.tsx` for one-time credential reveal.
-- Validation gate (27 Oct): `npm run typecheck` 0 · `npm run lint` 0 errors (legacy warnings only) · `npm test` 81/81 across 10 files (74 + 7 in w1-manifest) · `npm run build` 0 · authenticated headless-Chrome QA of /teams and /teams/team-01 at 1280×800 and 1024×768 on a temp DB: 24 rows, zero console errors/exceptions.
-- Runtime: `ADAPTER=mock` → `SIMULATED`; no real adapter; no real health source. Never claim `LIVE`.
-- Release gate: `npm run check-env` (pure logic in `src/lib/check-env.ts`) fails on short/placeholder SESSION_SECRET, DEMO_CONTROLS or ALLOW_DEFAULT_PASSWORDS true, DB_PATH unset or `:memory:`, default/unset organizer passwords, invalid ADAPTER. `npm run start:release` = check-env then `next start`. A local `.env` with `DEMO_CONTROLS=true` makes `next start` fail closed; release deployments ship `DEMO_CONTROLS=false`.
+- Date/slice: 27 Oct 2026 — v1.2 in progress on branch `release/v1.2`; slices W0–W6 done (W2 health source, W3 security/roles/freeze/accounts, W4 lifecycle capabilities + service actions + agent client, W5 overview matrix/UI copy, W6 operator workflows). Head: see `git log`. Not pushed. Next: dry-run with the real club inputs (doc 12 §11), then W7–W9. Full detail: `docs/defcon-control-center/BUILD_STATUS.md`.
+- Done: P1–P17 (v1.1), W0–W6. Manifest = `config/services.json` via `src/lib/event-config.ts` (names UNCONFIRMED); migrations 001–004 via `src/lib/migrate.ts`. Health pipeline in `src/lib/server/health/` (scoreboard pull + token ingest + staleness). Agent lifecycle client in `src/lib/server/adapters/agent/` (tested only against `scripts/fake-agent.ts`).
+- Validation gate (27 Oct, after W6): `npm run typecheck` 0 · `npm run lint` 0 errors (legacy warnings only) · `npm test` 388/388 across 18 files (authz matrix 185) · `npm run build` 0 · headless-Chrome QA per slice on temp DBs (ports 3100/3101): zero console errors after each fix.
+- Runtime: default `ADAPTER=mock` + `HEALTH_SOURCE=mock` → `SIMULATED`. `HEALTH_SOURCE=scoreboard|ingest` or `ADAPTER=real|docker-compose` → `PARTIAL`. `LIVE` is unreachable until `EVIDENCE_GATE_PASSED=true` **and** the adapter reports `capabilities.fullyReal` (no adapter does). The scoreboard parser is PROVISIONAL (no real `scoreboard.json` sample yet): unknown shape → `SOURCE_SHAPE_UNKNOWN`, never healthy. The agent contract (docs/15 §3) is a proposal, not a club fact.
+- Release gate: `npm run check-env` (pure logic in `src/lib/check-env.ts`) fails on short/placeholder SESSION_SECRET, DEMO_CONTROLS or ALLOW_DEFAULT_PASSWORDS true, DB_PATH unset or `:memory:`, default/unset organizer passwords, invalid ADAPTER, invalid HEALTH_SOURCE, scoreboard without URL, ingest without a 32+ char INGEST_TOKEN, explicit `HEALTH_SOURCE=mock` when `CHECK_RELEASE=1`. `npm run start:release` = check-env then `next start`. A local `.env` with `DEMO_CONTROLS=true` makes `next start` fail closed; release deployments ship `DEMO_CONTROLS=false`.
 - Version: single source is `package.json` (1.2.0-rc.1), served by `/api/meta`.
-- Known gaps (v1.2 roadmap, see docs/defcon-control-center/12 and 14): no real health source (W2; mock `flagstore_results` are not refreshed when checks change), roles/freeze/security headers (W3), real lifecycle adapter (W4), UI copy pass (W5–W6), soak/perf (W7). Club inputs still missing: template.compose.yml, scoreboard sample, verdict list, reset semantics.
-- Known bugs: Tailwind v4/Turbopack non-blocking CSS parser warnings on cold builds; legacy explicit-`any` lint warnings; keyboard/screen-reader QA is manual.
-- Security hardening: typed startup config requires SESSION_SECRET (32+), durable production DB_PATH, supported adapter config; login redirects same-origin only; state-changing API requests require same-origin Origin.
-- UI hardening: semantic `--accent` and `--muted` tokens must not be redefined as surface colors; use dedicated surface tokens for Tailwind mappings.
-- Decisions: default remains persistent SQLite `MockAdapter` (`SIMULATED`); Docker Compose opt-in and `PARTIAL`; import credentials cleared when the reveal dialog closes.
+- Known gaps: no backup cron/soak/perf run (W7); evidence gate with the club (W8) and final freeze/tag (W9); no admin action to reset the health baseline when a source restarts at a lower round; agent adapter has no delete operation and keeps credentials/resources/sessions dashboard-side; CSP still allows inline scripts; `npm audit --omit=dev` shows 2 transitive findings via `shadcn` (a CLI listed under dependencies). Club inputs still missing: template.compose.yml, real scoreboard sample, verdict list, reset semantics, agent owner.
+- Known bugs: Tailwind v4/Turbopack non-blocking CSS parser warnings on cold builds; legacy explicit-`any` lint warnings (64 warnings, 0 errors); keyboard/screen-reader QA is manual. `next dev` reloads in a loop if a tool writes files inside the repo (use the production build for browser QA).
+- Security hardening: typed startup config; login redirects same-origin only; every mutating route requires same-origin Origin (login/logout included); session epoch revocation; per-IP/per-user/pair login limits (per-IP bucket off without TRUST_PROXY); mutation freeze (423); `tests/authz-matrix.test.ts` fails when a route is not listed in `tests/routes.authz.ts`; security headers via `next.config.ts`; CSV formula guard (`src/lib/csv.ts`).
+- UI hardening: semantic `--accent` and `--muted` tokens must not be redefined as surface colors; use dedicated surface tokens for Tailwind mappings. `--idle` is now `#94A3B8` (4.5:1).
+- Decisions: default remains persistent SQLite `MockAdapter` (`SIMULATED`); Docker Compose adapter deprecated (do not extend); import credentials cleared when the reveal dialog closes; team self-reset off by default (`TEAM_SELF_RESET`); reset copy and required confirmation follow `/api/meta.capabilities.resetKind`.
 - Deadline: UNCONFIRMED. The earlier 19–20 Oct emergency window has passed; do not assume a freeze date until the club states one.
 
 ## What this is
@@ -59,3 +59,13 @@ Dark navy ops-console look using tokens in `docs/05 §1`. Status = colour + icon
 
 ## When resuming after a tool/limit switch
 State: "Read AGENTS.md and docs/. We are on slice P<n>. Last commit: <hash/message>." Then check `git status`, run the test suite, and continue.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

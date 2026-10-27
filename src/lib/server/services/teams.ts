@@ -66,6 +66,10 @@ export async function createTeam(
   }
   assertNotFrozen(user, { action: 'team.create', targetType: 'team', requestId: opts.requestId });
 
+  if (input.externalTeamId && dbHelper.get(`SELECT 1 AS x FROM teams WHERE external_team_id = ?`, input.externalTeamId)) {
+    throw new AppError('CONFLICT', `Engine team id "${input.externalTeamId}" is already used by another team.`);
+  }
+
   // Idempotency check
   if (opts.idempotencyKey) {
     const stored = lookupIdempotencyKey(opts.idempotencyKey, user.id, 'POST /api/teams');
@@ -129,7 +133,7 @@ export async function createTeam(
 export async function importTeams(
   user: SessionUser,
   input: {
-    rows: Array<{ name: string; participantNames?: string[] }>;
+    rows: Array<{ name: string; participantNames?: string[]; externalTeamId?: string }>;
     autoProvision?: boolean;
     dryRun?: boolean;
   },
@@ -147,7 +151,8 @@ export async function importTeams(
 
   const seen = new Set<string>();
   const created: Array<{ team: TeamDetail; credentials: IssuedCredential[] }> = [];
-  const skipped: Array<{ row: { name: string; participantNames?: string[] }; reason: string }> = [];
+  const seenExternal = new Set<string>();
+  const skipped: Array<{ row: { name: string; participantNames?: string[]; externalTeamId?: string }; reason: string }> = [];
 
   for (const row of input.rows) {
     const normalizedName = row.name.trim().toLocaleLowerCase();
@@ -166,6 +171,14 @@ export async function importTeams(
       continue;
     }
 
+    if (row.externalTeamId) {
+      if (seenExternal.has(row.externalTeamId) || dbHelper.get(`SELECT 1 AS x FROM teams WHERE external_team_id = ?`, row.externalTeamId)) {
+        skipped.push({ row, reason: `Engine team id "${row.externalTeamId}" is already used.` });
+        continue;
+      }
+      seenExternal.add(row.externalTeamId);
+    }
+
     if (input.dryRun) {
       skipped.push({ row, reason: 'Valid row; not created in dry-run mode.' });
       continue;
@@ -175,6 +188,7 @@ export async function importTeams(
       const result = await createTeam(user, {
         name: row.name.trim(),
         participantNames: row.participantNames,
+        externalTeamId: row.externalTeamId,
         autoProvision: input.autoProvision,
       }, { requestId: opts.requestId });
       const body = result.body as { team: TeamDetail; credentials: IssuedCredential[] };

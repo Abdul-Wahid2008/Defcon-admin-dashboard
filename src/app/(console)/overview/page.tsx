@@ -100,17 +100,17 @@ export default function OverviewPage() {
           <Card className="console-surface mb-4">
             <CardHeader className="border-b border-[var(--border)]">
               <CardTitle className="flex flex-wrap items-center justify-between gap-2">
-                <span role="tablist" aria-label="Overview view" className="flex gap-1">
-                  <Link role="tab" aria-selected={!incidents} href="/overview" className={`rounded px-2 py-1 text-sm ${!incidents ? 'bg-[var(--panel-2)] text-[var(--accent)]' : 'text-[var(--muted)] hover:text-[var(--text)]'}`}>Teams × services</Link>
-                  <Link role="tab" aria-selected={incidents} href="/overview?view=incidents" className={`rounded px-2 py-1 text-sm ${incidents ? 'bg-[var(--panel-2)] text-[var(--accent)]' : 'text-[var(--muted)] hover:text-[var(--text)]'}`}>Incidents <span className="tabular-nums">({data.grid.filter(t => teamSeverity(t) > 0).length})</span></Link>
-                </span>
+                <nav aria-label="Overview view" className="flex gap-1">
+                  <Link aria-current={!incidents ? 'page' : undefined} href="/overview" className={`rounded px-2 py-1 text-sm ${!incidents ? 'bg-[var(--panel-2)] text-[var(--accent)]' : 'text-[var(--muted)] hover:text-[var(--text)]'}`}>Teams × services</Link>
+                  <Link aria-current={incidents ? 'page' : undefined} href="/overview?view=incidents" className={`rounded px-2 py-1 text-sm ${incidents ? 'bg-[var(--panel-2)] text-[var(--accent)]' : 'text-[var(--muted)] hover:text-[var(--text)]'}`}>Incidents <span className="tabular-nums">({data.grid.filter(t => teamSeverity(t) > 0).length})</span></Link>
+                </nav>
                 <span className="text-xs font-normal tabular-nums text-[var(--text-subtle)]">
                   {data.services.failingReachability} reachability and {data.services.failingFunctional} functional failures
                 </span>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-3">
-              {incidents ? <IncidentList grid={data.grid} serviceActions={!!meta.data?.capabilities.serviceLevelReset} /> : <ServiceMatrix grid={data.grid} />}
+              {incidents ? <IncidentList grid={data.grid} serviceActions={!!meta.data?.capabilities.serviceLevelReset} simulated={meta.data?.sources.health === 'mock'} /> : <ServiceMatrix grid={data.grid} />}
             </CardContent>
           </Card>
 

@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Activity, ClipboardList, History, LayoutDashboard, Settings, Siren, Users } from 'lucide-react';
-import { apiListTeams } from '@/lib/api-client';
+import { apiListTeams, apiMeta } from '@/lib/api-client';
 import { apiRunCheck } from '@/lib/api-admin';
 import { useRecentTeams } from '@/lib/recent-teams';
 import {
@@ -33,6 +33,8 @@ export function CommandPalette({ role }: { role: string }) {
   const [open, setOpen] = useState(false);
   const [help, setHelp] = useState(false);
   const recent = useRecentTeams();
+  const qc = useQueryClient();
+  const simulated = useQuery({ queryKey: ['meta'], queryFn: apiMeta, staleTime: 30_000 }).data?.sources.health === 'mock';
   // Loaded only while the palette is open; no background polling for it.
   const teams = useQuery({ queryKey: ['palette-teams'], queryFn: () => apiListTeams({ pageSize: 100 }), enabled: open, staleTime: 10_000 });
 
@@ -56,11 +58,13 @@ export function CommandPalette({ role }: { role: string }) {
     setOpen(false);
     try {
       const r = await apiRunCheck(id);
-      toast(`${id}: check finished, health ${r.health}`);
+      toast(`${id}: ${simulated ? 'simulated check' : 'check'} finished, health ${r.health}`);
+      void qc.invalidateQueries({ queryKey: ['overview'] });
+      void qc.invalidateQueries({ queryKey: ['team', id] });
     } catch (e) {
       toast.error(`${id}: check failed. ${(e as Error).message}`, { duration: Infinity });
     }
-  }, []);
+  }, [simulated, qc]);
 
   const items = teams.data?.items ?? [];
   return (

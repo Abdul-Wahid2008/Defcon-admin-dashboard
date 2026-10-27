@@ -22,7 +22,7 @@ import { CredentialsReveal } from '@/components/teams/CredentialsReveal';
 import { RelativeTime } from '@/components/ui/relative-time';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
-type ImportRow = { name: string; participantNames?: string[] };
+type ImportRow = { name: string; participantNames?: string[]; externalTeamId?: string };
 
 function parseCsv(input: string): { rows: ImportRow[]; errors: string[] } {
   const records: string[][] = [];
@@ -48,8 +48,8 @@ function parseCsv(input: string): { rows: ImportRow[]; errors: string[] } {
   if (row.some(Boolean)) records.push(row);
   if (!records.length) return { rows: [], errors: ['CSV is empty.'] };
   const header = records[0].map((value) => value.toLowerCase());
-  if (header[0] !== 'team_name' || (header.length > 2 && header[1] !== 'participants')) {
-    return { rows: [], errors: ['CSV must start with the columns team_name,participants.'] };
+  if (header[0] !== 'team_name' || (header.length > 1 && header[1] !== 'participants') || (header.length > 2 && header[2] !== 'external_team_id')) {
+    return { rows: [], errors: ['CSV columns must be team_name, participants, external_team_id (the last two are optional).'] };
   }
   const rows: ImportRow[] = [];
   const errors: string[] = [];
@@ -58,7 +58,7 @@ function parseCsv(input: string): { rows: ImportRow[]; errors: string[] } {
     const participants = record[1]?.split(';').map((value) => value.trim()).filter(Boolean);
     if (name.length < 2 || name.length > 60) errors.push(`Row ${index + 2}: team_name must be 2–60 characters.`);
     else if (participants && participants.length > 8) errors.push(`Row ${index + 2}: at most 8 participants are allowed.`);
-    else rows.push({ name, ...(participants?.length ? { participantNames: participants } : {}) });
+    else rows.push({ name, ...(participants?.length ? { participantNames: participants } : {}), ...(record[2]?.trim() ? { externalTeamId: record[2].trim() } : {}) });
   });
   return { rows, errors };
 }
@@ -158,7 +158,7 @@ function ImportDialog({ onClose, onCredentials }: { onClose: () => void; onCrede
   };
   return <Overlay onClose={onClose} labelledBy="import-dialog-title" describedBy="import-dialog-description">
     <h2 id="import-dialog-title" className="mb-1 text-lg font-semibold">Import registered teams</h2>
-    <p id="import-dialog-description" className="mb-4 text-sm text-[var(--muted)]">CSV columns: <code>team_name,participants</code>. Separate participants with semicolons.</p>
+    <p id="import-dialog-description" className="mb-4 text-sm text-[var(--muted)]">CSV columns: <code>team_name,participants,external_team_id</code>. Separate participants with semicolons. <code>external_team_id</code> is the game engine&apos;s id for the team; health results are matched on it.</p>
     <div className="mb-3 flex items-center gap-2"><label className="inline-flex cursor-pointer items-center gap-2 rounded border border-[var(--border)] px-3 py-1.5 text-sm"><FileUp size={15} />Choose CSV<input type="file" accept=".csv,text/csv" className="hidden" onChange={fileSelected} /></label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={autoProvision} onChange={(event) => setAutoProvision(event.target.checked)} />Provision environments</label></div>
     <textarea value={csv} onChange={(event) => { setCsv(event.target.value); setParsed(null); setPreview(null); }} className="min-h-40 w-full rounded-lg border border-[var(--border)] bg-[var(--panel-2)] p-3 font-mono text-xs" spellCheck={false} />
     {parsed?.errors.length ? <div className="mt-3 space-y-1 text-sm text-[var(--bad)]">{parsed.errors.map((error) => <p key={error}>{error}</p>)}</div> : null}
@@ -175,17 +175,18 @@ function BulkDialog({ action, teams, onClose }: { action: 'start' | 'stop'; team
   const announced = useRef(false);
   // Names are captured when the dialog opens: the list behind it refetches and the selection may no longer match its filter.
   const [names] = useState(() => new Map(teams.map((t) => [t.id, t.name])));
+  const [ids] = useState(() => teams.map((t) => t.id)); // snapshot: the selection changes as teams leave a filtered list
   const bulk = useBulkEnvironmentAction();
   const expected = action === 'start' ? 'START ALL' : 'STOP ALL';
   const finalState = action === 'start' ? 'running' : 'stopped';
   const requiresConfirmation = teams.length >= 5;
-  const submit = () => bulk.mutate({ action, teamIds: teams.map((team) => team.id), ...(requiresConfirmation ? { confirm: confirmation } : {}) }, {
+  const submit = () => bulk.mutate({ action, teamIds: ids, ...(requiresConfirmation ? { confirm: confirmation } : {}) }, {
     onSuccess: (r) => { setRequestedAt(Date.now()); setResult(r); },
   });
 
   // After the request, follow every accepted team until its polled state matches the expected outcome.
   const progress = useQuery({
-    queryKey: ['bulk-progress', action, teams.map((t) => t.id)],
+    queryKey: ['bulk-progress', action, ids],
     queryFn: () => apiListTeams({ pageSize: 100 }),
     enabled: !!result,
     refetchInterval: 2000,
@@ -193,24 +194,25 @@ function BulkDialog({ action, teams, onClose }: { action: 'start' | 'stop'; team
   const rows = useMemo(() => (result?.results ?? []).map((r) => {
     const live = progress.data?.items.find((t) => t.id === r.teamId);
     const fresh = (progress.dataUpdatedAt ?? 0) > requestedAt; // ignore a list fetched before the request
-    let status: 'done' | 'working' | 'failed' | 'refused' | 'noop' = 'working';
+    let status: 'done' | 'working' | 'failed' | 'refused' | 'noop' | 'unknown' = 'working';
     if (r.status === 'rejected') status = 'refused';
     else if (r.status === 'noop') status = 'noop';
+    else if (progress.isError || (fresh && progress.data && !live)) status = 'unknown'; // cannot confirm: never leave a row waiting forever
     else if (live && fresh && !live.pending) status = live.lifecycleState === finalState ? 'done' : live.lifecycleState === 'failed' ? 'failed' : 'working';
     return { ...r, name: names.get(r.teamId) ?? r.teamId, status };
-  }), [result, progress.data, progress.dataUpdatedAt, requestedAt, finalState, names]);
+  }), [result, progress.data, progress.dataUpdatedAt, progress.isError, requestedAt, finalState, names]);
 
   const settled = !!result && rows.every((r) => r.status !== 'working');
   useEffect(() => {
     if (!settled || announced.current) return;
     announced.current = true;
     const done = rows.filter((r) => r.status === 'done').length;
-    const bad = rows.filter((r) => r.status === 'failed' || r.status === 'refused');
+    const bad = rows.filter((r) => r.status === 'failed' || r.status === 'refused' || r.status === 'unknown');
     if (bad.length === 0) toast.success(`${done} environment${done === 1 ? '' : 's'} ${finalState}${rows.length - done ? `, ${rows.length - done} already were` : ''}`);
     else toast.error(`${bad.length} of ${rows.length} did not ${action}: ${bad.map((r) => r.teamId).join(', ')}`, { duration: Infinity });
   }, [settled, rows, finalState, action]);
 
-  const label: Record<string, string> = { done: `Now ${finalState}`, working: 'In progress', failed: 'Failed. Open the team for the reason', refused: 'Refused', noop: `Already ${finalState}` };
+  const label: Record<string, string> = { done: `Now ${finalState}`, working: 'In progress', failed: 'Failed. Open the team for the reason', unknown: 'Could not confirm. Check the team page', refused: 'Refused', noop: `Already ${finalState}` };
   return <Overlay onClose={onClose} labelledBy="bulk-dialog-title" describedBy="bulk-dialog-description">
     <h2 id="bulk-dialog-title" className="mb-2 text-lg font-semibold">{action === 'start' ? 'Start' : 'Stop'} {teams.length === 1 ? teams[0].id : `${teams.length} environments`}?</h2>
     {!result ? <>
@@ -222,7 +224,7 @@ function BulkDialog({ action, teams, onClose }: { action: 'start' | 'stop'; team
     </> : <>
       <p id="bulk-dialog-description" className="text-sm text-[var(--muted)]" aria-live="polite">{settled ? 'Finished.' : `Waiting for ${rows.filter((r) => r.status === 'working').length} of ${rows.length} to reach ${finalState}…`}</p>
       <ul className="mt-3 max-h-72 divide-y divide-[var(--border)] overflow-auto rounded border border-[var(--border)] text-sm" aria-label="Progress per team">
-        {rows.map((r) => <li key={r.teamId} className="flex items-center justify-between gap-3 px-3 py-1.5"><span><span className="font-mono text-xs text-[var(--text-subtle)]">{r.teamId}</span> {r.name}</span><span className={r.status === 'done' ? 'text-[var(--ok)]' : r.status === 'failed' || r.status === 'refused' ? 'text-[var(--bad)]' : 'text-[var(--muted)]'}>{label[r.status]}{r.status === 'refused' && r.code ? ` (${r.code})` : ''}</span></li>)}
+        {rows.map((r) => <li key={r.teamId} className="flex items-center justify-between gap-3 px-3 py-1.5"><span><span className="font-mono text-xs text-[var(--text-subtle)]">{r.teamId}</span> {r.name}</span><span className={r.status === 'done' ? 'text-[var(--ok)]' : r.status === 'failed' || r.status === 'refused' || r.status === 'unknown' ? 'text-[var(--bad)]' : 'text-[var(--muted)]'}>{label[r.status]}{r.status === 'refused' && r.code ? ` (${r.code})` : ''}</span></li>)}
       </ul>
       <div className="mt-4 flex justify-end"><Button onClick={onClose}>{settled ? 'Close' : 'Close and keep waiting in the background'}</Button></div>
     </>}
@@ -302,8 +304,8 @@ export default function TeamsPage() {
   const [state, setState] = useState(params.get('state') ?? '');
   const [healthFilter, setHealthFilter] = useState(params.get('health') ?? '');
   const [accountFilter, setAccountFilter] = useState(params.get('account') ?? '');
-  const [pageNumber, setPageNumber] = useState(Number(params.get('page') ?? '1'));
-  const [sort, setSort] = useState(params.get('sort') ?? 'id');
+  const [pageNumber, setPageNumber] = useState(Math.max(1, Math.floor(Number(params.get('page') ?? '1')) || 1));
+  const [sort, setSort] = useState(/^-?(id|name|state|health|updated)$/.test(params.get('sort') ?? '') ? params.get('sort')! : 'id');
   const [selected, setSelected] = useState<string[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);

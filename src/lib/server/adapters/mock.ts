@@ -548,9 +548,9 @@ export class MockAdapter implements EnvironmentAdapter {
     const teamId = `team-${this.pad2(seq)}`;
 
     dbHelper.run(
-      `INSERT INTO teams (id, seq, name, notes, account_status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'active', ?, ?)`,
-      teamId, seq, input.name, input.notes || '', nowTs, nowTs
+      `INSERT INTO teams (id, seq, name, notes, account_status, created_at, updated_at, external_team_id)
+       VALUES (?, ?, ?, ?, 'active', ?, ?, ?)`,
+      teamId, seq, input.name, input.notes || '', nowTs, nowTs, input.externalTeamId ?? null
     );
 
     const provisionDuration = MOCK_DURATIONS.provision;
@@ -936,7 +936,9 @@ export class MockAdapter implements EnvironmentAdapter {
 
     // Recent alerts
     const recentAlerts = dbHelper.all<any>(
-      `SELECT * FROM alerts ORDER BY resolved_at IS NOT NULL, created_at DESC LIMIT 10`
+      `SELECT a.* FROM alerts a LEFT JOIN teams t ON t.id = a.team_id
+       WHERE t.archived_at IS NULL
+       ORDER BY a.resolved_at IS NOT NULL, a.acked_at IS NOT NULL, a.created_at DESC LIMIT 25`
     );
 
     // Recent activity (audit completions/denials)
@@ -973,7 +975,7 @@ export class MockAdapter implements EnvironmentAdapter {
       grid,
       healthSource,
       event: getEventClock(Date.parse(nowTs), healthSource),
-      openAlertCount: dbHelper.get<{ n: number }>(`SELECT COUNT(*) AS n FROM alerts WHERE resolved_at IS NULL AND acked_at IS NULL`)?.n ?? 0,
+      openAlertCount: dbHelper.get<{ n: number }>(`SELECT COUNT(*) AS n FROM alerts a LEFT JOIN teams t ON t.id = a.team_id WHERE a.resolved_at IS NULL AND a.acked_at IS NULL AND t.archived_at IS NULL`)?.n ?? 0,
       recentAlerts: recentAlerts.map(a => this.toAlert(a)),
       recentActivity: recentActivity.map((r: any) => ({
         id: r.id,

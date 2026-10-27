@@ -176,6 +176,8 @@ export interface TeamQuery {
 
 export interface CreateTeamInput {
   name: string;
+  /** The health source's id for this team (A31); required for scoreboard/ingest rows to find the team. */
+  externalTeamId?: string;
   notes?: string;
   participantNames?: string[];
   autoProvision?: boolean;
