@@ -70,15 +70,16 @@ export async function createUser(
   opts: { requestId: string },
 ) {
   guard(user, 'user.create', opts.requestId);
+  const password = generatePassword();
+  const hash = await bcrypt.hash(password, 10); // hash first: the check and insert below must have no await between them
+  const id = `u_${crypto.randomBytes(6).toString('hex')}`;
   if (dbHelper.get(`SELECT 1 AS x FROM users WHERE username = ? COLLATE NOCASE`, input.username)) {
     throw new AppError('CONFLICT', `Username "${input.username}" already exists.`);
   }
-  const password = generatePassword();
-  const id = `u_${crypto.randomBytes(6).toString('hex')}`;
   dbHelper.run(
     `INSERT INTO users (id, username, password_hash, display_name, role, active, must_change_password, created_at)
      VALUES (?, ?, ?, ?, ?, 1, 1, ?)`,
-    id, input.username, await bcrypt.hash(password, 10), input.displayName, input.role, new Date().toISOString());
+    id, input.username, hash, input.displayName, input.role, new Date().toISOString());
   appendAudit({
     actorId: user.id, actorName: user.displayName, actorRole: user.role, action: 'user.create',
     targetType: 'user', targetId: id, outcome: 'success', message: `Created ${input.role} ${input.username}`,
@@ -138,8 +139,7 @@ export async function changeOwnPassword(
   input: { currentPassword: string; newPassword: string },
   opts: { requestId: string },
 ) {
-  const row = dbHelper.get<{ password_hash: string; session_epoch: number }>(
-    `SELECT password_hash, session_epoch FROM users WHERE id = ?`, user.id);
+  const row = dbHelper.get<{ password_hash: string }>(`SELECT password_hash FROM users WHERE id = ?`, user.id);
   if (!row || !(await bcrypt.compare(input.currentPassword, row.password_hash))) {
     appendAudit({
       actorId: user.id, actorName: user.displayName, actorRole: user.role, action: 'auth.password_change',
@@ -149,10 +149,10 @@ export async function changeOwnPassword(
     throw new AppError('UNAUTHENTICATED', 'Current password is incorrect.');
   }
   if (input.newPassword === input.currentPassword) throw new AppError('VALIDATION_ERROR', 'New password must differ from the current one.');
-  const epoch = row.session_epoch + 1;
-  dbHelper.run(
-    `UPDATE users SET password_hash = ?, must_change_password = 0, session_epoch = ? WHERE id = ?`,
-    await bcrypt.hash(input.newPassword, 10), epoch, user.id);
+  const hash = await bcrypt.hash(input.newPassword, 10);
+  // Increment in SQL and read back with no await in between, so a concurrent revoke can never be undone.
+  dbHelper.run(`UPDATE users SET password_hash = ?, must_change_password = 0, session_epoch = session_epoch + 1 WHERE id = ?`, hash, user.id);
+  const epoch = dbHelper.get<{ session_epoch: number }>(`SELECT session_epoch FROM users WHERE id = ?`, user.id)!.session_epoch;
   appendAudit({
     actorId: user.id, actorName: user.displayName, actorRole: user.role, action: 'auth.password_change',
     targetType: 'user', targetId: user.id, outcome: 'success', message: `${user.username} changed their password`,

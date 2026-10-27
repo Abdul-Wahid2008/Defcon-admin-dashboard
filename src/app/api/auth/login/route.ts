@@ -1,4 +1,4 @@
-import { login, checkLoginRateLimit, recordLoginFailure, clearLoginAttempts, setSessionCookie, getClientIp } from '@/lib/server/auth';
+import { assertSameOrigin, login, checkLoginRateLimit, recordLoginFailure, clearLoginAttempts, setSessionCookie, getClientIp } from '@/lib/server/auth';
 import { appendAudit } from '@/lib/server/audit';
 import { errorResponse, newRequestId, AppError } from '@/lib/server/errors';
 import { z } from 'zod';
@@ -6,8 +6,8 @@ import { z } from 'zod';
 export const dynamic = 'force-dynamic';
 
 const LoginBody = z.object({
-  username: z.string().min(1),
-  password: z.string().min(1),
+  username: z.string().min(1).max(64),
+  password: z.string().min(1).max(200),
 });
 
 export async function POST(req: Request) {
@@ -15,6 +15,7 @@ export async function POST(req: Request) {
   const ip = getClientIp(req);
   let username = '';
   try {
+    assertSameOrigin(req); // login CSRF: a cross-site POST must not be able to set the session cookie
     const body = await req.json().catch(() => ({}));
     const parsed = LoginBody.safeParse(body);
     if (!parsed.success) {
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
     });
     return setSessionCookie(res, token, req);
   } catch (e: any) {
-    if (e?.code !== 'RATE_LIMITED') {
+    if (e?.code === 'UNAUTHENTICATED') {
       recordLoginFailure(ip, username || 'unknown');
       appendAudit({
         actorId: null, actorName: username || 'unknown', actorRole: 'anonymous',

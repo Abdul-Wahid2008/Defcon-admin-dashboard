@@ -14,7 +14,9 @@ export interface User {
 }
 
 export interface PendingAction {
-  action: LifecycleAction | 'provision';
+  action: LifecycleAction | 'provision' | 'service_restart' | 'service_reset';
+  /** Set for service_restart / service_reset. */
+  serviceKey?: string;
   correlationId: string;
   from: LifecycleState;
   to: LifecycleState;
@@ -185,9 +187,11 @@ export interface ActionResponse {
   };
 }
 
+export type ServiceActionKind = 'restart' | 'reset';
+
 export interface CompletedTransition {
   teamId: string;
-  action: LifecycleAction | 'provision';
+  action: LifecycleAction | 'provision' | 'service_restart' | 'service_reset';
   outcome: 'success' | 'failure';
   correlationId: string;
   ts: string;
@@ -246,8 +250,26 @@ export interface HealthSourceStatusDto {
   roundSec: number;
 }
 
+export interface AdapterCapabilities {
+  /** What an environment reset really does; drives dialog copy and the confirmation required (docs/12 C1, D22). */
+  resetKind: 'restore_patch' | 'recreate_pristine' | 'restart';
+  serviceLevelReset: boolean;
+  terminalMode: 'per_team' | 'shared';
+  flagstores: number;
+}
+
+export interface ServiceActionResponse {
+  teamId: string;
+  serviceKey: string;
+  kind: ServiceActionKind;
+  correlationId: string;
+  startedAt: string;
+  estimatedEndsAt: string;
+}
+
 export interface EnvironmentAdapter {
   readonly mode: 'mock' | 'real' | 'docker-compose';
+  readonly capabilities: AdapterCapabilities;
   listTeams(q: TeamQuery): Promise<Page<TeamSummary>>;
   getTeam(teamId: string): Promise<TeamDetail | null>;
   createTeam(input: CreateTeamInput): Promise<{ team: TeamDetail; credentials: IssuedCredential[]; completionDueAt: string }>;
@@ -260,4 +282,11 @@ export interface EnvironmentAdapter {
   getOverviewData(): Promise<OverviewData>;
   listAlerts(q: { status?: 'open' | 'resolved'; limit?: number }): Promise<Alert[]>;
   resolveDue(): Promise<CompletedTransition[]>;
+  /** Optional: only when capabilities.serviceLevelReset is true. */
+  requestServiceAction?(
+    teamId: string,
+    serviceKey: string,
+    kind: ServiceActionKind,
+    ctx: { correlationId: string },
+  ): Promise<ServiceActionResponse>;
 }

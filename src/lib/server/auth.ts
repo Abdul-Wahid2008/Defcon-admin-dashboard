@@ -34,7 +34,17 @@ const PAIR = { max: 5, window: 5 * 60_000, lock: 60_000 };
 const IP = { max: 30, window: 10 * 60_000 };
 const USER = { max: 10, window: 10 * 60_000, lock: 5 * 60_000 };
 
+const MAX_TRACKED = 5000;
+
+// ponytail: bounded memory without a timer; if >MAX_TRACKED live buckets remain after dropping expired ones, reset the map.
+function prune(map: Map<string, Bucket>, now: number): void {
+  if (map.size < MAX_TRACKED) return;
+  for (const [k, v] of map) if (now >= v.resetAt) map.delete(k);
+  if (map.size >= MAX_TRACKED) map.clear();
+}
+
 function bump(map: Map<string, Bucket>, key: string, window: number, now: number): Bucket {
+  prune(map, now);
   const entry = map.get(key);
   if (!entry || now >= entry.resetAt) {
     const fresh = { count: 1, resetAt: now + window };
@@ -54,7 +64,8 @@ export function checkLoginRateLimit(ip: string, username: string, now = Date.now
   const u = username.toLowerCase();
   const retryAfter = Math.max(
     retryAfterSec(pairAttempts, `${ip}:${u}`, PAIR.max, now),
-    retryAfterSec(ipAttempts, ip, IP.max, now),
+    // Without TRUST_PROXY every caller shares the 'direct' bucket, so a per-IP ceiling would lock everyone out.
+    ip === 'direct' ? 0 : retryAfterSec(ipAttempts, ip, IP.max, now),
     retryAfterSec(userAttempts, u, USER.max, now),
   );
   if (retryAfter > 0) {
@@ -66,7 +77,7 @@ export function recordLoginFailure(ip: string, username: string, now = Date.now(
   const u = username.toLowerCase();
   const pair = bump(pairAttempts, `${ip}:${u}`, PAIR.window, now);
   if (pair.count >= PAIR.max) pair.resetAt = now + PAIR.lock;
-  bump(ipAttempts, ip, IP.window, now);
+  if (ip !== 'direct') bump(ipAttempts, ip, IP.window, now);
   const user = bump(userAttempts, u, USER.window, now);
   if (user.count >= USER.max) user.resetAt = now + USER.lock;
 }

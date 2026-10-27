@@ -21,6 +21,8 @@ import {
   Service,
   FlagstoreKey,
   FlagstoreVerdict,
+  AdapterCapabilities,
+  ServiceActionResponse,
 } from './types';
 import { getEventConfig, servicePort, ttydPort, teamCapWarning } from '../../event-config';
 import { MOCK_DURATIONS, loadConfig } from '../../config';
@@ -29,7 +31,13 @@ import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 
 export class MockAdapter implements EnvironmentAdapter {
-  readonly mode = 'mock' as const;
+  readonly mode: 'mock' | 'real' = 'mock';
+  readonly capabilities: AdapterCapabilities = {
+    resetKind: 'restore_patch',
+    serviceLevelReset: true, // MOCK: service actions are simulated on the same pending slot
+    terminalMode: getEventConfig().terminalMode,
+    flagstores: getEventConfig().services[0].flagstores,
+  };
   private nowFn: () => string;
 
   constructor(nowFn?: () => string) {
@@ -43,6 +51,11 @@ export class MockAdapter implements EnvironmentAdapter {
   /** True when checks come from a real source: mock writers below must then leave them alone. */
   private realHealth(): boolean {
     return loadConfig().healthSource !== 'mock';
+  }
+
+  /** MOCK: a fake `.invalid` URL. The agent adapter overrides this with TERMINAL_URL_TEMPLATE. Never logged or audited. */
+  protected terminalUrlFor(teamId: string): string | null {
+    return `https://${teamId}-${crypto.randomBytes(2).toString('hex')}.terminal.invalid/`;
   }
 
   private generatePassword(): string {
@@ -113,7 +126,8 @@ export class MockAdapter implements EnvironmentAdapter {
       : null;
 
     const pending = env.pending_action ? {
-      action: env.pending_action as LifecycleAction | 'provision',
+      action: env.pending_action as NonNullable<TeamDetail['environment']['pending']>['action'],
+      ...(env.pending_service_key ? { serviceKey: env.pending_service_key as string } : {}),
       correlationId: env.pending_correlation_id,
       from: env.pending_from_state as LifecycleState,
       to: env.pending_to_state as LifecycleState,
@@ -230,15 +244,46 @@ export class MockAdapter implements EnvironmentAdapter {
       teamId, nowTs
     );
     if (!env) return [];
+    return this.finishPending(env, env.fail_next_action === env.pending_action ? 'failure' : 'success');
+  }
 
-    const action = env.pending_action as LifecycleAction | 'provision';
+  /**
+   * Completes the single pending transition of an environment. Shared by the lazy mock clock and the agent adapter
+   * (which decides success/failure from the job status). `tsOverride` is the completion time; default = scheduled end.
+   */
+  protected finishPending(
+    env: any,
+    outcome: 'success' | 'failure',
+    reasonOverride?: string,
+    tsOverride?: string,
+  ): CompletedTransition[] {
+    const teamId = env.team_id as string;
+    const action = env.pending_action as CompletedTransition['action'];
     const correlationId = env.pending_correlation_id;
     const toState = env.pending_to_state as LifecycleState;
-    const endsAt = env.pending_ends_at;
+    const endsAt = tsOverride ?? env.pending_ends_at;
 
-    // Failure injection
-    if (env.fail_next_action === action) {
-      const failureReason = `${action} failed (simulated)`;
+    // Service-level actions never change the lifecycle state; they only free the pending slot.
+    if (action === 'service_restart' || action === 'service_reset') {
+      dbHelper.run(
+        `UPDATE environments SET pending_action = NULL, pending_correlation_id = NULL, pending_from_state = NULL,
+          pending_to_state = NULL, pending_started_at = NULL, pending_ends_at = NULL,
+          pending_service_key = NULL, pending_job_id = NULL WHERE team_id = ?`, teamId);
+      if (outcome === 'failure') {
+        try {
+          dbHelper.run(
+            `INSERT INTO alerts (id, team_id, severity, kind, dedupe_key, message, created_at)
+             VALUES (?, ?, 'warning', 'action_failed', ?, ?, ?)`,
+            `a_${crypto.randomBytes(4).toString('hex')}`, teamId, `${teamId}:${action}:failure`,
+            reasonOverride ?? `${action} failed`, endsAt);
+        } catch { /* dedupe — already open */ }
+      }
+      return [{ teamId, action, outcome, correlationId, ts: endsAt }];
+    }
+
+    // Failure injection (mock) or a failed agent job
+    if (outcome === 'failure') {
+      const failureReason = reasonOverride ?? `${action} failed (simulated)`;
       dbHelper.run(
         `UPDATE environments SET
           lifecycle_state = 'failed',
@@ -249,6 +294,8 @@ export class MockAdapter implements EnvironmentAdapter {
           pending_to_state = NULL,
           pending_started_at = NULL,
           pending_ends_at = NULL,
+          pending_service_key = NULL,
+          pending_job_id = NULL,
           fail_next_action = NULL
         WHERE team_id = ?`,
         failureReason, teamId
@@ -277,7 +324,9 @@ export class MockAdapter implements EnvironmentAdapter {
         pending_from_state = NULL,
         pending_to_state = NULL,
         pending_started_at = NULL,
-        pending_ends_at = NULL
+        pending_ends_at = NULL,
+        pending_service_key = NULL,
+        pending_job_id = NULL
       WHERE team_id = ?`,
       toState, teamId
     );
@@ -310,8 +359,7 @@ export class MockAdapter implements EnvironmentAdapter {
         endsAt, teamId
       );
       // Regenerate terminal URL on provision/start/reset
-      const hex4 = crypto.randomBytes(2).toString('hex');
-      const terminalUrl = `https://${teamId}-${hex4}.terminal.invalid/`;
+      const terminalUrl = this.terminalUrlFor(teamId);
       dbHelper.run(
         `UPDATE environments SET terminal_url = ?, last_health_check_at = CASE WHEN ? THEN last_health_check_at ELSE ? END WHERE team_id = ?`,
         terminalUrl, this.realHealth() ? 1 : 0, endsAt, teamId
@@ -711,6 +759,32 @@ export class MockAdapter implements EnvironmentAdapter {
         estimatedEndsAt: endsAt,
       },
     };
+  }
+
+  /** MOCK: simulated service restart/reset on the environment's single pending slot. Never touches patches or audit. */
+  async requestServiceAction(
+    teamId: string,
+    serviceKey: string,
+    kind: 'restart' | 'reset',
+    ctx: { correlationId: string },
+  ): Promise<ServiceActionResponse> {
+    const fail = (code: string, message: string) => { const err = new Error(message); (err as Error & { code?: string }).code = code; throw err; };
+    this.resolveDueForSync(teamId);
+    const env = dbHelper.get<any>(`SELECT * FROM environments WHERE team_id = ?`, teamId);
+    if (!env) fail('NOT_FOUND', `Team ${teamId} not found.`);
+    if (env.pending_action) fail('ACTION_IN_PROGRESS', 'Another action is already running for this team.');
+    if (env.lifecycle_state !== 'running') fail('INVALID_TRANSITION', 'Service actions require a running environment.');
+    if (!dbHelper.get(`SELECT 1 AS x FROM services WHERE team_id = ? AND key = ?`, teamId, serviceKey)) {
+      fail('NOT_FOUND', `Service ${serviceKey} not found.`);
+    }
+    const startedAt = this.now();
+    const endsAt = new Date(Date.parse(startedAt) + Math.round(MOCK_DURATIONS.service * loadConfig().mockDurationScale)).toISOString();
+    dbHelper.run(
+      `UPDATE environments SET pending_action = ?, pending_correlation_id = ?, pending_from_state = 'running',
+        pending_to_state = 'running', pending_started_at = ?, pending_ends_at = ?, pending_service_key = ?, last_action_at = ?
+       WHERE team_id = ?`,
+      `service_${kind}`, ctx.correlationId, startedAt, endsAt, serviceKey, startedAt, teamId);
+    return { teamId, serviceKey, kind, correlationId: ctx.correlationId, startedAt, estimatedEndsAt: endsAt };
   }
 
   async runHealthChecks(teamId: string): Promise<HealthSnapshot> {

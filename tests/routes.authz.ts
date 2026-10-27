@@ -24,6 +24,8 @@ export interface AuthzCase {
   team?: Exp;
   /** team-01 session acting on team-02 (only for routes with a teamId) */
   teamOther?: Exp;
+  /** Mutating session routes must answer 423 for an admin while frozen, unless listed here as exempt (with the reason). */
+  frozen?: 'exempt';
   /** public/machine routes: the single expectation for every caller */
   any?: Exp;
 }
@@ -42,11 +44,11 @@ export const AUTHZ: Record<string, AuthzCase[]> = {
   '/api/auth/login': [{ method: 'POST', kind: 'public', body: {}, any: 400 }],
   '/api/auth/logout': [{ method: 'POST', kind: 'public', any: 204 }],
   '/api/auth/me': [{ method: 'GET', admin: 'allow', operator: 'allow', team: 'allow' }],
-  '/api/auth/change-password': [{ method: 'POST', body: {}, admin: 400, operator: 400, team: 'deny' }],
+  '/api/auth/change-password': [{ method: 'POST', body: {}, admin: 400, operator: 400, team: 'deny', frozen: 'exempt' }], // own credentials, not event state
 
-  '/api/demo/fail-next': [{ method: 'POST', admin: 404, operator: 'deny', team: 'deny' }],
-  '/api/demo/inject': [{ method: 'POST', admin: 404, operator: 'deny', team: 'deny' }],
-  '/api/demo/reseed': [{ method: 'POST', admin: 404, operator: 'deny', team: 'deny' }],
+  '/api/demo/fail-next': [{ method: 'POST', admin: 404, operator: 'deny', team: 'deny', frozen: 'exempt' }], // 404 first while demo controls are off
+  '/api/demo/inject': [{ method: 'POST', admin: 404, operator: 'deny', team: 'deny', frozen: 'exempt' }], // 404 first while demo controls are off
+  '/api/demo/reseed': [{ method: 'POST', admin: 404, operator: 'deny', team: 'deny', frozen: 'exempt' }], // 404 first while demo controls are off
 
   '/api/environments/bulk': [{ method: 'POST', body: { action: 'start', teamIds: ['team-01'] }, ...organizerOnly }],
 
@@ -63,7 +65,7 @@ export const AUTHZ: Record<string, AuthzCase[]> = {
     { method: 'GET', ...organizerOnly },
     { method: 'PATCH', body: { competitionStatus: 'running' }, ...adminOnly },
   ],
-  '/api/settings/freeze': [{ method: 'POST', body: { frozen: false }, ...adminOnly }],
+  '/api/settings/freeze': [{ method: 'POST', body: { frozen: false }, ...adminOnly, frozen: 'exempt' }], // must work to unfreeze
 
   '/api/teams': [
     { method: 'GET', ...organizerOnly },
@@ -82,7 +84,7 @@ export const AUTHZ: Record<string, AuthzCase[]> = {
   '/api/teams/[teamId]/health': [
     { method: 'GET', params: T1, admin: 'allow', operator: 'allow', team: 'allow', teamOther: 'deny' },
   ],
-  '/api/teams/[teamId]/health/run': [{ method: 'POST', params: T1, ...organizerOnly }],
+  '/api/teams/[teamId]/health/run': [{ method: 'POST', params: T1, ...organizerOnly, frozen: 'exempt' }], // read-refresh of health, not a state change
   '/api/teams/[teamId]/participants': [
     { method: 'GET', params: T1, admin: 'allow', operator: 'allow', team: 'allow', teamOther: 'deny' },
     { method: 'POST', params: T1, body: { name: 'Matrix Person' }, ...organizerOnly },
@@ -95,9 +97,9 @@ export const AUTHZ: Record<string, AuthzCase[]> = {
     { method: 'GET', ...adminOnly },
     { method: 'POST', body: { username: 'matrix.user', displayName: 'Matrix', role: 'organizer_operator' }, ...adminOnly },
   ],
-  '/api/users/[id]/disable': [{ method: 'POST', params: { id: 'u_target' }, ...adminOnly }],
+  '/api/users/[id]/disable': [{ method: 'POST', params: { id: 'u_target' }, ...adminOnly, frozen: 'exempt' }], // security action
   '/api/users/[id]/reset-password': [{ method: 'POST', params: { id: 'u_target' }, ...adminOnly }],
-  '/api/users/[id]/revoke-sessions': [{ method: 'POST', params: { id: 'u_target' }, ...adminOnly }],
+  '/api/users/[id]/revoke-sessions': [{ method: 'POST', params: { id: 'u_target' }, ...adminOnly, frozen: 'exempt' }], // security action
 };
 
 export { T2 };

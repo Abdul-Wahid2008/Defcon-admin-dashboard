@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 
 import { MockAdapter } from '../mock';
 import type {
+  AdapterCapabilities,
   ActionResponse,
   Alert,
   CompletedTransition,
@@ -45,8 +46,18 @@ export function buildComposeArgs(teamId: string, composeFile: string, command: s
   return ['compose', '-p', teamId, '-f', composeFile, ...command];
 }
 
+/**
+ * @deprecated v1.2 (docs/12 D21): parses Cloudflare tunnel logs and expects a Docker socket on the web host. Kept only
+ * so existing rehearsals keep working; do not extend. The supported real path is the allow-listed agent (ADAPTER=real).
+ */
 export class DockerComposeAdapter implements EnvironmentAdapter {
   readonly mode = 'docker-compose' as const;
+  readonly capabilities: AdapterCapabilities = {
+    resetKind: 'restart',
+    serviceLevelReset: false,
+    terminalMode: 'per_team',
+    flagstores: 3,
+  };
   readonly resetLabel = 'Restart (patch restore not available)';
   private readonly delegate: MockAdapter;
   private readonly execute: ExecFile;

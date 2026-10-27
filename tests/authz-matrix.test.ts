@@ -101,6 +101,11 @@ describe('authorization matrix (route × method × principal)', () => {
           expect(matches(await call(route, c, {}), c.any!)).toBe(true);
           expect(matches(await call(route, c, { token: tokens.admin }), c.any!)).toBe(true);
         });
+        if (mutating && c.kind === 'public') {
+          it(`${label} → 403 for a cross-origin request (login/logout CSRF)`, async () => {
+            expect(await call(route, c, { origin: 'http://evil.example' })).toBe(403);
+          });
+        }
         continue;
       }
 
@@ -128,6 +133,16 @@ describe('authorization matrix (route × method × principal)', () => {
         it(`${label} → 403 when the Origin header is missing`, async () => {
           expect(await call(route, c, { token: tokens.admin, origin: null })).toBe(403);
         });
+        if (c.frozen !== 'exempt') {
+          it(`${label} → 423 for an admin while mutations are frozen`, async () => {
+            dbHelper.run(`UPDATE settings SET value = '1' WHERE key = 'mutations_frozen'`);
+            try {
+              expect(await call(route, c, { token: tokens.admin })).toBe(423);
+            } finally {
+              dbHelper.run(`UPDATE settings SET value = '0' WHERE key = 'mutations_frozen'`);
+            }
+          });
+        }
       }
     }
   }

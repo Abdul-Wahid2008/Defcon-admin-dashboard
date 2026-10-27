@@ -42,8 +42,8 @@ describe('migration 002', () => {
     db.prepare(`INSERT INTO teams (id,seq,name,created_at,updated_at) VALUES ('team-01',1,'A','t','t')`).run();
     db.prepare(`INSERT INTO users (id,username,password_hash,display_name,role,created_at) VALUES ('u1','a','h','A','organizer_admin','t')`).run();
 
-    expect(migrate(db)).toBe(2);
-    expect(db.pragma('user_version', { simple: true })).toBe(2);
+    expect(migrate(db)).toBe(3);
+    expect(db.pragma('user_version', { simple: true })).toBe(3);
     expect(db.prepare(`SELECT name FROM teams`).all()).toEqual([{ name: 'A' }]);
     const u = db.prepare(`SELECT session_epoch, must_change_password, last_login_at FROM users`).get();
     expect(u).toEqual({ session_epoch: 0, must_change_password: 0, last_login_at: null });
@@ -52,7 +52,7 @@ describe('migration 002', () => {
     expect(db.prepare(`SELECT key,value FROM settings ORDER BY key`).all()).toEqual([
       { key: 'mutations_frozen', value: '0' }, { key: 'round_sec', value: '90' }, { key: 'stale_after_sec', value: '270' },
     ]);
-    expect(migrate(db)).toBe(2); // idempotent
+    expect(migrate(db)).toBe(3); // idempotent
   });
 
   it('enforces unique external_team_id, flagstore/verdict CHECKs, and keeps audit append-only', () => {

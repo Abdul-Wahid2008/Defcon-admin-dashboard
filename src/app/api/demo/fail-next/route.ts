@@ -1,3 +1,4 @@
+import { assertNotFrozen } from '@/lib/server/freeze';
 import { requireUser, assertSameOrigin } from '@/lib/server/auth';
 import { sync } from '@/lib/server/services/sync';
 import { getAdapter } from '@/lib/server/adapters';
@@ -26,6 +27,7 @@ export async function POST(req: Request) {
     if (!loadConfig().demoControls || adapter.mode !== 'mock') {
       throw new AppError('NOT_FOUND', 'Demo controls not available.');
     }
+    assertNotFrozen(user, { action: 'demo.fail_next', targetType: 'system', requestId });
     await sync();
     const body = await req.json().catch(() => null);
     const parsed = FailNextBody.safeParse(body);

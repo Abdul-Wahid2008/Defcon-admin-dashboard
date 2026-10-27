@@ -1,3 +1,4 @@
+import { assertNotFrozen } from '@/lib/server/freeze';
 import { requireUser, assertSameOrigin } from '@/lib/server/auth';
 import { sync } from '@/lib/server/services/sync';
 import { getAdapter } from '@/lib/server/adapters';
@@ -34,6 +35,7 @@ export async function POST(req: Request) {
       throw new AppError('FORBIDDEN', 'Requires organizer_admin.');
     }
     const adapter = demoGuard();
+    assertNotFrozen(user, { action: 'demo.inject', targetType: 'system', requestId });
     await sync();
     const body = await req.json().catch(() => null);
     const parsed = InjectBody.safeParse(body);

@@ -5,6 +5,7 @@ import { Download, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import type { IssuedCredential } from '@/lib/schemas';
 import { Button } from '@/components/ui/button';
+import { csvRow } from '@/lib/csv';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
 import { useRef, useEffect, type ReactNode } from 'react';
@@ -113,7 +114,7 @@ export function CredentialsReveal({
   const download = () => {
     const csv = [
       'participant_id,username,password',
-      ...credentials.map((item) => `${item.participantId},${item.username},${item.password}`),
+      ...credentials.map((item) => csvRow([item.participantId, item.username, item.password])),
     ].join('\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a');

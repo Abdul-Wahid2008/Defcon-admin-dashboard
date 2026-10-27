@@ -155,6 +155,7 @@ export const MOCK_DURATIONS = {
   stop: 2 * 1000,
   reset: 5 * 1000,
   delete: 3 * 1000,
+  service: 2 * 1000,
 };
 
 export const POLLING_INTERVALS = {

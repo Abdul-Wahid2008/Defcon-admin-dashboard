@@ -1,3 +1,4 @@
+import { assertNotFrozen } from '@/lib/server/freeze';
 import { requireUser, assertSameOrigin } from '@/lib/server/auth';
 import { getAdapter } from '@/lib/server/adapters';
 import { appendAudit } from '@/lib/server/audit';
@@ -22,6 +23,7 @@ export async function POST(req: Request) {
     if (!loadConfig().demoControls || adapter.mode !== 'mock') {
       throw new AppError('NOT_FOUND', 'Demo controls not available.');
     }
+    assertNotFrozen(user, { action: 'demo.reseed', targetType: 'system', requestId });
 
     const body = await req.json().catch(() => null);
     const parsed = ReseedBody.safeParse(body);
