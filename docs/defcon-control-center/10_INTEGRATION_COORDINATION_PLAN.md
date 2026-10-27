@@ -91,17 +91,19 @@ Complete this table before freeze:
 
 | Capability | Mock | Real read | Real mutation | Evidence | Release mode impact |
 |---|---:|---:|---:|---|---|
-| Team identity/reconciliation |  |  |  |  |  |
-| Create/provision |  |  |  |  |  |
-| Start |  |  |  |  |  |
-| Stop |  |  |  |  |  |
-| Reset |  |  |  |  |  |
-| Delete/archive |  |  |  |  |  |
-| Health/checkers |  |  |  |  |  |
-| Resources |  |  |  |  |  |
-| Credentials |  |  |  |  |  |
-| Terminal metadata |  |  |  |  |  |
-| Audit/recovery |  |  |  |  |  |
+| Team identity/reconciliation | yes | provisional (scoreboard parser, `external_team_id`) | no | none: no real sample | Stays PARTIAL at best |
+| Create/provision | yes | no | no (agent `start` only, vs fake agent) | none | Mock only |
+| Start | yes | no | agent client vs `fake-agent.ts` only | none | Mock only |
+| Stop | yes | no | agent client vs `fake-agent.ts` only | none | Mock only |
+| Reset | yes | no | agent client vs `fake-agent.ts` only; semantics unconfirmed | none | Mock only; copy follows `resetKind` |
+| Delete/archive | yes | no | no (agent has no delete) | none | Mock only; blocks LIVE |
+| Health/checkers | yes | provisional scoreboard pull + token ingest | n/a | none: untested against real data | PARTIAL when selected |
+| Resources | yes (MOCK) | no | n/a | none | Labelled MOCK |
+| Credentials | yes | no | no (dashboard-side) | none | Dashboard-side |
+| Terminal metadata | yes (mock) | `TERMINAL_URL_TEMPLATE` only | n/a | none | Unconfirmed |
+| Audit/recovery | yes (own audit) | n/a | no real action performed | none | Own audit only |
+
+**Filled 27 Oct 2026 (W8): every Evidence cell is "none" because the club has supplied no input and no test was authorised (see `docs/club-evidence/2026-10-27-w8-status.md`). Release mode: SIMULATED by default, PARTIAL with a real health source; LIVE not permitted.**
 
 Rules:
 

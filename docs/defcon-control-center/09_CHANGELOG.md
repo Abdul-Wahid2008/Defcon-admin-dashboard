@@ -1,4 +1,21 @@
-# 09 — CHANGELOG: v1.0 → v1.1 (17 Oct 2026)
+# 09 — CHANGELOG
+
+## v1.2.0-rc.1 (27 Oct 2026)
+
+Reconciliation after the club decisions (D16–D23) and slices W0–W9, details in `BUILD_STATUS.md`.
+
+- **Health**: scoreboard pull and token ingest with staleness; unknown shapes fail closed; flagstore verdicts per service (W2).
+- **Security**: roles v1.2, mutation freeze (423), organizer accounts and session revocation, login/CSRF hardening, rate limits, CSV formula guard, security headers (W3).
+- **Lifecycle**: capability-driven reset wording, service-level actions, agent client (tested only against the fake agent) (W4).
+- **UI and ops**: overview matrix, event clock, incidents view, command palette, alert acknowledge, conflict-safe notes, bulk progress (W5, W6).
+- **Reliability**: online backup (`npm run backup`), load and soak tools, WAL `synchronous=NORMAL`; measured p95 17 ms at 30 teams (W7).
+- **Evidence gate (W8)**: not executed, no club input or authorisation; decision record filled with "no evidence"; release mode stays SIMULATED/PARTIAL.
+- **Hardening (W9)**: `shadcn` moved to devDependencies (`npm audit --omit=dev`: 0 vulnerabilities), event runbook, README v1.2.
+- Contract changes: additive only (docs 03 and 04).
+
+---
+
+# v1.0 → v1.1 (17 Oct 2026)
 
 ## 1. Inputs reviewed and what each changed
 

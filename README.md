@@ -15,7 +15,7 @@ The default adapter is a persistent SQLite-backed mock state machine. It is inte
 ## Development
 
 ```powershell
-npm install --legacy-peer-deps
+npm install --legacy-peer-deps   # a vitest peer range on @types/node needs this flag; `npm ci` works from the lockfile
 $env:SESSION_SECRET = "replace-with-a-random-secret-at-least-32-characters"
 $env:DB_PATH = "data/defcon.db"
 $env:ADAPTER = "mock"
@@ -71,6 +71,16 @@ Restore from a backup file: stop the server, copy the chosen `<ts>.db` over `DB_
 
 This procedure was rehearsed on a temporary, explicitly named test database (`data/r7-rehearsal.db`) during the R7 release-candidate pass; the post-backup state change was reverted by the restore and the temporary files were removed afterwards.
 - Do not change adapter mode during an event. If external integration is unavailable, keep the known-good `SIMULATED` release and state the limitation plainly.
+
+## v1.2: health sources, capabilities, freeze, ingest
+
+- **Badge** (`/api/meta`): `SIMULATED` while lifecycle and health are both mock; `PARTIAL` if any source is real; `LIVE` only with `EVIDENCE_GATE_PASSED=true` **and** an adapter reporting `capabilities.fullyReal` (none does today).
+- **Health source** (`HEALTH_SOURCE`): `mock` (default), `scoreboard` (the server pulls `HEALTH_SCOREBOARD_URL` every `HEALTH_POLL_SEC`; SSRF-limited by `HEALTH_ALLOWED_HOSTS`, size-capped), or `ingest` (the checker pushes to `POST /api/ingest/check-results` with `Authorization: Bearer $INGEST_TOKEN`, token of 32+ characters, constant-time compare). The scoreboard parser is **provisional**: an unknown shape is `SOURCE_SHAPE_UNKNOWN` and is never shown healthy. Results older than `stale_after_sec` (default 270) show as unknown.
+- **Capabilities**: reset wording and service-level actions follow `/api/meta.capabilities` (`resetKind`, `serviceLevelReset`, `fullyReal`); unsupported actions are disabled with a reason.
+- **Roles**: `organizer_admin` and `organizer_operator` (moderator); operators cannot delete teams or change settings. Admin can manage organizer accounts and sessions through the API.
+- **Freeze**: Settings, admin only, type `FREEZE`. Mutating routes then return `423 MUTATIONS_FROZEN`; reads, the audit log and "Run check" keep working.
+- **Release gate**: `npm run check-env` (also run by `npm run start:release`) refuses weak or placeholder secrets, demo flags, default passwords, an unset or in-memory `DB_PATH`, and invalid adapter or health settings. A local `.env` with `DEMO_CONTROLS=true` makes `next start` fail closed.
+- **Windows start**: `npm ci`, set the release environment, `npm run build`, `npm run start:release`. Event-day procedures: [`docs/EVENT_RUNBOOK.md`](docs/EVENT_RUNBOOK.md).
 
 ## Verification and production start
 
