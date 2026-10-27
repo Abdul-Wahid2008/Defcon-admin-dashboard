@@ -1,7 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
 import type { HealthRow } from './apply';
-import { readCapped } from './limits';
+import { readCapped } from '../limits';
 
 export const FETCH_TIMEOUT_MS = 5000;
 export const MAX_SCOREBOARD_BYTES = 2 * 1024 * 1024;

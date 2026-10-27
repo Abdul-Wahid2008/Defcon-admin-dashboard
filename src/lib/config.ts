@@ -9,6 +9,12 @@ export interface AppConfig {
   healthAllowedHosts: string[];
   healthPollSec: number;
   ingestToken: string | undefined;
+  /** Team role may reset its own environment (spec) — default false per the club's decision (docs/12 C1). */
+  teamSelfReset: boolean;
+  /** Read X-Forwarded-For / treat the app as behind a reverse proxy. */
+  trustProxy: boolean;
+  /** Force the Secure cookie flag (otherwise set from X-Forwarded-Proto=https). */
+  cookieSecure: boolean;
   dbPath: string;
   sessionSecret: string | undefined;
   demoControls: boolean;
@@ -124,6 +130,9 @@ export function loadConfig(
     healthAllowedHosts,
     healthPollSec,
     ingestToken,
+    teamSelfReset: parseBoolean(env.TEAM_SELF_RESET, 'TEAM_SELF_RESET'),
+    trustProxy: parseBoolean(env.TRUST_PROXY, 'TRUST_PROXY'),
+    cookieSecure: parseBoolean(env.COOKIE_SECURE, 'COOKIE_SECURE'),
     dbPath,
     sessionSecret,
     demoControls,

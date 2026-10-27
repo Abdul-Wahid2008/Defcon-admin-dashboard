@@ -1,4 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// requireUser reads cookies() outside a Next request scope in tests, so the cookie is an in-memory holder.
+const cookieState = vi.hoisted(() => ({ token: undefined as string | undefined }));
+vi.mock('next/headers', () => ({
+  cookies: async () => ({
+    get: (name: string) => (name === 'dc_session' && cookieState.token ? { name, value: cookieState.token } : undefined),
+  }),
+}));
+
 import fs from 'node:fs';
 import { MockAdapter } from '../src/lib/server/adapters/mock';
 import { dbHelper } from '../src/lib/server/db';
@@ -6,12 +15,13 @@ import { applyHealthBatch, type HealthRow } from '../src/lib/server/health/apply
 import { deriveChecks, normalizeVerdict } from '../src/lib/server/health/verdicts';
 import { fetchScoreboardJson, parseScoreboard } from '../src/lib/server/health/scoreboard-source';
 import { getHealthSourceStatus, pullIfDue, resetPullStateForTests } from '../src/lib/server/health/source';
-import { resetLimits } from '../src/lib/server/health/limits';
+import { resetLimits } from '../src/lib/server/limits';
 import { badgeFor } from '../src/lib/server/health/badge';
 import { loadConfig } from '../src/lib/config';
 import { machineCan } from '../src/lib/server/permissions';
 import { GET as getMeta } from '../src/app/api/meta/route';
 import { GET as ingestGet, POST as ingestPost } from '../src/app/api/ingest/check-results/route';
+import { createSession } from '../src/lib/server/auth';
 import { getOverview } from '../src/lib/server/services/overview';
 
 const T0 = Date.parse('2026-10-27T10:00:00Z');
@@ -195,6 +205,12 @@ describe('applyHealthBatch', () => {
   it('rejects rows for an archived team', () => {
     dbHelper.run(`UPDATE teams SET archived_at = '2026-10-27T00:00:00Z' WHERE id = ?`, teamId);
     expect(applyHealthBatch([row()], 'ingest').rejected).toEqual([{ index: 0, reason: 'team_archived' }]);
+  });
+
+  it('rejects a checkedAt in the future so it can never keep data fresh or block later rows', () => {
+    const r = applyHealthBatch([row({ round: null, checkedAt: '2099-01-01T00:00:00Z' })], 'ingest', '2026-10-27T10:00:00.000Z');
+    expect(r.rejected).toEqual([{ index: 0, reason: 'invalid_checked_at' }]);
+    expect(applyHealthBatch([row({ round: null, checkedAt: '2026-10-27T10:00:30Z' })], 'ingest', '2026-10-27T10:00:00.000Z').accepted).toBe(1); // within 60 s skew
   });
 
   it('rolls the whole batch back if the database throws mid-batch', () => {
@@ -438,6 +454,22 @@ describe('ingest route', () => {
     expect(auditCount('ingest.rejected') - before).toBe(10);
   });
 
+  it('bad tokens never lock out the real checker', async () => {
+    for (let i = 0; i < 200; i++) await post(good, { authorization: 'Bearer nope' });
+    expect((await post(good)).status).toBe(200);
+  });
+
+  it('requires round or checkedAt on every row', async () => {
+    const { checkedAt: _c, round: _r, ...bare } = good.results[0];
+    void _c; void _r;
+    expect((await post({ results: [bare] })).status).toBe(400);
+  });
+
+  it('does not mark the source ok when every row is rejected', async () => {
+    await post({ results: [{ ...good.results[0], teamId: '404' }] });
+    expect(getHealthSourceStatus()).toMatchObject({ state: 'error', lastError: 'all_rows_rejected' });
+  });
+
   it('rate-limits the overall request rate', async () => {
     let last = 0;
     for (let i = 0; i < 125; i++) last = (await post(good)).status;
@@ -500,10 +532,19 @@ describe('config and /api/meta', () => {
     expect(badgeFor('real', 'scoreboard')).toBe('LIVE');
   });
 
+  it('/api/meta gives public callers only the badge, not source detail', async () => {
+    useScoreboard();
+    const body = await (await getMeta(new Request('http://localhost/api/meta'))).json() as Record<string, unknown>;
+    expect(body).toMatchObject({ badge: 'PARTIAL', sources: { health: 'mock' }, health: { state: 'mock', lastError: null, lastRound: null }, frozen: false });
+  });
+
   it('/api/meta reports sources, capabilities and badge without secrets or URLs', async () => {
     useScoreboard();
     vi.stubEnv('INGEST_TOKEN', TOKEN);
-    const body = await (await getMeta()).json() as Record<string, unknown>;
+    vi.stubEnv('SESSION_SECRET', 's'.repeat(40));
+    cookieState.token = await createSession({ id: 'u', username: 'a', displayName: 'A', role: 'organizer_admin' });
+    const body = await (await getMeta(new Request('http://localhost/api/meta'))).json() as Record<string, unknown>;
+    cookieState.token = undefined;
     expect(body).toMatchObject({
       badge: 'PARTIAL',
       sources: { health: 'scoreboard', lifecycle: 'mock', roster: 'manual' },

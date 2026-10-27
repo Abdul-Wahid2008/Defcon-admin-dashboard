@@ -87,13 +87,16 @@ export function getHealthSourceStatus(nowMs = Date.now()): HealthSourceStatus {
 /** Records a successful push (ingest) so freshness is visible next to the data. */
 export function recordIngestOk(result: ApplyResult, maxRound: number | null, nowIso = new Date().toISOString()): void {
   const prev = readState('ingest');
+  if (result.accepted + result.unchanged === 0 && result.rejected.length > 0) {
+    patchState('ingest', { last_fetch_at: nowIso, last_error: 'all_rows_rejected' });
+    return;
+  }
   patchState('ingest', {
     last_fetch_at: nowIso,
     last_ok_at: nowIso,
     last_error: null,
     last_round: maxRound !== null ? Math.max(maxRound, prev?.last_round ?? 0) : prev?.last_round ?? null,
   });
-  void result;
 }
 
 /**

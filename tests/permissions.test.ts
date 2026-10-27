@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { can, User, Resource, Permission } from '../src/lib/server/permissions';
 
 describe('Permissions System', () => {
@@ -13,6 +13,7 @@ describe('Permissions System', () => {
     'team.read', 'team.create', 'team.update', 'team.delete',
     'env.start', 'env.stop', 'env.reset', 'credential.manage',
     'audit.read', 'settings.update', 'demo.use',
+    'service.restart', 'service.reset', 'alert.ack', 'user.manage',
   ];
 
   describe('organizer_admin', () => {
@@ -28,9 +29,10 @@ describe('Permissions System', () => {
       'team.read', 'team.create', 'team.update',
       'env.start', 'env.stop', 'env.reset', 'credential.manage',
       'audit.read',
+      'service.restart', 'service.reset', 'alert.ack',
     ];
     const forbidden: Permission[] = [
-      'team.delete', 'settings.update', 'demo.use',
+      'team.delete', 'settings.update', 'demo.use', 'user.manage',
     ];
 
     it('should have allowed permissions', () => {
@@ -47,16 +49,23 @@ describe('Permissions System', () => {
   });
 
   describe('team role', () => {
-    it('should only have team.read and env.reset', () => {
-      expect(can(teamUser, 'team.read', teamA)).toBe(true);
-      expect(can(teamUser, 'env.reset', teamA)).toBe(true);
+    afterEach(() => vi.unstubAllEnvs());
 
-      // Every other permission should be denied
+    it('has only team.read by default; env.reset is denied unless TEAM_SELF_RESET=true', () => {
+      expect(can(teamUser, 'team.read', teamA)).toBe(true);
+      expect(can(teamUser, 'env.reset', teamA)).toBe(false);
+      ALL_PERMISSIONS
+        .filter(p => p !== 'team.read')
+        .forEach(p => expect(can(teamUser, p, teamA)).toBe(false));
+    });
+
+    it('with TEAM_SELF_RESET=true the team gets env.reset on its own team only', () => {
+      vi.stubEnv('TEAM_SELF_RESET', 'true');
+      expect(can(teamUser, 'env.reset', teamA)).toBe(true);
+      expect(can(teamUser, 'env.reset', teamB)).toBe(false);
       ALL_PERMISSIONS
         .filter(p => p !== 'team.read' && p !== 'env.reset')
-        .forEach(p => {
-          expect(can(teamUser, p, teamA)).toBe(false);
-        });
+        .forEach(p => expect(can(teamUser, p, teamA)).toBe(false));
     });
 
     it('should be denied access to other teams', () => {

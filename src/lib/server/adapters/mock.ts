@@ -803,8 +803,15 @@ export class MockAdapter implements EnvironmentAdapter {
        ORDER BY t.id`
     );
 
+    let failingReachability = 0;
+    let failingFunctional = 0;
     const grid = gridRows.map(row => {
       const services = this.loadServicesForTeam(row.id);
+      // counted from the stale-aware view so a stale "fail" is not reported as a live failure
+      for (const s of services) {
+        if (s.checks.some(c => c.type === 'reachability' && c.status === 'fail')) failingReachability++;
+        if (s.checks.some(c => c.type === 'functional' && c.status === 'fail')) failingFunctional++;
+      }
       const health = this.deriveHealth(row.lifecycle_state as LifecycleState, services);
       return {
         teamId: row.id,
@@ -858,8 +865,8 @@ export class MockAdapter implements EnvironmentAdapter {
       healthTotals,
       services: {
         total: svcStats?.total || 0,
-        failingReachability: svcStats?.failing_reachability || 0,
-        failingFunctional: svcStats?.failing_functional || 0,
+        failingReachability,
+        failingFunctional,
       },
       activeSessions: sessionsRow?.total || 0,
       competitionStatus: compStatus?.value || null,

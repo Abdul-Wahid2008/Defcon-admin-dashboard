@@ -7,10 +7,10 @@ export type AuditAction =
   | 'team.create' | 'team.update' | 'team.suspend' | 'team.reactivate' | 'team.delete'
   | 'env.provision' | 'env.start' | 'env.stop' | 'env.reset' | 'env.delete'
   | 'participant.add' | 'participant.remove' | 'credential.issue' | 'credential.rotate'
-  | 'health.run' | 'alert.open' | 'alert.resolve' | 'ingest.rejected' | 'settings.update' | 'demo.inject' | 'demo.fail_next' | 'demo.reseed';
+  | 'health.run' | 'settings.freeze' | 'user.create' | 'user.reset_password' | 'user.revoke_sessions' | 'user.disable' | 'auth.password_change' | 'auth.session_revoked' | 'alert.open' | 'alert.resolve' | 'ingest.rejected' | 'settings.update' | 'demo.inject' | 'demo.fail_next' | 'demo.reseed';
 
 export type AuditOutcome = 'requested' | 'success' | 'failure' | 'denied' | 'noop';
-export type TargetType = 'team' | 'participant' | 'session' | 'settings' | 'system';
+export type TargetType = 'team' | 'participant' | 'session' | 'settings' | 'system' | 'user';
 export type ActorRole = 'organizer_admin' | 'organizer_operator' | 'team' | 'system' | 'anonymous';
 
 export interface AuditParams {

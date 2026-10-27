@@ -161,7 +161,7 @@ export const AuditEntrySchema = z.object({
   actorName: z.string(),
   actorRole: z.union([RoleSchema, z.literal('system'), z.literal('anonymous')]),
   action: AuditActionSchema,
-  targetType: z.enum(['team', 'participant', 'session', 'settings', 'system']),
+  targetType: z.enum(['team', 'participant', 'session', 'settings', 'system', 'user']),
   targetId: z.string().nullable(),
   outcome: z.enum(['requested', 'success', 'failure', 'denied', 'noop']),
   message: z.string(),

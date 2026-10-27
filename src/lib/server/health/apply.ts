@@ -59,7 +59,8 @@ export function applyHealthBatch(rows: HealthRow[], source: HealthSourceName, no
       const round = row.round ?? null;
       if (round !== null && (!Number.isInteger(round) || round < 0)) return reject('invalid_round');
       const given = row.checkedAt ?? null;
-      if (given !== null && Number.isNaN(Date.parse(given))) return reject('invalid_checked_at');
+      // a time in the future would never go stale and would block every later row; allow 60 s of clock skew
+      if (given !== null && (Number.isNaN(Date.parse(given)) || Date.parse(given) > Date.parse(now) + 60_000)) return reject('invalid_checked_at');
       const checkedAtGiven = given === null ? null : new Date(given).toISOString();
 
       const stored = dbHelper.get<Stored>(

@@ -11,7 +11,8 @@ export type AppErrorCode =
   | 'VALIDATION_ERROR'
   | 'RATE_LIMITED'
   | 'INTERNAL'
-  | 'ADAPTER_ERROR';
+  | 'ADAPTER_ERROR'
+  | 'MUTATIONS_FROZEN';
 
 export class AppError extends Error {
   constructor(
@@ -38,6 +39,7 @@ export function toHttpStatus(code: AppErrorCode): number {
     case 'RATE_LIMITED': return 429;
     case 'INTERNAL': return 500;
     case 'ADAPTER_ERROR': return 502;
+    case 'MUTATIONS_FROZEN': return 423;
     default: return 500;
   }
 }

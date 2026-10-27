@@ -122,7 +122,7 @@ export interface AuditEntry {
   actorName: string;
   actorRole: Role | 'system' | 'anonymous';
   action: string;
-  targetType: 'team' | 'participant' | 'session' | 'settings' | 'system';
+  targetType: 'team' | 'participant' | 'session' | 'settings' | 'system' | 'user';
   targetId: string | null;
   outcome: 'requested' | 'success' | 'failure' | 'denied' | 'noop';
   message: string;

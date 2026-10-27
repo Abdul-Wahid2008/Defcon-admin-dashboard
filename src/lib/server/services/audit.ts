@@ -33,7 +33,7 @@ interface AuditRow {
   details_json: string | null;
 }
 
-type AuditEntryTargetType = 'team' | 'participant' | 'session' | 'settings' | 'system';
+type AuditEntryTargetType = 'team' | 'participant' | 'session' | 'settings' | 'system' | 'user';
 type AuditOutcome = 'requested' | 'success' | 'failure' | 'denied' | 'noop';
 
 /**

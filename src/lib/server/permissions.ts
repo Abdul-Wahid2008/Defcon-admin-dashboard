@@ -1,4 +1,5 @@
 import 'server-only';
+import { loadConfig } from '../config';
 
 export type Role = 'organizer_admin' | 'organizer_operator' | 'team';
 
@@ -13,7 +14,11 @@ export type Permission =
   | 'credential.manage'
   | 'audit.read'
   | 'settings.update'
-  | 'demo.use';
+  | 'demo.use'
+  | 'service.restart'
+  | 'service.reset'
+  | 'alert.ack'
+  | 'user.manage';
 
 export interface User {
   id: string;
@@ -30,15 +35,17 @@ const ROLE_PERMISSIONS: Record<Role, Set<Permission>> = {
     'team.read', 'team.create', 'team.update', 'team.delete',
     'env.start', 'env.stop', 'env.reset', 'credential.manage',
     'audit.read', 'settings.update', 'demo.use',
+    'service.restart', 'service.reset', 'alert.ack', 'user.manage',
   ]),
   organizer_operator: new Set([
     'team.read', 'team.create', 'team.update',
     'env.start', 'env.stop', 'env.reset', 'credential.manage',
     'audit.read',
+    'service.restart', 'service.reset', 'alert.ack',
   ]),
   team: new Set([
     'team.read',
-    'env.reset',
+    'env.reset', // only effective when TEAM_SELF_RESET=true, see can()
   ]),
 };
 
@@ -54,6 +61,7 @@ export function can(user: User, permission: Permission, resource?: Resource): bo
 
   // Role 'team' is restricted to their own team only
   if (user.role === 'team') {
+    if (permission === 'env.reset' && !loadConfig().teamSelfReset) return false;
     if (!user.teamId || !resource?.teamId || user.teamId !== resource.teamId) {
       return false;
     }

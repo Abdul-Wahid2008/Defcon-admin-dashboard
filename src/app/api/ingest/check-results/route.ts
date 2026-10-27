@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { loadConfig } from '@/lib/config';
 import { appendAudit } from '@/lib/server/audit';
 import { applyHealthBatch } from '@/lib/server/health/apply';
-import { allow, readCapped } from '@/lib/server/health/limits';
+import { allow, readCapped } from '@/lib/server/limits';
 import { adoptRealSource, recordIngestOk } from '@/lib/server/health/source';
 import { machineCan } from '@/lib/server/permissions';
 import { newRequestId } from '@/lib/server/errors';
@@ -22,7 +22,7 @@ const Body = z.object({
     message: z.string().max(500).nullish(),
     round: z.number().int().nonnegative().nullish(),
     checkedAt: z.string().datetime({ offset: true }).nullish(),
-  }).strict()).min(1).max(MAX_ROWS),
+  }).strict().refine(r => r.round != null || r.checkedAt != null, { message: 'round or checkedAt is required' })).min(1).max(MAX_ROWS),
 }).strict();
 
 const sha = (v: string) => crypto.createHash('sha256').update(v).digest();
@@ -44,11 +44,6 @@ export async function POST(req: Request) {
   // No token configured, or another health source selected → the route does not exist.
   if (!cfg.ingestToken || cfg.healthSource !== 'ingest') return reply(404, { error: { code: 'NOT_FOUND', message: 'Not found.', requestId } }, requestId);
 
-  // Overall ceiling first so a flood cannot reach the (audited) auth path.
-  if (!allow('ingest:all', 120, 60_000)) {
-    return reply(429, { error: { code: 'RATE_LIMITED', message: 'Too many requests.', requestId } }, requestId, { 'Retry-After': '60' });
-  }
-
   // Cookies are never accepted: a machine caller authenticates with the bearer token only.
   const header = req.headers.get('authorization') ?? '';
   const presented = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
@@ -56,6 +51,11 @@ export async function POST(req: Request) {
   if (!ok) {
     if (allow('ingest:badauth', 10, 60_000)) reject('bad_token', requestId);
     return reply(401, { error: { code: 'UNAUTHENTICATED', message: 'Invalid token.', requestId } }, requestId);
+  }
+
+  // Only authenticated calls are rate limited, so a flood of bad tokens cannot lock the real checker out.
+  if (!allow('ingest:ok', 120, 60_000)) {
+    return reply(429, { error: { code: 'RATE_LIMITED', message: 'Too many requests.', requestId } }, requestId, { 'Retry-After': '60' });
   }
 
   const declared = Number(req.headers.get('content-length'));

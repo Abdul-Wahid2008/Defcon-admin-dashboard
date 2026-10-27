@@ -13,5 +13,7 @@ export async function sync(): Promise<void> {
   if (completions.length > 0) {
     appendCompletionAudits(completions);
   }
-  await pullIfDue(); // no-op unless HEALTH_SOURCE=scoreboard and the poll interval has elapsed
+  // Not awaited: a slow or down source must not delay organizer actions. Stale data is shown as unknown instead.
+  // No-op unless HEALTH_SOURCE=scoreboard and the poll interval has elapsed.
+  void pullIfDue().catch(() => undefined);
 }
