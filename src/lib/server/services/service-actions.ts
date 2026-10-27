@@ -46,6 +46,12 @@ export async function requestServiceAction(
     throw new AppError('CONFLICT', 'This adapter does not support service-level actions.');
   }
 
+  const route = `POST /api/teams/${teamId}/services/${serviceKey}/${kind}`;
+  if (opts.idempotencyKey) {
+    const stored = lookupIdempotencyKey(opts.idempotencyKey, user.id, route);
+    if (stored) return { ...stored, replay: true };
+  }
+
   if (kind === 'reset') {
     const reason = input.reason?.trim() ?? '';
     if (reason.length < MIN_REASON_CHARS || input.confirmTeamId !== teamId) {
@@ -53,12 +59,6 @@ export async function requestServiceAction(
         `A reason of at least ${MIN_REASON_CHARS} characters and the typed team id are required to reset a service.`,
         { expectedTeamId: teamId, minReasonChars: MIN_REASON_CHARS });
     }
-  }
-
-  const route = `POST /api/teams/${teamId}/services/${serviceKey}/${kind}`;
-  if (opts.idempotencyKey) {
-    const stored = lookupIdempotencyKey(opts.idempotencyKey, user.id, route);
-    if (stored) return { ...stored, replay: true };
   }
 
   const correlationId = newCorrelationId();

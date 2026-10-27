@@ -21,7 +21,7 @@ export async function GET(req?: Request) {
     const authed = req ? await requireUser(req).then(() => true, () => false) : false;
     return Response.json({
       adapter: adapter.mode,
-      badge: badgeFor(adapter.mode, config.healthSource, config.evidenceGatePassed),
+      badge: badgeFor(adapter.mode, config.healthSource, config.evidenceGatePassed && adapter.capabilities.fullyReal),
       version: pkg.version,
       serverTime: new Date().toISOString(),
       demoControls,

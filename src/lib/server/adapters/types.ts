@@ -211,6 +211,20 @@ export interface HealthSnapshot {
   lastHealthCheckAt: string | null;
 }
 
+export type EventPhase = 'not_started' | 'peace' | 'battle' | 'freeze' | 'ended';
+
+/** Event clock. Phase lengths are UNCONFIRMED (event-flow draft, docs/12 C8); the start time is set by an admin. */
+export interface EventClock {
+  phase: EventPhase | null;
+  /** From the health source when it reports one. */
+  currentRound: number | null;
+  roundSec: number;
+  startedAt: string | null;
+  /** Where currentRound comes from. */
+  source: 'scoreboard' | 'ingest' | 'none';
+  phaseMinutes: { peace: number; battle: number; freeze: number };
+}
+
 export interface OverviewData {
   adapter: string;
   serverTime: string;
@@ -241,7 +255,17 @@ export interface OverviewData {
     lifecycleState: LifecycleState;
     health: Health;
     pending: boolean;
+    /** One entry per manifest service, for the teams × services matrix. */
+    services: {
+      key: string;
+      name: string;
+      reachability: CheckStatus;
+      functional: CheckStatus;
+      stale: boolean;
+      flagstores: FlagstoreVerdict[];
+    }[];
   }[];
+  event: EventClock;
   recentAlerts: Alert[];
   recentActivity: AuditEntry[];
   healthSource: HealthSourceStatusDto;
@@ -264,6 +288,8 @@ export interface AdapterCapabilities {
   serviceLevelReset: boolean;
   terminalMode: 'per_team' | 'shared';
   flagstores: number;
+  /** True only when every environment-affecting call (lifecycle, credentials, terminal, resources) is real. Gates the LIVE badge. */
+  fullyReal: boolean;
 }
 
 export interface ServiceActionResponse {

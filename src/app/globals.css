@@ -16,7 +16,7 @@
   --ok:      #34D399;
   --warn:    #F59E0B;
   --bad:     #F87171;
-  --idle:    #64748B;
+  --idle:    #94A3B8; /* 4.5:1 or better on --bg, --panel and --panel-2 */
 
   /* shadcn / Tailwind CSS-variable mapping */
   --background:             var(--bg);
@@ -124,16 +124,17 @@ html { color-scheme: dark; }
     background: var(--accent);
   }
 
+  /* Data views stay flat: no grid, gradient or glow behind tables (the login page keeps its own treatment). */
   .console-main {
-    background:
-      linear-gradient(90deg, rgba(34, 211, 238, 0.025) 1px, transparent 1px) 0 0 / 32px 32px,
-      var(--bg);
+    background: var(--bg);
   }
+
+  /* Counts, ports, times and table cells use tabular figures so columns do not jitter on every poll. */
+  table, .tabular { font-variant-numeric: tabular-nums; }
 
   .console-surface {
     border: 1px solid var(--border);
     background: var(--panel);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   }
 
   .console-inset {

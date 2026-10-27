@@ -37,6 +37,9 @@ export default function SettingsPage() {
   const me = useQuery({ queryKey: ['me'], queryFn: apiMe, staleTime: 60_000 });
   const isAdmin = me.data?.user.role === 'organizer_admin';
   const [freezeText, setFreezeText] = useState('');
+  const [eventStart, setEventStart] = useState<string | null>(null); // datetime-local value, null = untouched
+  const savedStart = settings.data?.eventStartIso ? settings.data.eventStartIso.slice(0, 16) : '';
+  const startValue = eventStart ?? savedStart;
   const freeze = useMutation({
     mutationFn: (frozen: boolean) => apiSetFrozen(frozen, frozen ? freezeText : undefined),
     onSuccess: (r) => { setFreezeText(''); toast.success(r.frozen ? 'Mutations frozen' : 'Mutations unfrozen'); void qc.invalidateQueries({ queryKey: ['meta'] }); },
@@ -47,7 +50,7 @@ export default function SettingsPage() {
     <QueryState loading={meta.isLoading || settings.isLoading} error={meta.error ?? settings.error} onRetry={() => { void meta.refetch(); void settings.refetch(); }}>
       {meta.data && settings.data && (
         <div>
-          <PageHeader title="Settings" description="Runtime context and the small set of organizer-facing controls." />
+          <PageHeader title="Settings" description="Event clock, status label, mutation freeze and organizer accounts." />
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
             <Card className="console-surface">
               <CardHeader className="border-b border-[var(--border)]">
@@ -70,6 +73,17 @@ export default function SettingsPage() {
             </Card>
 
             <div className="space-y-4">
+              {isAdmin && <Card className="console-surface">
+                <CardHeader className="border-b border-[var(--border)]"><CardTitle>Event clock</CardTitle></CardHeader>
+                <CardContent className="space-y-3 pt-4 text-sm">
+                  <p className="text-[var(--muted)]">Start time in UTC. The overview derives the phase from it (peace 45, battle 165, freeze 30 minutes; these lengths come from the event-flow draft and are not confirmed). Leave empty to show &quot;Event clock not set&quot;.</p>
+                  <label className="grid gap-1 text-xs font-medium" htmlFor="event-start">Start (UTC)<Input id="event-start" type="datetime-local" value={startValue} onChange={(e) => setEventStart(e.target.value)} className="border-[var(--border-strong)] bg-[var(--surface-inset)]" /></label>
+                  <div className="flex gap-2">
+                    <Button disabled={update.isPending || startValue === savedStart || !startValue} onClick={() => update.mutate({ eventStartIso: new Date(`${startValue}:00Z`).toISOString() }, { onSuccess: () => { setEventStart(null); toast.success('Event start saved'); } })}>{update.isPending ? 'Saving…' : 'Save start time'}</Button>
+                    <Button variant="outline" disabled={update.isPending || !savedStart} onClick={() => update.mutate({ eventStartIso: null }, { onSuccess: () => { setEventStart(null); toast.success('Event clock cleared'); } })}>Clear</Button>
+                  </div>
+                </CardContent>
+              </Card>}
               {isAdmin && <Card className="console-surface">
                 <CardHeader className="border-b border-[var(--border)]"><CardTitle>Mutation freeze</CardTitle></CardHeader>
                 <CardContent className="space-y-3 pt-4 text-sm">

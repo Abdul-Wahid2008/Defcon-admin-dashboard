@@ -57,6 +57,7 @@ export class DockerComposeAdapter implements EnvironmentAdapter {
     serviceLevelReset: false,
     terminalMode: 'per_team',
     flagstores: 3,
+    fullyReal: false,
   };
   readonly resetLabel = 'Restart (patch restore not available)';
   private readonly delegate: MockAdapter;

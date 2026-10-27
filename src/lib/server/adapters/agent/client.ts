@@ -15,7 +15,8 @@ const Capabilities = z.object({
   resetKind: z.enum(['recreate_pristine', 'restart', 'restore_patch']),
   serviceLevelReset: z.boolean(),
 });
-const JobAccepted = z.object({ jobId: z.string().min(1).max(128), status: z.enum(['queued', 'running']) });
+const JOB_ID = /^[A-Za-z0-9_-]{1,128}$/;
+const JobAccepted = z.object({ jobId: z.string().regex(JOB_ID), status: z.enum(['queued', 'running']) });
 const Job = z.object({
   jobId: z.string(),
   status: z.enum(['queued', 'running', 'succeeded', 'failed']),
@@ -66,8 +67,10 @@ export class AgentClient {
     return `/v1/teams/${teamId}`;
   }
 
-  private async request<T>(method: 'GET' | 'POST', path: string, schema: z.ZodType<T>, headers: Record<string, string> = {}): Promise<T> {
-    const attempts = method === 'GET' ? 1 + this.getRetries : 1; // POST is never retried here: Idempotency-Key replay is the caller's decision
+  private async request<T>(method: 'GET' | 'POST', path: string, schema: z.ZodType<T>, headers: Record<string, string> = {}, quick = false): Promise<T> {
+    // `quick` (polling, capability refresh) must never stall a dashboard request: 3 s, no retry.
+    const attempts = method === 'GET' && !quick ? 1 + this.getRetries : 1;
+    const timeoutMs = quick ? Math.min(this.timeoutMs, 3000) : this.timeoutMs; // POST is never retried here: Idempotency-Key replay is the caller's decision
     let lastReason = 'network_error';
     for (let attempt = 0; attempt < attempts; attempt++) {
       let res: Response;
@@ -78,7 +81,7 @@ export class AgentClient {
           credentials: 'omit',
           cache: 'no-store',
           headers: { accept: 'application/json', authorization: `Bearer ${this.opts.token}`, ...headers },
-          signal: AbortSignal.timeout(this.timeoutMs),
+          signal: AbortSignal.timeout(timeoutMs),
         });
       } catch (e) {
         const name = (e as { name?: string }).name;
@@ -97,17 +100,17 @@ export class AgentClient {
     throw adapterError(lastReason);
   }
 
-  capabilities(): Promise<AgentCapabilities> {
-    return this.request('GET', '/v1/capabilities', Capabilities);
+  capabilities(quick = false): Promise<AgentCapabilities> {
+    return this.request('GET', '/v1/capabilities', Capabilities, {}, quick);
   }
 
   async status(teamId: string): Promise<AgentStatus> {
     return this.request('GET', `${this.teamPath(teamId)}/status`, Status);
   }
 
-  async job(jobId: string): Promise<AgentJob> {
-    if (!/^[A-Za-z0-9_-]{1,128}$/.test(jobId)) throw new AppError('VALIDATION_ERROR', 'Invalid job id.');
-    return this.request('GET', `/v1/jobs/${jobId}`, Job);
+  async job(jobId: string, quick = false): Promise<AgentJob> {
+    if (!JOB_ID.test(jobId)) throw new AppError('VALIDATION_ERROR', 'Invalid job id.');
+    return this.request('GET', `/v1/jobs/${jobId}`, Job, {}, quick);
   }
 
   async teamAction(teamId: string, action: AgentTeamAction, idempotencyKey: string) {

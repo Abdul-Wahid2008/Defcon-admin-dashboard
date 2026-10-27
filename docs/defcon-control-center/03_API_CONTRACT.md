@@ -291,3 +291,8 @@ Anything the orchestrator cannot supply is shown as "not available" in the UI (`
 - `POST /api/teams/{teamId}/environment/reset` accepts `{reason, confirmTeamId}`. When `capabilities.resetKind !== 'restore_patch'` both are required (422 `CONFIRMATION_MISMATCH`) and the `requested` audit row carries `details.reason` and `details.resetKind`.
 - `ADAPTER=real` builds the agent adapter (docs/15 §3 proposal) when `ORCHESTRATOR_BASE_URL/TOKEN/TIMEOUT_MS` are set. It has no delete operation (delete → 502 `ADAPTER_ERROR`). The badge is never `LIVE` until `EVIDENCE_GATE_PASSED=true`.
 - Migration 003: `environments.pending_service_key`, `pending_job_id`, `last_service_action_json`. New config: `TERMINAL_URL_TEMPLATE`, `EVIDENCE_GATE_PASSED`.
+
+### v1.2 W5 — overview matrix and event clock (CONTRACT CHANGE, additive)
+- `OverviewData.grid[].services[]` `{key,name,reachability,functional,stale,flagstores[]}` (stale-aware) feeds the teams × services matrix. `OverviewData.event` `{phase|null, currentRound|null, roundSec, startedAt|null, source, phaseMinutes}`; phase is derived from the admin-set `event_start_iso` and phase lengths 45/165/30 min (settings `phase_*_min`; UNCONFIRMED, docs/12 C8). `phase=null` means "Event clock not set".
+- `GET/PATCH /api/settings` carry `eventStartIso` (ISO string or null to clear; admin only, audited as `settings.update`).
+- `/api/meta.capabilities.fullyReal` (false for every adapter today); the LIVE badge needs `EVIDENCE_GATE_PASSED=true` **and** `fullyReal`.

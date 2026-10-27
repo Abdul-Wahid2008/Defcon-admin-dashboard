@@ -25,6 +25,14 @@ import { useQueryClient } from '@tanstack/react-query';
 
 type ActionKind = 'start' | 'stop' | 'reset';
 
+/** Failing services first: reachability fail, then functional fail, then unknown/stale. */
+function serviceRank(service: { stale?: boolean; checks: { type: string; status: string }[] }): number {
+  if (service.stale) return 1;
+  if (service.checks.some((c) => c.type === 'reachability' && c.status === 'fail')) return 3;
+  if (service.checks.some((c) => c.type === 'functional' && c.status === 'fail')) return 2;
+  return service.checks.some((c) => c.status === 'unknown') ? 1 : 0;
+}
+
 function TeamDetailsForm({
   team,
   onUpdate,
@@ -111,6 +119,7 @@ export default function TeamDetailPage() {
   // ignored, so the Activity tab previously showed the global log.
   const audit = useAudit({ team: teamId });
   const [tab, setTab] = useState('overview');
+  const [showTerminal, setShowTerminal] = useState(false); // the link is not in the DOM until an organizer asks for it
   const [actionDialog, setActionDialog] = useState<ActionKind | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmName, setConfirmName] = useState('');
@@ -118,7 +127,8 @@ export default function TeamDetailPage() {
   const [participantDialog, setParticipantDialog] = useState(false);
   const [credentialDialog, setCredentialDialog] = useState<IssuedCredential[] | null>(null);
   const [statusDialog, setStatusDialog] = useState<'active' | 'suspended' | null>(null);
-  const [awaitingAction, setAwaitingAction] = useState<ActionKind | null>(null);
+  // startedAt comes from the 202 response; the toast waits until the polled team shows that action finished.
+  const [awaitingAction, setAwaitingAction] = useState<{ kind: ActionKind; startedAt: string } | null>(null);
   const team = query.data;
   const metaQuery = useMeta();
   const staleAfter = metaQuery.data?.health.staleAfterSec;
@@ -135,10 +145,12 @@ export default function TeamDetailPage() {
 
   useEffect(() => {
     if (!team || !awaitingAction || team.environment.pending) return;
+    // A stale cached team (from before the request) has an older lastActionAt: keep waiting for the refetch.
+    if (!team.environment.lastActionAt || team.environment.lastActionAt < awaitingAction.startedAt) return;
     if (team.lifecycleState === 'failed') {
-      toast.error(`${team.id} ${awaitingAction} failed: ${team.environment.failureReason ?? 'The adapter reported a failure.'}`, { duration: Infinity });
+      toast.error(`${team.id} ${awaitingAction.kind} failed: ${team.environment.failureReason ?? 'The adapter reported a failure.'}`, { duration: Infinity });
     } else {
-      toast.success(`${team.id} ${awaitingAction} complete — ${team.lifecycleState}`);
+      toast.success(`${team.id} ${awaitingAction.kind} complete — ${team.lifecycleState}`);
     }
     window.setTimeout(() => setAwaitingAction(null), 0);
   }, [team, awaitingAction]);
@@ -184,16 +196,20 @@ export default function TeamDetailPage() {
 
   const submitAction = async () => {
     if (!team || !actionDialog) return;
-    setAwaitingAction(actionDialog);
-    setActionDialog(null);
     try {
-      await action.mutateAsync({
+      const res = (await action.mutateAsync({
         teamId: team.id, action: actionDialog, idempotencyKey: crypto.randomUUID(),
         confirmation: needsResetConfirmation ? { reason: resetReason.trim(), confirmTeamId: resetTyped } : undefined,
-      });
-      toast(` ${actionDialog.charAt(0).toUpperCase() + actionDialog.slice(1)} requested for ${team.id}`, { icon: <CheckCircle2 size={16} className="text-[var(--accent)]" /> });
+      })) as { transition?: { startedAt: string }; noop?: boolean; reason?: string };
+      setActionDialog(null);
+      if (res.noop || !res.transition) {
+        toast(`${team.id}: ${res.reason ?? 'nothing to do'}`);
+        return;
+      }
+      setAwaitingAction({ kind: actionDialog, startedAt: res.transition.startedAt });
+      toast(`${actionDialog.charAt(0).toUpperCase() + actionDialog.slice(1)} requested for ${team.id}`, { icon: <CheckCircle2 size={16} className="text-[var(--accent)]" /> });
     } catch {
-      setAwaitingAction(null);
+      // The error stays visible in the open dialog (action.error).
     }
   };
 
@@ -247,7 +263,7 @@ export default function TeamDetailPage() {
       {team.environment.pending && <div role="status" className="mb-5 flex items-center gap-3 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/10 p-3 text-sm text-[var(--warn)]"><ShieldAlert size={16} /><span><strong>{team.environment.pending.action.replace('service_', 'service ')}{team.environment.pending.serviceKey ? ` (${team.environment.pending.serviceKey})` : ''}</strong> is in progress. The final state will be confirmed by polling.</span></div>}
       {team.environment.failureReason && <div className="mb-5 flex items-start gap-3 rounded-lg border border-[var(--bad)]/40 bg-[var(--bad)]/10 p-3 text-sm text-[var(--bad)]"><ShieldAlert size={17} className="mt-0.5" /><div><strong>Environment needs attention.</strong><p className="mt-1">{team.environment.failureReason}</p></div></div>}
 
-      <div className="mb-5 flex gap-1 overflow-x-auto border-b border-[var(--border)]" role="tablist" aria-label="Team detail sections">{['overview', 'participants', 'activity', 'details'].map((name) => <button key={name} role="tab" aria-selected={tab === name} onClick={() => setTab(name)} className={`border-b-2 px-3 py-2.5 text-sm capitalize ${tab === name ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--muted)] hover:text-[var(--text)]'}`}>{name}</button>)}</div>
+      <div className="mb-5 flex gap-1 overflow-x-auto border-b border-[var(--border)]" role="tablist" aria-label="Team detail sections">{['overview', 'services', 'participants', 'activity', 'settings'].map((name) => <button key={name} role="tab" aria-selected={tab === name} onClick={() => setTab(name)} className={`border-b-2 px-3 py-2.5 text-sm capitalize ${tab === name ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--muted)] hover:text-[var(--text)]'}`}>{name}</button>)}</div>
 
       {tab === 'overview' && <div className="grid gap-4 xl:grid-cols-3">
         <Card className="console-surface"><CardHeader className="border-b border-[var(--border)]"><CardTitle>Environment</CardTitle></CardHeader><CardContent className="space-y-3 pt-4 text-sm">
@@ -256,14 +272,15 @@ export default function TeamDetailPage() {
           <div className="flex justify-between"><span className="text-[var(--muted)]">Last action</span><RelativeTime ts={team.environment.lastActionAt} /></div>
           <div className="flex justify-between"><span className="text-[var(--muted)]">Last health check</span><RelativeTime ts={team.environment.lastHealthCheckAt} /></div>
           {team.environment.lastDeploy && <div className="flex justify-between"><span className="text-[var(--muted)]">Last deploy</span><span className="font-mono text-xs">{team.environment.lastDeploy.result} · v{team.environment.lastDeploy.version}</span></div>}
-          {team.environment.terminal?.url ? <div className="border-t border-[var(--border)] pt-3"><div className="mb-1 text-xs text-[var(--muted)]">Simulated terminal endpoint</div><div className="flex items-center gap-2"><a className="min-w-0 flex-1 break-all font-mono text-xs text-[var(--accent)] hover:underline" href={team.environment.terminal.url} target="_blank" rel="noreferrer">{team.environment.terminal.url}</a><button type="button" className="rounded p-1.5 text-[var(--muted)] hover:bg-[var(--panel-2)] hover:text-[var(--accent)]" aria-label="Copy terminal endpoint" onClick={() => navigator.clipboard.writeText(team.environment.terminal?.url ?? '')}><Copy size={14} /></button><ExternalLink size={13} className="shrink-0 text-[var(--muted)]" /></div></div> : <p className="border-t border-[var(--border)] pt-3 text-xs text-[var(--muted)]">Terminal endpoint unavailable while this environment is not running.</p>}
+          {team.environment.terminal?.url ? <div className="border-t border-[var(--border)] pt-3"><div className="mb-1 text-xs text-[var(--muted)]">{team.environment.terminal.isMock ? 'Terminal (simulated placeholder)' : 'Terminal'}: available, {team.environment.terminal.mode === 'per_team' ? 'per team' : 'shared'}, port {team.environment.terminal.port}</div>{showTerminal ? <div className="flex items-center gap-2"><a className="min-w-0 flex-1 break-all font-mono text-xs text-[var(--accent)] hover:underline" href={team.environment.terminal.url} target="_blank" rel="noreferrer noopener">{team.environment.terminal.url}</a><button type="button" className="rounded p-1.5 text-[var(--muted)] hover:bg-[var(--panel-2)] hover:text-[var(--accent)]" aria-label="Copy terminal link" onClick={() => navigator.clipboard.writeText(team.environment.terminal?.url ?? '')}><Copy size={14} /></button><ExternalLink size={13} className="shrink-0 text-[var(--muted)]" aria-hidden="true" /></div> : <Button size="sm" variant="outline" onClick={() => setShowTerminal(true)}>Show terminal link</Button>}</div> : <p className="border-t border-[var(--border)] pt-3 text-xs text-[var(--muted)]">Terminal is not available while this environment is not running.</p>}
         </CardContent></Card>
-        <div className="space-y-4 xl:col-span-2"><Card className="console-surface"><CardHeader className="border-b border-[var(--border)]"><CardTitle className="flex items-center justify-between">Services <Button size="sm" variant="outline" onClick={() => health.mutate(team.id)} disabled={health.isPending || team.lifecycleState !== 'running'}>{health.isPending ? 'Checking…' : 'Run check now'}</Button></CardTitle></CardHeader><CardContent className="overflow-x-auto pt-4"><Table><TableHeader><TableRow><TableHead>Service</TableHead><TableHead>Reachability</TableHead><TableHead>Functional</TableHead><TableHead>Flagstores</TableHead><TableHead>Detail</TableHead><TableHead>Last checked</TableHead>{caps?.serviceLevelReset && <TableHead>Actions</TableHead>}</TableRow></TableHeader><TableBody>{team.environment.services.map((service) => { const reach = service.checks.find((c) => c.type === 'reachability'); const functional = service.checks.find((c) => c.type === 'functional'); const failing = reach?.status === 'fail' || functional?.status === 'fail'; return <TableRow key={service.key} className={failing ? 'bg-[var(--bad)]/5' : undefined}><TableCell><div className="font-medium">{service.name}</div><div className="font-mono text-xs text-[var(--muted)]">:{service.port}{service.placeholder ? ' · placeholder' : ''}</div></TableCell><TableCell><CheckStatus status={reach?.status ?? 'unknown'} detail={reach?.detail} /></TableCell><TableCell><CheckStatus status={functional?.status ?? 'unknown'} detail={functional?.detail} /></TableCell><TableCell><FlagstoreDots flagstores={service.flagstores} stale={service.stale} />{service.stale && <div className="mt-1 text-xs text-[var(--warn)]">Stale (over {staleAfter ?? 270} s)</div>}</TableCell><TableCell className="max-w-[170px] truncate text-xs text-[var(--muted)]" title={reach?.detail ?? functional?.detail ?? ''}>{reach?.detail ?? functional?.detail ?? 'No checker detail'}</TableCell><TableCell><RelativeTime ts={reach?.lastCheckedAt ?? functional?.lastCheckedAt} /></TableCell>{caps?.serviceLevelReset && <TableCell><div className="flex gap-1"><Button size="sm" variant="ghost" disabled={!serviceActionable} title={serviceActionable ? undefined : serviceBlockReason} onClick={() => { setSvcError(null); setServiceDialog({ key: service.key, name: service.name, kind: 'restart' }); }}><RotateCw size={13} />Restart</Button><Button size="sm" variant="ghost" disabled={!serviceActionable} title={serviceActionable ? undefined : serviceBlockReason} onClick={() => { setSvcError(null); setSvcReason(''); setSvcTyped(''); setServiceDialog({ key: service.key, name: service.name, kind: 'reset' }); }}><RotateCcw size={13} />Reset</Button></div></TableCell>}</TableRow>; })}</TableBody></Table></CardContent></Card><Card className="console-surface"><CardHeader className="border-b border-[var(--border)]"><CardTitle className="flex items-center justify-between">Resource usage <span className="text-xs font-normal text-[var(--muted)]">{team.environment.resources?.isMock ? 'Simulated values' : 'Runtime values'}</span></CardTitle></CardHeader><CardContent className="pt-4"><ResourceBars resources={team.environment.resources} /></CardContent></Card></div>
+        <div className="space-y-4 xl:col-span-2"><Card className="console-surface"><CardHeader className="border-b border-[var(--border)]"><CardTitle className="flex items-center justify-between">Services <Button size="sm" variant="outline" onClick={() => setTab('services')}>Open services</Button></CardTitle></CardHeader><CardContent className="pt-3"><ul className="divide-y divide-[var(--border)] text-sm">{team.environment.services.map((service) => { const reach = service.checks.find((c) => c.type === 'reachability'); const functional = service.checks.find((c) => c.type === 'functional'); return <li key={service.key} className="flex flex-wrap items-center justify-between gap-2 py-2"><span className="font-medium">{service.name}</span><span className="flex items-center gap-3"><FlagstoreDots flagstores={service.flagstores} stale={service.stale} /><CheckStatus status={reach?.status ?? 'unknown'} detail={reach?.detail} /><CheckStatus status={functional?.status ?? 'unknown'} detail={functional?.detail} /></span></li>; })}</ul></CardContent></Card><Card className="console-surface"><CardHeader className="border-b border-[var(--border)]"><CardTitle className="flex items-center justify-between">Resource usage <span className="text-xs font-normal text-[var(--muted)]">{team.environment.resources?.isMock ? 'Simulated values' : 'Runtime values'}</span></CardTitle></CardHeader><CardContent className="pt-4"><ResourceBars resources={team.environment.resources} /></CardContent></Card></div>
       </div>}
 
+      {tab === 'services' && <div><Card className="console-surface"><CardHeader className="border-b border-[var(--border)]"><CardTitle className="flex items-center justify-between">Services <Button size="sm" variant="outline" onClick={() => health.mutate(team.id)} disabled={health.isPending || team.lifecycleState !== 'running'}>{health.isPending ? 'Checking…' : 'Run check now'}</Button></CardTitle></CardHeader><CardContent className="overflow-x-auto pt-4"><Table className="text-[13px] [&_td]:px-2 [&_th]:px-2"><TableHeader><TableRow><TableHead>Service</TableHead><TableHead>Reachability</TableHead><TableHead>Functional</TableHead><TableHead>Flagstores</TableHead><TableHead>Detail</TableHead><TableHead>Last checked</TableHead>{caps?.serviceLevelReset && <TableHead>Actions</TableHead>}</TableRow></TableHeader><TableBody>{[...team.environment.services].sort((a, b) => serviceRank(b) - serviceRank(a)).map((service) => { const reach = service.checks.find((c) => c.type === 'reachability'); const functional = service.checks.find((c) => c.type === 'functional'); const failing = reach?.status === 'fail' || functional?.status === 'fail'; return <TableRow key={service.key} className={failing ? 'bg-[var(--bad)]/5' : undefined}><TableCell className="max-w-[200px] whitespace-normal"><div className="font-medium">{service.name}</div><div className="font-mono text-xs text-[var(--muted)]">:{service.port}{service.placeholder ? ' · placeholder' : ''}</div></TableCell><TableCell><CheckStatus status={reach?.status ?? 'unknown'} detail={reach?.detail} /></TableCell><TableCell><CheckStatus status={functional?.status ?? 'unknown'} detail={functional?.detail} /></TableCell><TableCell><FlagstoreDots flagstores={service.flagstores} stale={service.stale} />{service.stale && <div className="mt-1 text-xs text-[var(--warn)]">Stale (over {staleAfter ?? 270} s)</div>}</TableCell><TableCell className="max-w-[140px] truncate text-xs text-[var(--muted)]" title={reach?.detail ?? functional?.detail ?? ''}>{reach?.detail ?? functional?.detail ?? 'No checker detail'}</TableCell><TableCell><RelativeTime ts={reach?.lastCheckedAt ?? functional?.lastCheckedAt} /></TableCell>{caps?.serviceLevelReset && <TableCell><div className="flex gap-1"><Button size="sm" variant="ghost" disabled={!serviceActionable} title={serviceActionable ? undefined : serviceBlockReason} onClick={() => { setSvcError(null); setServiceDialog({ key: service.key, name: service.name, kind: 'restart' }); }}><RotateCw size={13} />Restart</Button><Button size="sm" variant="ghost" disabled={!serviceActionable} title={serviceActionable ? undefined : serviceBlockReason} onClick={() => { setSvcError(null); setSvcReason(''); setSvcTyped(''); setServiceDialog({ key: service.key, name: service.name, kind: 'reset' }); }}><RotateCcw size={13} />Reset</Button></div></TableCell>}</TableRow>; })}</TableBody></Table></CardContent></Card></div>}
       {tab === 'participants' && <Card className="console-surface"><CardHeader className="flex-row items-center justify-between border-b border-[var(--border)]"><CardTitle>Participants</CardTitle><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => rotateCredentials()} disabled={rotate.isPending || !participants.data?.length}><KeyRound size={14} />Rotate all</Button><Button size="sm" onClick={() => setParticipantDialog(true)} disabled={(participants.data?.length ?? 0) >= 8}><UserPlus size={14} />Add participant</Button></div></CardHeader><CardContent className="overflow-x-auto pt-4">{participants.data?.length ? <Table><TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Username</TableHead><TableHead>Credential</TableHead><TableHead>Status</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader><TableBody>{participants.data.map((person) => <TableRow key={person.id}><TableCell>{person.name}</TableCell><TableCell className="font-mono text-xs">{person.username} <button aria-label={`Copy ${person.username}`} className="ml-1 rounded p-1 text-[var(--muted)] hover:text-[var(--accent)]" onClick={() => navigator.clipboard.writeText(person.username)}><Copy size={12} className="inline" /></button></TableCell><TableCell>v{person.credentialVersion} · <RelativeTime ts={person.credentialIssuedAt} /></TableCell><TableCell><span className={person.active ? 'text-[var(--ok)]' : 'text-[var(--muted)]'}>{person.active ? 'Active' : 'Inactive'}</span></TableCell><TableCell><div className="flex gap-1"><Button size="sm" variant="ghost" onClick={() => rotateCredentials(person.id)} disabled={rotate.isPending}>Rotate</Button><Button size="sm" variant="ghost" onClick={() => remove.mutate({ teamId: team.id, participantId: person.id })} disabled={remove.isPending}>Remove</Button></div></TableCell></TableRow>)}</TableBody></Table> : <p className="py-8 text-center text-sm text-[var(--muted)]">No participants have been issued credentials.</p>}</CardContent></Card>}
       {tab === 'activity' && <Card className="console-surface"><CardHeader className="border-b border-[var(--border)]"><CardTitle>Activity</CardTitle></CardHeader><CardContent className="pt-2"><ActivityList entries={audit.data?.items ?? []} /></CardContent></Card>}
-      {tab === 'details' && <TeamDetailsForm
+      {tab === 'settings' && <TeamDetailsForm
         key={team.id}
         team={team}
         onUpdate={(patch) => update.mutate({ teamId: team.id, patch }, { onSuccess: () => toast.success('Team details updated') })}

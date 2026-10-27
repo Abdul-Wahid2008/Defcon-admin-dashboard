@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  keepPreviousData,
   useQuery,
   useMutation,
   useQueryClient,
@@ -60,6 +61,7 @@ export function useTeams(filters: Record<string, string | string[] | boolean | n
     queryFn: () => apiListTeams(filters),
     refetchInterval: POLLING_INTERVALS.DEFAULT,
     staleTime: 2_000,
+    placeholderData: keepPreviousData, // filtering or sorting must not blank the table (no layout shift)
   });
 }
 
@@ -246,7 +248,7 @@ export function useSettings() {
 export function useUpdateSettings() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (patch: { competitionStatus?: string }) => apiUpdateSettings(patch),
+    mutationFn: (patch: { competitionStatus?: string; eventStartIso?: string | null }) => apiUpdateSettings(patch),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
   });
 }

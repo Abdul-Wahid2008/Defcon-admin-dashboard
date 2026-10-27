@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 
 const PatchSettingsBody = z.object({
   competitionStatus: z.enum(['not_started', 'running', 'paused', 'ended']).optional(),
+  eventStartIso: z.string().datetime({ offset: true }).nullable().optional(),
 });
 
 export async function GET(req: Request) {

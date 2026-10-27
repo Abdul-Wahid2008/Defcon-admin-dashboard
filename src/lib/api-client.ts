@@ -279,10 +279,10 @@ export async function apiQueryAudit(params: QueryParams = {}) {
 
 export async function apiGetSettings() {
   const res = await fetch('/api/settings', { credentials: 'same-origin' });
-  return handleResponse<{ competitionStatus: string }>(res);
+  return handleResponse<{ competitionStatus: string; eventStartIso: string | null }>(res);
 }
 
-export async function apiUpdateSettings(patch: { competitionStatus?: string }) {
+export async function apiUpdateSettings(patch: { competitionStatus?: string; eventStartIso?: string | null }) {
   const res = await fetch('/api/settings', {
     method: 'PATCH',
     headers: defaultHeaders(),

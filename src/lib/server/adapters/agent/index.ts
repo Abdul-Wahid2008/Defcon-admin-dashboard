@@ -12,13 +12,13 @@ import type {
   ServiceActionResponse,
 } from '../types';
 import { AgentClient } from './client';
-import { appendCompletionAudits } from '../../audit';
 
 // Estimated duration shown in the UI while an agent job runs; the job status, not this clock, decides completion.
 const ESTIMATE_MS = 60_000;
 const JOB_TIMEOUT_MS = 10 * 60_000;
 const POLL_GAP_MS = 2_000;
 const CAPS_REFRESH_MS = 60_000;
+const UNASSIGNED_GRACE_MS = 30_000;
 
 export interface AgentAdapterOptions {
   baseUrl: string;
@@ -46,12 +46,15 @@ export class AgentAdapter extends MockAdapter {
   private capsCheckedAt = 0;
   private readonly polledAt = new Map<string, number>();
   private readonly inFlight = new Set<string>();
+  /** Completions produced outside resolveDue (e.g. a refused provisioning) are returned by the next resolveDue, after their requested row. */
+  private readonly deferred: CompletedTransition[] = [];
 
   constructor(opts: AgentAdapterOptions) {
     super(opts.nowFn);
     this.client = new AgentClient({ baseUrl: opts.baseUrl, token: opts.token, timeoutMs: opts.timeoutMs, fetchImpl: opts.fetchImpl });
     // Conservative until the agent answers GET /v1/capabilities.
-    this.capabilities = { ...this.capabilities, resetKind: 'recreate_pristine', serviceLevelReset: false };
+    // fullyReal stays false: participants/credentials, resources and session counts are still dashboard-side (MOCK).
+    this.capabilities = { ...this.capabilities, resetKind: 'recreate_pristine', serviceLevelReset: false, fullyReal: false };
   }
 
   protected override terminalUrlFor(teamId: string): string | null {
@@ -66,7 +69,7 @@ export class AgentAdapter extends MockAdapter {
     if (!force && nowMs - this.capsCheckedAt < CAPS_REFRESH_MS) return;
     this.capsCheckedAt = nowMs;
     try {
-      const caps = await this.client.capabilities();
+      const caps = await this.client.capabilities(true);
       this.capabilities = { ...this.capabilities, resetKind: caps.resetKind, serviceLevelReset: caps.serviceLevelReset };
     } catch {
       // keep the previous (conservative) capabilities
@@ -79,33 +82,46 @@ export class AgentAdapter extends MockAdapter {
   }
 
   override async resolveDue(): Promise<CompletedTransition[]> {
-    await this.refreshCapabilities();
+    // Not awaited: a slow or down agent must never stall a dashboard request (every route calls sync()).
+    void this.refreshCapabilities().catch(() => undefined);
     const nowIso = this.now();
     const nowMs = Date.parse(nowIso);
-    const pending = dbHelper.all<any>(`SELECT * FROM environments WHERE pending_action IS NOT NULL AND pending_job_id IS NOT NULL`);
-    const completed: CompletedTransition[] = [];
-    for (const env of pending) {
-      const last = this.polledAt.get(env.pending_job_id) ?? 0;
-      if (nowMs - last < POLL_GAP_MS) continue;
-      this.polledAt.set(env.pending_job_id, nowMs);
+    const completed: CompletedTransition[] = this.deferred.splice(0);
+    const pending = dbHelper.all<any>(`SELECT * FROM environments WHERE pending_action IS NOT NULL`);
+
+    // A pending row with no job id was never handed to the agent (crash between commit and job id, or leftover state).
+    for (const env of pending.filter(e => !e.pending_job_id && nowMs - Date.parse(e.pending_started_at) > UNASSIGNED_GRACE_MS)) {
+      completed.push(...this.finishPending(env, 'failure', 'The request was not handed to the agent. Try again.', nowIso));
+    }
+
+    const due = pending.filter(e => e.pending_job_id && nowMs - (this.polledAt.get(e.pending_job_id) ?? 0) >= POLL_GAP_MS);
+    for (const env of due) this.polledAt.set(env.pending_job_id, nowMs);
+    // Polled in parallel with a short timeout, so N pending teams cost one 3 s wait at worst, not N × 20 s.
+    const results = await Promise.all(due.map(async (env): Promise<CompletedTransition[]> => {
       try {
-        const job = await this.client.job(env.pending_job_id);
-        if (job.status === 'succeeded') {
-          completed.push(...this.finishPending(env, 'success', undefined, nowIso));
-        } else if (job.status === 'failed') {
-          completed.push(...this.finishPending(env, 'failure', safeReason(job.error, `${env.pending_action} failed (agent job failed)`), nowIso));
-        } else if (nowMs - Date.parse(env.pending_started_at) > JOB_TIMEOUT_MS) {
-          completed.push(...this.finishPending(env, 'failure', 'Timed out waiting for the agent job.', nowIso));
+        const job = await this.client.job(env.pending_job_id, true);
+        if (job.status === 'succeeded') return this.finishPending(env, 'success', undefined, nowIso);
+        if (job.status === 'failed') return this.finishPending(env, 'failure', safeReason(job.error, `${env.pending_action} failed (agent job failed)`), nowIso);
+        if (nowMs - Date.parse(env.pending_started_at) > JOB_TIMEOUT_MS) {
+          return this.finishPending(env, 'failure', `Gave up waiting for agent job ${env.pending_job_id} after 10 minutes; the job state is unknown and it may still finish.`, nowIso);
         }
       } catch (e) {
         if (e instanceof AppError && e.code === 'NOT_FOUND') {
-          completed.push(...this.finishPending(env, 'failure', 'The agent no longer knows this job.', nowIso));
-        } else if (nowMs - Date.parse(env.pending_started_at) > JOB_TIMEOUT_MS) {
-          completed.push(...this.finishPending(env, 'failure', 'The agent was unreachable for 10 minutes.', nowIso));
+          return this.finishPending(env, 'failure', 'The agent no longer knows this job.', nowIso);
+        }
+        if (nowMs - Date.parse(env.pending_started_at) > JOB_TIMEOUT_MS) {
+          return this.finishPending(env, 'failure', `The agent was unreachable for 10 minutes; job ${env.pending_job_id} state is unknown.`, nowIso);
         }
         // otherwise: transient error, keep the pending state and try again on the next sync
       }
-      if (completed.some(c => c.teamId === env.team_id)) this.polledAt.delete(env.pending_job_id);
+      return [];
+    }));
+    for (const r of results) {
+      completed.push(...r);
+      for (const c of r) {
+        const env = due.find(e => e.team_id === c.teamId);
+        if (env) this.polledAt.delete(env.pending_job_id);
+      }
     }
     return completed;
   }
@@ -152,7 +168,8 @@ export class AgentAdapter extends MockAdapter {
       dbHelper.run(`UPDATE environments SET pending_job_id = ?, pending_ends_at = ? WHERE team_id = ?`, job.jobId, endsAt, teamId);
       return { ...result, team: (await this.getTeam(teamId))!, completionDueAt: endsAt };
     } catch {
-      appendCompletionAudits(this.finishPending(env, 'failure', 'The agent did not accept provisioning for this team.', nowIso));
+      // Audited by the next resolveDue(), i.e. after the service has written the 'requested' row.
+      this.deferred.push(...this.finishPending(env, 'failure', 'The agent did not accept provisioning for this team.', nowIso));
       return { ...result, team: (await this.getTeam(teamId))! };
     }
   }

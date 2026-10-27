@@ -228,7 +228,23 @@ export const OverviewDataSchema = z.object({
     lifecycleState: LifecycleStateSchema,
     health: HealthSchema,
     pending: z.boolean(),
+    services: z.array(z.object({
+      key: z.string(),
+      name: z.string(),
+      reachability: CheckStatusSchema,
+      functional: CheckStatusSchema,
+      stale: z.boolean(),
+      flagstores: z.array(z.enum(['OK', 'MUMBLE', 'OFFLINE', 'INTERNAL_ERROR', 'UNKNOWN'])),
+    })),
   })),
+  event: z.object({
+    phase: z.enum(['not_started', 'peace', 'battle', 'freeze', 'ended']).nullable(),
+    currentRound: z.number().int().nullable(),
+    roundSec: z.number(),
+    startedAt: z.string().nullable(),
+    source: z.enum(['scoreboard', 'ingest', 'none']),
+    phaseMinutes: z.object({ peace: z.number(), battle: z.number(), freeze: z.number() }),
+  }),
   recentAlerts: z.array(AlertSchema),
   recentActivity: z.array(AuditEntrySchema),
   healthSource: z.object({
@@ -272,6 +288,7 @@ export const MetaResponseSchema = z.object({
     serviceLevelReset: z.boolean(),
     terminalMode: z.enum(['per_team', 'shared']),
     flagstores: z.number().int(),
+    fullyReal: z.boolean(),
   }),
   frozen: z.boolean(),
 });

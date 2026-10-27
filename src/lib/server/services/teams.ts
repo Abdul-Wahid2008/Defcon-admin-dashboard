@@ -263,6 +263,15 @@ export async function requestLifecycleAction(
   }
   assertNotFrozen(user, { action: auditAction, targetType: 'team', targetId: teamId, requestId: opts.requestId });
 
+  // A retry with the same key replays the stored answer before anything is re-validated.
+  const route = `POST /api/teams/${teamId}/environment/${action}`;
+  if (opts.idempotencyKey) {
+    const stored = lookupIdempotencyKey(opts.idempotencyKey, user.id, route);
+    if (stored) {
+      return { ...stored, replay: true };
+    }
+  }
+
   // When a reset does more than restore the latest patch (recreate/restart), it needs a reason and the typed team id.
   const caps = getAdapter().capabilities;
   if (action === 'reset' && caps.resetKind !== 'restore_patch') {
@@ -282,14 +291,6 @@ export async function requestLifecycleAction(
       throw new AppError('CONFIRMATION_MISMATCH', 'Team name confirmation does not match.', {
         expected: team.name,
       });
-    }
-  }
-
-  const route = `POST /api/teams/${teamId}/environment/${action}`;
-  if (opts.idempotencyKey) {
-    const stored = lookupIdempotencyKey(opts.idempotencyKey, user.id, route);
-    if (stored) {
-      return { ...stored, replay: true };
     }
   }
 

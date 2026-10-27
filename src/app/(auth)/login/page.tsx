@@ -84,25 +84,25 @@ function LoginForm() {
             <div className="brand-mark"><Radar size={27} strokeWidth={1.7} /></div>
             <div><p className="brand-kicker">DEFCON 2.0</p><p className="brand-name">CONTROL CENTER</p></div>
           </div>
-          <h1>Keep every team<br /><span>moving forward.</span></h1>
-          <p className="login-lede">One clear workspace for team environments, health checks, and the decisions behind every change.</p>
+          <h1>DEFCON 2.0<br /><span>Control Center</span></h1>
+          <p className="login-lede">Team environments, service health and the audit log for the event.</p>
           <div className="login-principles">
             <div className="login-principle">
               <span className="login-principle-icon"><CheckCircle2 size={17} /></span>
-              <span><strong>See what needs attention</strong><small>Understand the current state at a glance.</small></span>
+              <span><strong>Current state</strong><small>Which teams are running and which services are failing.</small></span>
             </div>
             <div className="login-principle">
               <span className="login-principle-icon"><ShieldCheck size={17} /></span>
-              <span><strong>Act with guardrails</strong><small>Permissions and confirmations protect live work.</small></span>
+              <span><strong>Roles and confirmations</strong><small>Destructive actions need the right role and a typed confirmation.</small></span>
             </div>
             <div className="login-principle">
               <span className="login-principle-icon"><History size={17} /></span>
-              <span><strong>Trace every change</strong><small>Actions stay visible in the append-only audit log.</small></span>
+              <span><strong>Audit log</strong><small>Every action is recorded and cannot be edited or deleted.</small></span>
             </div>
           </div>
           <div className="login-trust">
             <span className="login-trust-rule" />
-            <span>Organizer access · local simulation environment</span>
+            <span>Organizer accounts only</span>
           </div>
         </motion.section>
 
@@ -112,10 +112,10 @@ function LoginForm() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.45, delay: 0.08, ease: 'easeOut' }}
         >
-          <div className="login-card-top"><span>Organizer sign in</span><span className="login-card-mode">Local demo</span></div>
+          <div className="login-card-top"><span>Organizer sign in</span><span className="login-card-mode">Restricted</span></div>
           <div className="login-card-heading">
-            <h2>Welcome back</h2>
-            <p>Use your organizer account to continue.</p>
+            <h2>Sign in</h2>
+            <p>Use your organizer account.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="login-form" noValidate>
@@ -186,7 +186,7 @@ function LoginForm() {
             )}
           </Button>
           </form>
-          <div className="login-card-footer"><span>SIMULATED ENVIRONMENT</span><span className="footer-pulse" /> <span>LOCAL CONTROL PLANE</span></div>
+          <div className="login-card-footer"><span>ORGANIZER CONSOLE</span><span className="footer-pulse" /> <span>RESTRICTED ACCESS</span></div>
         </motion.section>
       </div>
       <footer className="login-footer"><span>DEFCON 2.0 · TECHNOZION / NIT WARANGAL</span><span>SESSION ENCRYPTED · 8H TTL</span></footer>

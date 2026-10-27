@@ -13,12 +13,13 @@ export function getSettings(user: SessionUser) {
     throw new AppError('FORBIDDEN', 'Insufficient permissions.', { required: 'team.read' });
   }
   const row = dbHelper.get<{ value: string }>(`SELECT value FROM settings WHERE key = 'competition_status'`);
-  return { competitionStatus: (row?.value || 'not_started') as CompetitionStatus };
+  const start = dbHelper.get<{ value: string }>(`SELECT value FROM settings WHERE key = 'event_start_iso'`)?.value || null;
+  return { competitionStatus: (row?.value || 'not_started') as CompetitionStatus, eventStartIso: start };
 }
 
 export function updateSettings(
   user: SessionUser,
-  patch: { competitionStatus?: CompetitionStatus },
+  patch: { competitionStatus?: CompetitionStatus; eventStartIso?: string | null },
   opts: { requestId: string },
 ) {
   if (!can(user, 'settings.update')) {
@@ -38,6 +39,14 @@ export function updateSettings(
        ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
       patch.competitionStatus,
     );
+  }
+
+  if (patch.eventStartIso !== undefined) {
+    // null clears the clock: the UI then says "Event clock not set".
+    if (patch.eventStartIso === null) dbHelper.run(`DELETE FROM settings WHERE key = 'event_start_iso'`);
+    else dbHelper.run(
+      `INSERT INTO settings (key, value) VALUES ('event_start_iso', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      new Date(patch.eventStartIso).toISOString());
   }
 
   appendAudit({

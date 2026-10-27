@@ -27,6 +27,7 @@ import {
 import { getEventConfig, servicePort, ttydPort, teamCapWarning } from '../../event-config';
 import { MOCK_DURATIONS, loadConfig } from '../../config';
 import { getHealthSourceStatus, isStale, pullIfDue } from '../health/source';
+import { getEventClock } from '../services/event';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 
@@ -40,6 +41,7 @@ export class MockAdapter implements EnvironmentAdapter {
     serviceLevelReset: true, // MOCK: service actions are simulated on the same pending slot
     terminalMode: getEventConfig().terminalMode,
     flagstores: getEventConfig().services[0].flagstores,
+    fullyReal: false,
   };
   private nowFn: () => string;
 
@@ -907,6 +909,14 @@ export class MockAdapter implements EnvironmentAdapter {
         lifecycleState: row.lifecycle_state as LifecycleState,
         health,
         pending: Boolean(row.pending_action),
+        services: services.map(s => ({
+          key: s.key,
+          name: s.name,
+          reachability: s.checks.find(c => c.type === 'reachability')?.status ?? 'unknown',
+          functional: s.checks.find(c => c.type === 'functional')?.status ?? 'unknown',
+          stale: !!s.stale,
+          flagstores: (s.flagstores ?? []).map(f => f.verdict),
+        })),
       };
     });
 
@@ -936,6 +946,8 @@ export class MockAdapter implements EnvironmentAdapter {
        ORDER BY ts DESC LIMIT 10`
     );
 
+    const healthSource = getHealthSourceStatus(Date.parse(nowTs));
+
     // Settings
     const compStatus = dbHelper.get<any>(`SELECT value FROM settings WHERE key = 'competition_status'`);
 
@@ -959,7 +971,8 @@ export class MockAdapter implements EnvironmentAdapter {
       activeSessions: sessionsRow?.total || 0,
       competitionStatus: compStatus?.value || null,
       grid,
-      healthSource: getHealthSourceStatus(Date.parse(nowTs)),
+      healthSource,
+      event: getEventClock(Date.parse(nowTs), healthSource),
       recentAlerts: recentAlerts.map(a => ({
         id: a.id,
         teamId: a.team_id,

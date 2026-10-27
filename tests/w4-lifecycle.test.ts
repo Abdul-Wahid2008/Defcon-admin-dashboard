@@ -353,6 +353,36 @@ describe('AgentAdapter (ADAPTER=real) against the fake agent', () => {
     expect((await adapter.getTeam(team.id))!.environment.lastServiceAction).toMatchObject({ kind: 'reset', outcome: 'success' });
   });
 
+  it('fails a pending row that was never handed to the agent instead of wedging the environment', async () => {
+    const { team } = await adapter.createTeam({ name: 'Agent Team' });
+    at(5000);
+    await resolve();
+    dbHelper.run(
+      `UPDATE environments SET pending_action = 'stop', pending_correlation_id = 'c_orphan', pending_from_state = 'running',
+        pending_to_state = 'stopped', pending_started_at = ?, pending_ends_at = ?, lifecycle_state = 'stopping', pending_job_id = NULL WHERE team_id = ?`,
+      new Date(T0 + 5000).toISOString(), new Date(T0 + 65_000).toISOString(), team.id);
+    at(5000 + 10_000);
+    expect(await resolve()).toEqual([]); // inside the 30 s grace: createTeam/requestAction may still be mid-flight
+    at(5000 + 40_000);
+    expect((await resolve())[0]).toMatchObject({ teamId: team.id, action: 'stop', outcome: 'failure' });
+    expect((await adapter.getTeam(team.id))!.environment.failureReason).toContain('not handed to the agent');
+  });
+
+  it('a refused provisioning is audited after the requested row, via the next resolveDue', async () => {
+    agent.respondWith(500);
+    const { team } = await adapter.createTeam({ name: 'Refused Team' });
+    expect((await adapter.getTeam(team.id))!.lifecycleState).toBe('failed');
+    const before = audit('env.provision', 'failure').length;
+    const done = await resolve();
+    expect(done).toMatchObject([{ teamId: team.id, action: 'provision', outcome: 'failure' }]);
+    expect(audit('env.provision', 'failure').length).toBe(before + 1);
+    expect(await resolve()).toEqual([]);
+  });
+
+  it('never reports fullyReal (credentials, resources and sessions are still dashboard-side)', () => {
+    expect(adapter.capabilities.fullyReal).toBe(false);
+  });
+
   it('fails a job the agent no longer knows and one that never finishes', async () => {
     const { team } = await adapter.createTeam({ name: 'Agent Team' });
     at(5000);

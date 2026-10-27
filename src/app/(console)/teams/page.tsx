@@ -1,10 +1,10 @@
 'use client';
 
 import type { ChangeEvent, ReactNode } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { FileUp, Plus, Search, Upload, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, FileUp, MoreHorizontal, Plus, Search, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBulkEnvironmentAction, useCreateTeam, useImportTeams, useTeams } from '@/lib/queries';
 import type { IssuedCredential, TeamImportResponse, TeamSummary } from '@/lib/schemas';
@@ -17,6 +17,7 @@ import { StateBadge } from '@/components/status/StateBadge';
 import { PageHeader, QueryState } from '@/components/console/DashboardPrimitives';
 import { CredentialsReveal } from '@/components/teams/CredentialsReveal';
 import { RelativeTime } from '@/components/ui/relative-time';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 type ImportRow = { name: string; participantNames?: string[] };
 
@@ -182,6 +183,59 @@ function BulkDialog({ action, teams, onClose }: { action: 'start' | 'stop'; team
   </Overlay>;
 }
 
+function SortHead({ field, label, sort, onSort }: { field: string; label: string; sort: string; onSort: (next: string) => void }) {
+  const active = sort === field || sort === `-${field}`;
+  const desc = sort === `-${field}`;
+  const Icon = !active ? ArrowUpDown : desc ? ArrowDown : ArrowUp;
+  return (
+    <TableHead aria-sort={active ? (desc ? 'descending' : 'ascending') : 'none'}>
+      <button type="button" className="inline-flex items-center gap-1 hover:text-[var(--accent)]" onClick={() => onSort(active && !desc ? `-${field}` : field)}>
+        {label}<Icon size={12} aria-hidden="true" className={active ? 'text-[var(--accent)]' : 'text-[var(--text-subtle)]'} />
+      </button>
+    </TableHead>
+  );
+}
+
+const TeamRow = memo(function TeamRow({ team, selected, onToggle, onOpen, onBulk }: {
+  team: TeamSummary;
+  selected: boolean;
+  onToggle: (id: string) => void;
+  onOpen: (id: string) => void;
+  onBulk: (action: 'start' | 'stop', team: TeamSummary) => void;
+}) {
+  const busy = !!team.pending;
+  return (
+    <TableRow
+      tabIndex={0}
+      className="h-10 cursor-pointer focus-visible:bg-[var(--panel-2)]"
+      aria-label={`${team.id} ${team.name}`}
+      onClick={() => onOpen(team.id)}
+      onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onOpen(team.id); } }}
+    >
+      <TableCell onClick={(e) => e.stopPropagation()}><input type="checkbox" aria-label={`Select ${team.id}`} checked={selected} onChange={() => onToggle(team.id)} /></TableCell>
+      <TableCell className="whitespace-nowrap"><span className="font-mono text-xs text-[var(--text-subtle)]">{team.id}</span>{' '}<span className="font-medium">{team.name}</span></TableCell>
+      <TableCell><StateBadge state={team.lifecycleState} size="sm" /></TableCell>
+      <TableCell><HealthBadge health={team.health} size="sm" /></TableCell>
+      <TableCell className="tabular-nums">{team.participantCount}</TableCell>
+      <TableCell><span className={team.accountStatus === 'active' ? 'text-[var(--ok)]' : 'text-[var(--warn)]'}>{team.accountStatus === 'active' ? 'Active' : 'Suspended'}</span></TableCell>
+      <TableCell><RelativeTime ts={team.updatedAt} className="text-xs text-[var(--text-subtle)]" /></TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger className="rounded p-1 text-[var(--muted)] hover:bg-[var(--panel-2)] hover:text-[var(--text)]" aria-label={`Actions for ${team.id}`}><MoreHorizontal size={16} aria-hidden="true" /></DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuItem onClick={() => onOpen(team.id)}>Open team</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem disabled={busy || team.lifecycleState !== 'stopped'} onClick={() => onBulk('start', team)}>{team.lifecycleState === 'running' ? 'Start (already running)' : busy ? 'Start (action in progress)' : 'Start environment'}</DropdownMenuItem>
+            <DropdownMenuItem disabled={busy || team.lifecycleState !== 'running'} onClick={() => onBulk('stop', team)}>{team.lifecycleState === 'stopped' ? 'Stop (already stopped)' : busy ? 'Stop (action in progress)' : 'Stop environment'}</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => { void navigator.clipboard.writeText(team.id); toast.success(`Copied ${team.id}`); }}>Copy team id</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
+    </TableRow>
+  );
+});
+
 export default function TeamsPage() {
   const router = useRouter();
   const pathname = usePathname();
@@ -197,12 +251,25 @@ export default function TeamsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [bulkAction, setBulkAction] = useState<'start' | 'stop' | null>(null);
+  const [rowTarget, setRowTarget] = useState<TeamSummary | null>(null); // set when the dialog was opened from one row's menu
   const [credentials, setCredentials] = useState<IssuedCredential[] | null>(null);
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
   const [participantNames, setParticipantNames] = useState('Participant 1\nParticipant 2\nParticipant 3\nParticipant 4');
   const [autoProvision, setAutoProvision] = useState(true);
   const create = useCreateTeam();
+  // "/" focuses this page's search (capture phase, so the top-bar search does not also take it).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (document.activeElement?.tagName ?? '').toLowerCase();
+      if (e.key !== '/' || tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      document.getElementById('teams-search')?.focus();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
   useEffect(() => { const id = window.setTimeout(() => setTerm(search), 250); return () => window.clearTimeout(id); }, [search]);
   useEffect(() => {
     const next = new URLSearchParams();
@@ -219,7 +286,10 @@ export default function TeamsPage() {
   const selectedTeams = useMemo(() => page?.items.filter((team) => selected.includes(team.id)) ?? [], [page?.items, selected]);
   const allVisibleSelected = !!page?.items.length && page.items.every((team) => selected.includes(team.id));
   const toggleAll = () => setSelected(allVisibleSelected ? [] : (page?.items.map((team) => team.id) ?? []));
-  const toggleTeam = (teamId: string) => setSelected((current) => current.includes(teamId) ? current.filter((id) => id !== teamId) : [...current, teamId]);
+  const toggleTeam = useCallback((teamId: string) => setSelected((current) => current.includes(teamId) ? current.filter((id) => id !== teamId) : [...current, teamId]), []);
+  const openTeam = useCallback((teamId: string) => router.push(`/teams/${teamId}`), [router]);
+  const rowBulk = useCallback((action: 'start' | 'stop', team: TeamSummary) => { setRowTarget(team); setBulkAction(action); }, []);
+  const onSort = useCallback((next: string) => { setSort(next); setPageNumber(1); }, []);
   const submit = async () => {
     if (!name.trim()) return;
     const names = participantNames.split(/\r?\n/).map((value) => value.trim()).filter(Boolean).slice(0, 8);
@@ -235,13 +305,13 @@ export default function TeamsPage() {
       <Button variant="outline" onClick={() => setShowImport(true)}><Upload size={15} />Import CSV</Button><Button onClick={() => setShowCreate(true)}><Plus size={15} />Create team</Button>
     </PageHeader>
     <Card className="console-surface"><CardContent className="p-4">
-      <div className="mb-4 flex flex-wrap gap-3"><div className="relative min-w-[240px] flex-1"><Search size={15} className="absolute left-3 top-2.5 text-[var(--muted)]" /><Input className="pl-9" value={search} onChange={(e) => { setSearch(e.target.value); setPageNumber(1); }} placeholder="Search by team name or ID" aria-label="Search teams" /></div><select aria-label="Filter by lifecycle state" value={state} onChange={(e) => { setState(e.target.value); setPageNumber(1); }} className="h-8 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-3 text-sm"><option value="">All states</option><option value="running">Running</option><option value="stopped">Stopped</option><option value="failed">Failed</option><option value="starting">Starting</option><option value="stopping">Stopping</option></select><select aria-label="Filter by health" value={healthFilter} onChange={(e) => { setHealthFilter(e.target.value); setPageNumber(1); }} className="h-8 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-3 text-sm"><option value="">All health</option><option value="healthy">Healthy</option><option value="degraded">Degraded</option><option value="down">Down</option><option value="unknown">Unknown</option></select><select aria-label="Filter by account status" value={accountFilter} onChange={(e) => { setAccountFilter(e.target.value); setPageNumber(1); }} className="h-8 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-3 text-sm"><option value="">All accounts</option><option value="active">Active</option><option value="suspended">Suspended</option></select><select aria-label="Sort teams" value={sort} onChange={(e) => { setSort(e.target.value); setPageNumber(1); }} className="h-8 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-3 text-sm"><option value="id">Sort: ID</option><option value="name">Sort: Name</option><option value="-updated">Sort: Recently updated</option><option value="state">Sort: State</option><option value="health">Sort: Health</option></select>{(search || state || healthFilter || accountFilter || sort !== 'id' || pageNumber > 1) && <Button size="sm" variant="ghost" onClick={() => { setSearch(''); setTerm(''); setState(''); setHealthFilter(''); setAccountFilter(''); setSort('id'); setPageNumber(1); }}>Clear filters</Button>}</div>
-      {selectedTeams.length > 0 && <div className="mb-4 flex items-center justify-between rounded border border-[var(--accent)] bg-[var(--panel-2)] p-3 text-sm"><span>{selectedTeams.length} selected</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setBulkAction('start')}>Start selected</Button><Button size="sm" variant="outline" onClick={() => setBulkAction('stop')}>Stop selected</Button><Button size="sm" variant="ghost" onClick={() => setSelected([])}>Clear</Button></div></div>}
-      {!page?.items.length ? <div className="py-12 text-center text-sm text-[var(--muted)]">{term || state || healthFilter || accountFilter ? 'No teams match these filters' : 'No teams yet'}</div> : <><Table><TableHeader><TableRow><TableHead><input type="checkbox" aria-label="Select visible teams" checked={allVisibleSelected} onChange={toggleAll} /></TableHead><TableHead>Team</TableHead><TableHead>State</TableHead><TableHead>Health</TableHead><TableHead>Participants</TableHead><TableHead>Account</TableHead><TableHead>Updated</TableHead></TableRow></TableHeader><TableBody>{page.items.map((team) => <TableRow key={team.id}><TableCell><input type="checkbox" aria-label={`Select ${team.id}`} checked={selected.includes(team.id)} onChange={() => toggleTeam(team.id)} /></TableCell><TableCell><Link href={`/teams/${team.id}`} className="block hover:text-[var(--accent)]"><div className="font-mono text-xs text-[var(--muted)]">{team.id}</div><div className="font-medium">{team.name}</div></Link></TableCell><TableCell><StateBadge state={team.lifecycleState} size="sm" /></TableCell><TableCell><HealthBadge health={team.health} size="sm" /></TableCell><TableCell>{team.participantCount}</TableCell><TableCell><span className={team.accountStatus === 'active' ? 'text-[var(--ok)]' : 'text-[var(--warn)]'}>{team.accountStatus === 'active' ? 'Active' : 'Suspended'}</span></TableCell><TableCell><RelativeTime ts={team.updatedAt} className="text-xs text-[var(--muted)]" /></TableCell></TableRow>)}</TableBody></Table><div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-3 text-xs text-[var(--muted)]"><span>Page {page.page} of {Math.max(1, Math.ceil(page.total / page.pageSize))}</span><div className="flex gap-2"><Button size="sm" variant="outline" disabled={page.page <= 1} onClick={() => setPageNumber((value) => Math.max(1, value - 1))}>Previous</Button><Button size="sm" variant="outline" disabled={page.page * page.pageSize >= page.total} onClick={() => setPageNumber((value) => value + 1)}>Next</Button></div></div></>}
+      <div className="mb-4 flex flex-wrap gap-3"><div className="relative min-w-[240px] flex-1"><Search size={15} className="absolute left-3 top-2.5 text-[var(--muted)]" /><Input className="pl-9" value={search} onChange={(e) => { setSearch(e.target.value); setPageNumber(1); }} id="teams-search" placeholder="Search by team name or ID ( / )" aria-label="Search teams" /></div><select aria-label="Filter by lifecycle state" value={state} onChange={(e) => { setState(e.target.value); setPageNumber(1); }} className="h-8 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-3 text-sm"><option value="">All states</option><option value="running">Running</option><option value="stopped">Stopped</option><option value="failed">Failed</option><option value="starting">Starting</option><option value="stopping">Stopping</option></select><select aria-label="Filter by health" value={healthFilter} onChange={(e) => { setHealthFilter(e.target.value); setPageNumber(1); }} className="h-8 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-3 text-sm"><option value="">All health</option><option value="healthy">Healthy</option><option value="degraded">Degraded</option><option value="down">Down</option><option value="unknown">Unknown</option></select><select aria-label="Filter by account status" value={accountFilter} onChange={(e) => { setAccountFilter(e.target.value); setPageNumber(1); }} className="h-8 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-3 text-sm"><option value="">All accounts</option><option value="active">Active</option><option value="suspended">Suspended</option></select>{(search || state || healthFilter || accountFilter || sort !== 'id' || pageNumber > 1) && <Button size="sm" variant="ghost" onClick={() => { setSearch(''); setTerm(''); setState(''); setHealthFilter(''); setAccountFilter(''); setSort('id'); setPageNumber(1); }}>Clear filters</Button>}</div>
+      {selectedTeams.length > 0 && <div className="mb-4 flex items-center justify-between rounded border border-[var(--accent)] bg-[var(--panel-2)] p-3 text-sm"><span aria-live="polite">{selectedTeams.length} of {page?.total ?? 0} selected</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setBulkAction('start')}>Start selected</Button><Button size="sm" variant="outline" onClick={() => setBulkAction('stop')}>Stop selected</Button><Button size="sm" variant="ghost" onClick={() => setSelected([])}>Clear</Button></div></div>}
+      {!page?.items.length ? <div className="py-12 text-center text-sm text-[var(--muted)]">{term || state || healthFilter || accountFilter ? 'No teams match these filters' : 'No teams yet'}</div> : <><Table className="tabular-nums [&_td]:py-1.5"><TableHeader><TableRow><TableHead><input type="checkbox" aria-label="Select visible teams" checked={allVisibleSelected} onChange={toggleAll} /></TableHead><SortHead field="id" label="Team" sort={sort} onSort={onSort} /><SortHead field="state" label="State" sort={sort} onSort={onSort} /><SortHead field="health" label="Health" sort={sort} onSort={onSort} /><TableHead>Participants</TableHead><TableHead>Account</TableHead><SortHead field="updated" label="Updated" sort={sort} onSort={onSort} /><TableHead><span className="sr-only">Actions</span></TableHead></TableRow></TableHeader><TableBody>{page.items.map((team) => <TeamRow key={team.id} team={team} selected={selected.includes(team.id)} onToggle={toggleTeam} onOpen={openTeam} onBulk={rowBulk} />)}</TableBody></Table><div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-3 text-xs text-[var(--muted)]"><span>Page {page.page} of {Math.max(1, Math.ceil(page.total / page.pageSize))}</span><div className="flex gap-2"><Button size="sm" variant="outline" disabled={page.page <= 1} onClick={() => setPageNumber((value) => Math.max(1, value - 1))}>Previous</Button><Button size="sm" variant="outline" disabled={page.page * page.pageSize >= page.total} onClick={() => setPageNumber((value) => value + 1)}>Next</Button></div></div></>}
     </CardContent></Card>
     {showCreate && <Overlay onClose={() => setShowCreate(false)} labelledBy="create-dialog-title" describedBy="create-dialog-description"><h2 id="create-dialog-title" className="text-lg font-semibold">Create team</h2><p id="create-dialog-description" className="mt-1 text-sm text-[var(--muted)]">Credentials are shown once after the team is created.</p><label className="mt-4 block text-sm">Team name<Input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} autoFocus /></label><label className="mt-3 block text-sm">Notes<textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} className="mt-1 min-h-20 w-full rounded-lg border border-[var(--border)] bg-[var(--panel-2)] p-2" /></label><label className="mt-3 block text-sm">Participants <span className="text-xs text-[var(--muted)]">(one name per line, up to 8)</span><textarea value={participantNames} onChange={(e) => setParticipantNames(e.target.value)} className="mt-1 min-h-24 w-full rounded-lg border border-[var(--border)] bg-[var(--panel-2)] p-2 text-sm" /></label><label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={autoProvision} onChange={(e) => setAutoProvision(e.target.checked)} /> Provision environment now</label>{create.error && <p role="alert" className="mt-3 text-sm text-[var(--bad)]">{create.error.message}</p>}<div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button><Button onClick={submit} disabled={!name.trim() || create.isPending}>{create.isPending ? 'Creating…' : 'Create team'}</Button></div></Overlay>}
     {showImport && <ImportDialog onClose={() => setShowImport(false)} onCredentials={handleImport} />}
-    {bulkAction && <BulkDialog action={bulkAction} teams={selectedTeams} onClose={() => { setBulkAction(null); setSelected([]); }} />}
+    {bulkAction && <BulkDialog action={bulkAction} teams={rowTarget ? [rowTarget] : selectedTeams} onClose={() => { setBulkAction(null); setRowTarget(null); if (!rowTarget) setSelected([]); }} />}
     {credentials && <CredentialsReveal credentials={credentials} onClose={() => setCredentials(null)} />}
   </QueryState>;
 }
