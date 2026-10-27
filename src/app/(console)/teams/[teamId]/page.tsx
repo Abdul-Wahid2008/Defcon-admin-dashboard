@@ -21,9 +21,9 @@ import { formatTimestamp } from '@/lib/format';
 import { isResetConfirmed, resetCopy } from '@/lib/reset-copy';
 import { ResetFields } from '@/components/teams/ResetFields';
 import { apiSaveNotes, apiServiceAction } from '@/lib/api-admin';
-import { ApiError } from '@/lib/api-client';
+import { ApiError, apiMe } from '@/lib/api-client';
 import { pushRecentTeam } from '@/lib/recent-teams';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 type ActionKind = 'start' | 'stop' | 'reset';
 
@@ -182,6 +182,8 @@ export default function TeamDetailPage() {
   const [awaitingAction, setAwaitingAction] = useState<{ kind: ActionKind; startedAt: string } | null>(null);
   const team = query.data;
   const metaQuery = useMeta();
+  const me = useQuery({ queryKey: ['me'], queryFn: apiMe, staleTime: 60_000 });
+  const canDelete = me.data?.user.role === 'organizer_admin'; // affordance only; the server enforces team.delete
   const staleAfter = metaQuery.data?.health.staleAfterSec;
   useEffect(() => { if (team) pushRecentTeam({ id: team.id, name: team.name }); }, [team?.id, team?.name]); // eslint-disable-line react-hooks/exhaustive-deps
   const caps = metaQuery.data?.capabilities;
@@ -308,7 +310,7 @@ export default function TeamDetailPage() {
         <div className="flex flex-wrap gap-2">
           <Button size="sm" onClick={() => setActionDialog(team.lifecycleState === 'running' ? 'stop' : 'start')} disabled={!!team.environment.pending || team.lifecycleState === 'deleted'}>{team.lifecycleState === 'running' ? <><Square size={14} />Stop</> : <><Play size={14} />Start</>}</Button>
           <Button size="sm" variant="outline" onClick={() => { setResetReason(''); setResetTyped(''); setActionDialog('reset'); }} disabled={!!team.environment.pending || !['running', 'failed'].includes(team.lifecycleState)}><RotateCcw size={14} />Reset</Button>
-          <Button size="sm" variant="destructive" onClick={() => { setConfirmName(''); setDeleteOpen(true); }} disabled={!!team.environment.pending || team.lifecycleState === 'deleted'}><Trash2 size={14} />Delete</Button>
+          <Button size="sm" variant="destructive" onClick={() => { setConfirmName(''); setDeleteOpen(true); }} disabled={!canDelete || !!team.environment.pending || team.lifecycleState === 'deleted'} title={canDelete ? undefined : 'Only administrators can delete teams.'}><Trash2 size={14} />Delete</Button>
         </div>
       </div>
 
