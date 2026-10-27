@@ -15,6 +15,8 @@ const db = new Database(loadConfig().dbPath);
 
 // Essential SQLite settings for consistency and performance
 db.pragma('journal_mode = WAL');
+db.pragma('synchronous = NORMAL'); // safe with WAL; fewer fsyncs
+// busy_timeout: better-sqlite3 already defaults to 5000 ms
 db.pragma('foreign_keys = ON');
 
 migrate(db);

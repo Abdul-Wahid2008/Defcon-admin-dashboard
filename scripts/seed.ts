@@ -40,6 +40,7 @@ const TEAM_NAMES = [
   'Sudo Squad', 'Hash Collision', 'Rubber Duckies', 'Lambda Lurkers',
   'Buffer Overflowers', 'Daemon Hunters', 'Fork Bomb', 'Segfault Society',
   'Trojan Horsepower', 'Phantom Pings', 'Rootkit Rebels', 'Brute Force Brigade',
+  'Heap Spray', 'Format String', 'Race Condition', 'Dangling Pointers', 'Return Oriented', 'Canary Keepers',
 ];
 
 const PASSWORD_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';

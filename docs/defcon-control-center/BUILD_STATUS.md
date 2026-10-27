@@ -1,10 +1,10 @@
-# BUILD STATUS (27 Oct 2026, verified on the real repo)
+# BUILD STATUS (27 Oct 2026, verified on the real repo; W7 added at the end of the session)
 
 Previous version (W1 only) is in git history (`c3fda66`). This file covers W2–W6, written after all five were built, reviewed and committed.
 
 ## Snapshot
 - Branch `release/v1.2`, version `1.2.0-rc.1`. **Not pushed.** Working tree is clean after the final commit of this session.
-- Done: P1–P17 (v1.1), W0, W1, **W2 health source, W3 security/roles/freeze/accounts, W4 lifecycle capabilities + service actions + agent client, W5 overview matrix + UI copy, W6 operator workflows**. Not started: W7 (soak/perf/backup), W8 (evidence gate with the club), W9 (final hardening, tag, freeze). The tonight dry-run (doc 12 §11) has not been done: it needs the club's real `scoreboard.json` URL and a roster.
+- Done: P1–P17 (v1.1), W0, W1, **W2 health source, W3 security/roles/freeze/accounts, W4 lifecycle capabilities + service actions + agent client, W5 overview matrix + UI copy, W6 operator workflows**. W7 (perf/backup/soak tools) done except the 60-minute soak (10 min run). Not started: W8 (evidence gate with the club), W9 (final hardening, tag, freeze). The tonight dry-run (doc 12 §11) has not been done: it needs the club's real `scoreboard.json` URL and a roster.
 - Runtime default is unchanged: `ADAPTER=mock` + `HEALTH_SOURCE=mock` → badge **SIMULATED**. `HEALTH_SOURCE=scoreboard|ingest` or `ADAPTER=real|docker-compose` → **PARTIAL**. **LIVE cannot be shown today**: it needs `EVIDENCE_GATE_PASSED=true` and an adapter reporting `capabilities.fullyReal`, and none does.
 - Gates at the end of the session: `npm run typecheck` 0 errors · `npm run lint` 0 errors, 64 warnings (58 before this work; the 6 new ones are unused-variable / `any` warnings in new code and tests, not fixed) · `npm test` **388/388 in 18 files** (was 81/81 in 10 files) · `npm run build` exit 0.
 - Commits since `c3fda66` (oldest first):
@@ -81,6 +81,36 @@ Previous version (W1 only) is in git history (`c3fda66`). This file covers W2–
 - Team detail: tabs Overview / Services / Participants / Activity / Settings; services table failing-first and no longer overflowing at 1280; terminal shows availability and a "Show terminal link" button (the URL is not in the DOM until clicked; it is still in the authenticated API response).
 - Consistency: removed the grid/gradient/shadow on data views, `tabular-nums` on tables, `--idle` → `#94A3B8`, a unit test fails on marketing words in `src/`, and a test fails on hard-coded "SIMULATED" outside the badge components.
 - Evidence: a contrast scan of every text node on `/teams` found exactly 2 failures (the idle colour), fixed; `/` focus, header sort toggling (`?sort=state` → `-state`) and row tabindex checked in the browser; zero console errors. Screenshots `docs/qa/w5-after/`: overview at 1280×800, 1024×768, 1920×1080; teams and team services at 1280. **Not done:** 1440×900 shots, 1920 for teams/detail, a Lighthouse run. `next build` (Turbopack) prints no per-route JS sizes; total client chunks are about 1.4 MB uncompressed. Tab order, dialog focus and Esc were checked for the new dialogs only, not for the whole app.
+
+## W7 — Performance, reliability, soak (27 Oct 2026)
+
+**Approach: measure first.** The baseline already beat every target, so no query rewrite was made. Numbers below are from a production build (`next start`, port 3100), temp DB `data/w7.db` seeded with 30 teams (`SEED_TEAMS=30`; seed team names extended from 24 to 30), 3 simulated organizers, mock adapter, this Windows laptop.
+
+| Run | /api/overview p50 / p95 / p99 | /api/teams p50 / p95 / p99 | max overview payload | 5xx / network errors |
+|---|---|---|---|---|
+| Before (2 min, 53 polls each) | 13.5 / 17.6 / 22.5 ms | 12.3 / 15.2 / 28.7 ms | 23.9 KB | 0 / 0 |
+| After pragmas (10 min soak, 244 polls each) | 12.5 / 17.3 / 21.0 ms | 10.5 / 15.7 / 17.9 ms | 23.7 KB | 0 / 0 |
+
+Targets (p95 < 150 ms, payload < 60 KB, zero 5xx): all met with about 8x headroom. Lifecycle actions during the soak: 29 stop + 29 start, all 2xx, p95 11.0 / 8.0 ms.
+**Memory:** RSS 117 MB -> 126 MB (+8.3%) over 10.2 min (22 samples). The target is < 15% over 60 min. **The 60-minute soak was NOT run**; only 10 minutes. The 8.3% includes warm-up, so it neither proves nor disproves stability at 60 min. Run `npm run soak` with `LT_PID` set on the demo machine.
+
+**Not done, deliberately (numbers did not justify it).** The N+1 in `listTeams`/`getOverviewData` (`loadServicesForTeam` once per team, 2 queries each) was not batched: 30 teams cost about 13 ms end to end. Revisit only if team count or per-request latency grows. `EXPLAIN QUERY PLAN` on the hot queries: services, checks, flagstore, participants and environments lookups all use primary-key or existing indexes; `audit_log` recent uses `ix_audit_ts`. Full scans exist only on `environments` (due-pending check, 30 rows), `alerts` (recent/open count) and `idempotency_keys` (expiry delete) — all tiny, so no index was added.
+
+**Changes**
+- `src/lib/server/db.ts`: added `synchronous = NORMAL` (WAL and foreign_keys were already set; busy_timeout is already 5000 ms by better-sqlite3 default, so no pragma was added for it).
+- `scripts/loadtest.ts` (`npm run loadtest`): login with `LT_USER`/`LT_PASS`, per-organizer polling of overview + teams every 5 s, one stop/start per minute, p50/p95/p99, max payload, 2xx/4xx/5xx/network counts, RSS growth with `LT_PID`, exit 1 if a target fails. `scripts/soak.ts` (`npm run soak`) is the same with a 60-minute default.
+- `scripts/backup.ts` (`npm run backup`): online backup API to `data/backups/<UTC ts>.db`, converted to a single file (no -wal/-shm), `integrity_check`, keeps newest 12 (`BACKUP_KEEP`), removes the partial file on failure. Verified: 3 consecutive backups with `BACKUP_KEEP=2` left exactly 2 files; run while the server was up.
+- Restore drill re-run on a temp copy: teams 30, participants 120, environments 30, services 120, checks 240, audit_log 62, users 2, alerts 4 identical to live; `integrity_check` ok; `user_version` 4.
+- README: online backup, Windows Task Scheduler line (every 5 min), restore steps, load/soak tools. The Task Scheduler line was written but **not executed** on this machine.
+
+**Client checks (Playwright on the production build, overview page, admin).** 16 s visible: 3 `/api/overview` + 1 `/api/meta` requests; after faking `visibilityState=hidden`: **0** API calls in 16 s; 1 on return to visible; 0 overlapping in-flight requests to the same endpoint; 0 console errors. Nothing sets `refetchIntervalInBackground: true`.
+First-load JS per page (all chunks referenced by the served HTML, production build; `next build` itself prints no sizes): /login 744 KB raw / 237 KB gzip · /overview 1001 / 318 · /teams 1011 / 321 · /audit 993 / 316 · /settings 1005 / 319 · /teams/team-01 1018 / 324. Not optimised.
+
+**W7 review (fresh subagent, static, 10 findings).** Applied: README schtasks line was corrupted by my own template string (tab/backspace instead of backslashes — the task would never have run; rewritten and checked with `cat -A`), `set "DB_PATH=..."&&` quoting, logged-on-only note and `/RU SYSTEM` hint; backup now closes the check connection in `finally` and retries cleanup on Windows, filenames carry milliseconds (same-second runs no longer collide; prune regex updated and verified: 6 files -> 2 kept, 4 pruned), `BACKUP_KEEP` must be >= 1; load test now counts any non-2xx on the polled endpoints as a failure (a 401/429 can no longer print PASS), percentile uses ceil, and each organizer logs how many stop/start pairs ran; the redundant `busy_timeout` pragma was removed (better-sqlite3 already defaults to 5000 ms); the `synchronous=NORMAL` power-loss trade-off is documented in the README. Not applied: none rejected. Re-ran after fixes: 1-min load test PASS (7 stop + 7 start), wrong password exits 2.
+
+**Gates after W7:** typecheck 0 · lint 0 errors, 66 warnings before fixing 2 new `any` in loadtest.ts (back to 64; after review fixes 0 warnings in the three scripts) · tests 388/388 in 18 files (no new test files: the scripts are tools; their check is the load test and backup run above) · build exit 0.
+
+---
 
 ## W6 — Operator workflows
 
@@ -180,7 +210,7 @@ Note: W5 and W6 got one combined review, not one each as doc 13 asks.
 
 ## Next step
 1. Get the club inputs (questions 1–2, 5–6) and do the dry-run (doc 12 §11): import the real roster with `external_team_id`, point `HEALTH_SCOREBOARD_URL` at the real file, fix the parser, compare 3 teams against the club's scoreboard, record `docs/club-evidence/2026-10-27-dryrun.md`.
-2. W7: 60-minute soak with 24 teams and the fake scoreboard, backup script (db + wal + shm), load test with 30 teams.
+2. W7 remainder: run the full 60-minute `npm run soak` (with `LT_PID`) and register the Task Scheduler backup on the demo machine; optionally soak with the fake scoreboard as health source.
 3. W8 evidence gate with one real team once an agent exists; only then consider `EVIDENCE_GATE_PASSED=true`.
 4. W9: final hardening, tag, freeze.
 To resume: `git status`; `npm run typecheck && npm test` (expect 388/388); read this file and docs 12–15; QA on ports 3100/3101 only, on a production build.

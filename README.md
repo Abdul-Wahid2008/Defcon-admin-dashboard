@@ -32,7 +32,7 @@ $env:ALLOW_DEFAULT_PASSWORDS = "true"
 npm run seed
 ```
 
-The seed script creates 24 teams with five services each. Use `npm run reset-demo` to restore the deterministic demo state.
+The seed script creates 24 teams by default (`SEED_TEAMS`, up to 30) with five services each. Use `npm run reset-demo` to restore the deterministic demo state.
 
 ## Configuration and operator handoff
 
@@ -43,7 +43,25 @@ The seed script creates 24 teams with five services each. Use `npm run reset-dem
 - `SESSION_SECRET` signs organizer sessions. It is never logged, returned by `/api/meta`, or sent to the browser. Rotate it through the deployment secret store and restart the process.
 - Back up the SQLite database before rehearsal and event operations. A restart preserves mock state and lazily completes due transitions on the next read; it does not replace a database backup.
 
-### SQLite backup and restore (rehearsed 19 Oct 2026)
+### Online backup (no stop needed) — v1.2 W7
+
+`npm run backup` uses SQLite's online backup API: it is consistent while the server runs, writes one self-contained file `data/backups/<UTC timestamp>.db`, runs `integrity_check` on it, and keeps the newest 12 (`BACKUP_KEEP`, `BACKUP_DIR`). `DB_PATH` must be set, as for the server.
+
+Every 5 minutes during the event (Windows Task Scheduler; the task runs only while that user is logged on, add `/RU SYSTEM` if it must run logged out; adjust the paths and DB path):
+
+```
+schtasks /Create /SC MINUTE /MO 5 /TN "defcon-backup" /TR "cmd /c cd /d C:\path\to\defcon-control-center && set \"DB_PATH=data\defcon.db\"&& npm run backup >> data\backup.log 2>&1"
+```
+
+Durability note: the server uses `synchronous=NORMAL` with WAL, so a power cut can lose the last few committed transactions (audit rows included) but cannot corrupt the database; the 5-minute backups bound the exposure.
+
+Restore from a backup file: stop the server, copy the chosen `<ts>.db` over `DB_PATH`, delete `<DB_PATH>-wal` and `<DB_PATH>-shm`, start the server. Drill re-run 27 Oct 2026 on a temp DB: row counts of teams, participants, environments, services, checks, audit_log, users and alerts matched, `integrity_check` ok, `user_version` 4.
+
+### Load and soak tools
+
+`npm run loadtest` (3 simulated organizers polling overview and teams every 5 s, one stop/start per minute on mock) and `npm run soak` (same, 60 minutes by default) print p50/p95/p99, payload size, 5xx counts and, with `LT_PID` set to the server's node PID, RSS growth. Env: `BASE_URL`, `LT_USER`, `LT_PASS`, `MINUTES`, `ORGANIZERS`. Run against a temp-DB server only; never against a live event DB.
+
+### SQLite backup and restore, offline method (rehearsed 19 Oct 2026)
 
 1. Stop the application process (`next start`) so no writer holds the database.
 2. Copy all three SQLite files together: `<DB_PATH>`, `<DB_PATH>-wal`, and `<DB_PATH>-shm`. Copying only the main file can lose committed-but-uncheckpointed rows.
