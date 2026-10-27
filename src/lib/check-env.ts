@@ -11,7 +11,9 @@ export function checkEnv(env: Record<string, string | undefined>): string[] {
   else if (EXAMPLE_VALUES.has(secret)) problems.push('SESSION_SECRET is the .env.example placeholder.');
 
   for (const name of ['DEMO_CONTROLS', 'ALLOW_DEFAULT_PASSWORDS']) {
-    if (get(name) === 'true') problems.push(`${name} must not be true in a release.`);
+    const value = get(name);
+    if (value === 'true') problems.push(`${name} must not be true in a release.`);
+    else if (value !== '' && value !== 'false') problems.push(`${name} must be "true" or "false" (config.ts rejects anything else).`);
   }
 
   const dbPath = get('DB_PATH');

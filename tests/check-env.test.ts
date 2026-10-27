@@ -23,6 +23,7 @@ describe('checkEnv', () => {
     ['memory DB_PATH', { DB_PATH: ':memory:' }, 'DB_PATH'],
     ['default admin password', { ORGANIZER_ADMIN_PASSWORD: 'change-me' }, 'ORGANIZER_ADMIN_PASSWORD'],
     ['unset operator password', { ORGANIZER_OPERATOR_PASSWORD: undefined }, 'ORGANIZER_OPERATOR_PASSWORD'],
+    ['non-boolean DEMO_CONTROLS', { DEMO_CONTROLS: '1' }, 'DEMO_CONTROLS'],
     ['bad ADAPTER', { ADAPTER: 'nope' }, 'ADAPTER'],
   ])('rejects %s', (_label, override, name) => {
     const problems = checkEnv({ ...good, ...override });
