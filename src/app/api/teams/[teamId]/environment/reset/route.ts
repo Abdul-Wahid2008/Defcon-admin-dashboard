@@ -16,7 +16,13 @@ export async function POST(
     await sync();
     const { teamId } = await params;
     const idempotencyKey = req.headers.get('Idempotency-Key');
-    const result = await requestLifecycleAction(user, teamId, 'reset', { requestId, idempotencyKey });
+    const body = (await req.json().catch(() => null)) as { reason?: unknown; confirmTeamId?: unknown } | null;
+    const result = await requestLifecycleAction(user, teamId, 'reset', {
+      requestId,
+      idempotencyKey,
+      reason: typeof body?.reason === 'string' ? body.reason.slice(0, 500) : undefined,
+      confirmTeamId: typeof body?.confirmTeamId === 'string' ? body.confirmTeamId : undefined,
+    });
     const headers: Record<string, string> = { 'X-Request-Id': requestId };
     if (result.replay) headers['Idempotent-Replay'] = 'true';
     return Response.json(result.body, { status: result.status, headers });

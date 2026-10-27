@@ -244,7 +244,7 @@ export async function requestLifecycleAction(
   user: SessionUser,
   teamId: string,
   action: 'start' | 'stop' | 'reset' | 'delete',
-  opts: { requestId: string; idempotencyKey?: string | null; confirmName?: string },
+  opts: { requestId: string; idempotencyKey?: string | null; confirmName?: string; reason?: string; confirmTeamId?: string },
 ) {
   const permMap: Record<string, 'env.start' | 'env.stop' | 'env.reset' | 'team.delete'> = {
     start: 'env.start', stop: 'env.stop', reset: 'env.reset', delete: 'team.delete',
@@ -262,6 +262,17 @@ export async function requestLifecycleAction(
     throw new AppError('FORBIDDEN', 'Insufficient permissions.', { required });
   }
   assertNotFrozen(user, { action: auditAction, targetType: 'team', targetId: teamId, requestId: opts.requestId });
+
+  // When a reset does more than restore the latest patch (recreate/restart), it needs a reason and the typed team id.
+  const caps = getAdapter().capabilities;
+  if (action === 'reset' && caps.resetKind !== 'restore_patch') {
+    const reason = opts.reason?.trim() ?? '';
+    if (reason.length < 10 || opts.confirmTeamId !== teamId) {
+      throw new AppError('CONFIRMATION_MISMATCH',
+        'A reason of at least 10 characters and the typed team id are required to reset this environment.',
+        { expectedTeamId: teamId, minReasonChars: 10, resetKind: caps.resetKind });
+    }
+  }
 
   // Delete requires typed confirmation
   if (action === 'delete') {
@@ -308,7 +319,10 @@ export async function requestLifecycleAction(
     message: `${action} requested for ${teamId}`,
     requestId: opts.requestId,
     correlationId,
-    details: { transition: (result as any).transition },
+    details: {
+      transition: (result as any).transition,
+      ...(action === 'reset' && caps.resetKind !== 'restore_patch' ? { reason: opts.reason?.trim(), resetKind: caps.resetKind } : {}),
+    },
   });
 
   const body = result as any;

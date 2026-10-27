@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DockerComposeAdapter } from './docker-compose';
 import { MockAdapter } from './mock';
+import { AgentAdapter } from './agent';
 import { EnvironmentAdapter } from './types';
 import { loadConfig, type AppConfig } from '../../config';
 
@@ -26,5 +27,13 @@ export function createAdapter(config: AppConfig): EnvironmentAdapter {
     }
     return new DockerComposeAdapter();
   }
-  throw new Error('ADAPTER=real is not available because no verified real orchestrator client is implemented.');
+  if (!config.orchestratorBaseUrl || !config.orchestratorToken || !config.orchestratorTimeoutMs) {
+    throw new Error('ADAPTER=real requires ORCHESTRATOR_BASE_URL, ORCHESTRATOR_TOKEN, and ORCHESTRATOR_TIMEOUT_MS.');
+  }
+  // PARTIAL until the one-team evidence gate (W8): the agent contract in docs/15 §3 is a proposal, not a club fact.
+  return new AgentAdapter({
+    baseUrl: config.orchestratorBaseUrl,
+    token: config.orchestratorToken,
+    timeoutMs: config.orchestratorTimeoutMs,
+  });
 }

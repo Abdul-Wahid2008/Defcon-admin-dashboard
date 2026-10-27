@@ -60,9 +60,10 @@ describe('release configuration', () => {
       ORCHESTRATOR_TOKEN: 'redacted-test-token',
       ORCHESTRATOR_TIMEOUT_MS: '5000',
     }), 'production');
-    expect(() => createAdapter(config)).toThrow(
-      'ADAPTER=real is not available because no verified real orchestrator client is implemented.',
-    );
+    const adapter = createAdapter(config);
+    expect(adapter.mode).toBe('real');
+    expect(adapter.mode).not.toBe('mock');
+    expect(() => createAdapter({ ...config, orchestratorBaseUrl: undefined })).toThrow('ADAPTER=real requires ORCHESTRATOR_BASE_URL');
   });
 
   it('keeps demo controls disabled outside explicit mock development mode', () => {

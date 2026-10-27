@@ -142,8 +142,8 @@ export function useDeleteTeam() {
 export function useLifecycleAction() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ teamId, action, idempotencyKey }: { teamId: string; action: 'start' | 'stop' | 'reset'; idempotencyKey?: string }) =>
-      apiLifecycleAction(teamId, action, idempotencyKey),
+    mutationFn: ({ teamId, action, idempotencyKey, confirmation }: { teamId: string; action: 'start' | 'stop' | 'reset'; idempotencyKey?: string; confirmation?: { reason: string; confirmTeamId: string } }) =>
+      apiLifecycleAction(teamId, action, idempotencyKey, confirmation),
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['team', vars.teamId] });
       qc.invalidateQueries({ queryKey: ['teams'] });

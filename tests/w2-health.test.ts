@@ -530,7 +530,10 @@ describe('config and /api/meta', () => {
     expect(badgeFor('mock', 'ingest')).toBe('PARTIAL');
     expect(badgeFor('docker-compose', 'mock')).toBe('PARTIAL');
     expect(badgeFor('real', 'mock')).toBe('PARTIAL');
-    expect(badgeFor('real', 'scoreboard')).toBe('LIVE');
+    expect(badgeFor('real', 'scoreboard')).toBe('PARTIAL'); // no evidence gate
+    expect(badgeFor('real', 'scoreboard', true)).toBe('LIVE');
+    expect(badgeFor('real', 'mock', true)).toBe('PARTIAL');
+    expect(badgeFor('mock', 'scoreboard', true)).toBe('PARTIAL');
   });
 
   it('/api/meta gives public callers only the badge, not source detail', async () => {
@@ -550,7 +553,7 @@ describe('config and /api/meta', () => {
     expect(body).toMatchObject({
       badge: 'PARTIAL',
       sources: { health: 'scoreboard', lifecycle: 'mock', roster: 'manual' },
-      capabilities: { resetKind: 'restore_patch', serviceLevelReset: false, terminalMode: 'per_team', flagstores: 3 },
+      capabilities: { resetKind: 'restore_patch', serviceLevelReset: true, terminalMode: 'per_team', flagstores: 3 },
       frozen: false,
     });
     const text = JSON.stringify(body);

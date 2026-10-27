@@ -33,7 +33,8 @@ export const UserSchema = z.object({
 export type User = z.infer<typeof UserSchema>;
 
 export const PendingActionSchema = z.object({
-  action: z.union([LifecycleActionSchema, z.literal('provision')]),
+  action: z.union([LifecycleActionSchema, z.literal('provision'), z.literal('service_restart'), z.literal('service_reset')]),
+  serviceKey: z.string().optional(),
   correlationId: z.string(),
   from: LifecycleStateSchema,
   to: LifecycleStateSchema,
@@ -105,6 +106,14 @@ export const EnvironmentSchema = z.object({
   failureReason: z.string().nullable(),
   lastActionAt: z.string().datetime({ offset: true }).nullable(),
   lastHealthCheckAt: z.string().datetime({ offset: true }).nullable(),
+  lastServiceAction: z.object({
+    kind: z.enum(['restart', 'reset']),
+    serviceKey: z.string(),
+    outcome: z.enum(['success', 'failure']),
+    correlationId: z.string(),
+    at: z.string(),
+    reason: z.string().nullable(),
+  }).nullable().optional(),
 });
 export type Environment = z.infer<typeof EnvironmentSchema>;
 

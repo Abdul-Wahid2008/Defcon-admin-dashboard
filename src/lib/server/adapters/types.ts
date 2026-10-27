@@ -2,6 +2,7 @@ export type Role = 'organizer_admin' | 'organizer_operator' | 'team';
 export type LifecycleState = 'provisioning' | 'running' | 'stopping' | 'stopped' | 'starting' | 'resetting' | 'deleting' | 'deleted' | 'failed';
 export type LifecycleAction = 'start' | 'stop' | 'reset' | 'delete';
 export type Health = 'healthy' | 'degraded' | 'down' | 'unknown';
+export type ServiceActionKind = 'restart' | 'reset';
 export type CheckType = 'reachability' | 'functional';
 export type CheckStatus = 'pass' | 'fail' | 'unknown';
 export type AccountStatus = 'active' | 'suspended';
@@ -82,6 +83,15 @@ export interface Environment {
   failureReason: string | null;
   lastActionAt: string | null;
   lastHealthCheckAt: string | null;
+  /** Outcome of the last finished service restart/reset; the UI matches it by correlationId before it toasts. */
+  lastServiceAction?: {
+    kind: ServiceActionKind;
+    serviceKey: string;
+    outcome: 'success' | 'failure';
+    correlationId: string;
+    at: string;
+    reason: string | null;
+  } | null;
 }
 
 export interface Participant {
@@ -186,8 +196,6 @@ export interface ActionResponse {
     estimatedEndsAt: string;
   };
 }
-
-export type ServiceActionKind = 'restart' | 'reset';
 
 export interface CompletedTransition {
   teamId: string;

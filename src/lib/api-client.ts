@@ -194,10 +194,12 @@ export async function apiLifecycleAction(
   teamId: string,
   action: 'start' | 'stop' | 'reset',
   idempotencyKey?: string,
+  confirmation?: { reason: string; confirmTeamId: string },
 ) {
   const res = await fetch(`/api/teams/${teamId}/environment/${action}`, {
     method: 'POST',
     headers: defaultHeaders(idempotencyKey),
+    body: confirmation ? JSON.stringify(confirmation) : undefined,
     credentials: 'same-origin',
   });
   return handleResponse<unknown>(res);

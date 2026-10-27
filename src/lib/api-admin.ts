@@ -41,3 +41,20 @@ export const apiDisableUser = (id: string) =>
   post<{ user: OrganizerUser }>(`/api/users/${encodeURIComponent(id)}/disable`);
 export const apiChangePassword = (currentPassword: string, newPassword: string) =>
   post<{ ok: true }>('/api/auth/change-password', { currentPassword, newPassword });
+
+// Service-level actions (v1.2 W4)
+export async function apiServiceAction(
+  teamId: string,
+  serviceKey: string,
+  kind: 'restart' | 'reset',
+  idempotencyKey: string,
+  confirmation?: { reason: string; confirmTeamId: string },
+) {
+  const res = await fetch(`/api/teams/${encodeURIComponent(teamId)}/services/${encodeURIComponent(serviceKey)}/${kind}`, {
+    method: 'POST',
+    headers: defaultHeaders(idempotencyKey),
+    body: confirmation ? JSON.stringify(confirmation) : undefined,
+    credentials: 'same-origin',
+  });
+  return handleResponse<{ correlationId: string; estimatedEndsAt: string }>(res);
+}

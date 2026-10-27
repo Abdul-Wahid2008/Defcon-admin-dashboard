@@ -2,7 +2,6 @@ import { getAdapter } from '@/lib/server/adapters';
 import { errorResponse, newRequestId } from '@/lib/server/errors';
 import { requireUser } from '@/lib/server/auth';
 import { loadConfig } from '@/lib/config';
-import { getEventConfig } from '@/lib/event-config';
 import { dbHelper } from '@/lib/server/db';
 import { getHealthSourceStatus } from '@/lib/server/health/source';
 import { badgeFor } from '@/lib/server/health/badge';
@@ -10,14 +9,11 @@ import pkg from '../../../../package.json';
 
 export const dynamic = 'force-dynamic';
 
-const RESET_KIND = { mock: 'restore_patch', 'docker-compose': 'restart', real: 'recreate_pristine' } as const;
-
 export async function GET(req?: Request) {
   const requestId = newRequestId();
   try {
     const adapter = getAdapter();
     const config = loadConfig();
-    const event = getEventConfig();
     const demoControls = config.demoControls && adapter.mode === 'mock' && config.healthSource === 'mock';
     const frozen = dbHelper.get<{ value: string }>(`SELECT value FROM settings WHERE key = 'mutations_frozen'`)?.value === '1';
     const health = getHealthSourceStatus();
@@ -25,7 +21,7 @@ export async function GET(req?: Request) {
     const authed = req ? await requireUser(req).then(() => true, () => false) : false;
     return Response.json({
       adapter: adapter.mode,
-      badge: badgeFor(adapter.mode, config.healthSource),
+      badge: badgeFor(adapter.mode, config.healthSource, config.evidenceGatePassed),
       version: pkg.version,
       serverTime: new Date().toISOString(),
       demoControls,
@@ -42,12 +38,7 @@ export async function GET(req?: Request) {
         lastError: authed ? health.lastError : null,
         staleAfterSec: health.staleAfterSec,
       },
-      capabilities: {
-        resetKind: RESET_KIND[adapter.mode],
-        serviceLevelReset: false,
-        terminalMode: event.terminalMode,
-        flagstores: event.services[0].flagstores,
-      },
+      capabilities: adapter.capabilities,
       frozen: authed ? frozen : false,
     }, { headers: { 'X-Request-Id': requestId } });
   } catch (e) {

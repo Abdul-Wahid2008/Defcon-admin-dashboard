@@ -7,7 +7,7 @@ export type AuditAction =
   | 'team.create' | 'team.update' | 'team.suspend' | 'team.reactivate' | 'team.delete'
   | 'env.provision' | 'env.start' | 'env.stop' | 'env.reset' | 'env.delete'
   | 'participant.add' | 'participant.remove' | 'credential.issue' | 'credential.rotate'
-  | 'health.run' | 'settings.freeze' | 'user.create' | 'user.reset_password' | 'user.revoke_sessions' | 'user.disable' | 'auth.password_change' | 'auth.session_revoked' | 'alert.open' | 'alert.resolve' | 'ingest.rejected' | 'settings.update' | 'demo.inject' | 'demo.fail_next' | 'demo.reseed';
+  | 'service.restart' | 'service.reset' | 'health.run' | 'settings.freeze' | 'user.create' | 'user.reset_password' | 'user.revoke_sessions' | 'user.disable' | 'auth.password_change' | 'auth.session_revoked' | 'alert.open' | 'alert.resolve' | 'ingest.rejected' | 'settings.update' | 'demo.inject' | 'demo.fail_next' | 'demo.reseed';
 
 export type AuditOutcome = 'requested' | 'success' | 'failure' | 'denied' | 'noop';
 export type TargetType = 'team' | 'participant' | 'session' | 'settings' | 'system' | 'user';
@@ -68,7 +68,7 @@ export function appendCompletionAudits(
   actorRole: ActorRole = 'system',
 ): void {
   for (const c of completions) {
-    const action = `env.${c.action === 'provision' ? 'provision' : c.action}` as AuditAction;
+    const action = (c.action === 'service_restart' ? 'service.restart' : c.action === 'service_reset' ? 'service.reset' : `env.${c.action}`) as AuditAction;
     appendAudit({
       ts: c.ts,
       actorId: null,

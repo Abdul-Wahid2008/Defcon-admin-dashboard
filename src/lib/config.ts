@@ -10,6 +10,10 @@ export interface AppConfig {
   healthPollSec: number;
   ingestToken: string | undefined;
   /** Team role may reset its own environment (spec) — default false per the club's decision (docs/12 C1). */
+  /** e.g. https://host/{port}/ — `{port}` = ttyd port, `{team}` = team id. Used by the real adapter only. */
+  terminalUrlTemplate: string | undefined;
+  /** Operator-set after the W8 one-team real-mutation evidence; the only way the badge can read LIVE. */
+  evidenceGatePassed: boolean;
   teamSelfReset: boolean;
   /** Read X-Forwarded-For / treat the app as behind a reverse proxy. */
   trustProxy: boolean;
@@ -118,6 +122,14 @@ export function loadConfig(
   }
   const healthPollSec = parsePositiveNumber(env.HEALTH_POLL_SEC, 'HEALTH_POLL_SEC', 15);
 
+  const terminalUrlTemplate = env.TERMINAL_URL_TEMPLATE?.trim() || undefined;
+  if (terminalUrlTemplate) {
+    let u: URL;
+    try { u = new URL(terminalUrlTemplate.replaceAll('{port}', '7601').replaceAll('{team}', 'team-01')); } catch { throw new Error('TERMINAL_URL_TEMPLATE must be a valid URL.'); }
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('TERMINAL_URL_TEMPLATE must use http or https.');
+    if (u.username || u.password) throw new Error('TERMINAL_URL_TEMPLATE must not contain credentials.');
+  }
+
   const ingestToken = env.INGEST_TOKEN?.trim() || undefined;
   if (ingestToken && ingestToken.length < 32) {
     throw new Error('INGEST_TOKEN must be at least 32 characters.');
@@ -130,6 +142,8 @@ export function loadConfig(
     healthAllowedHosts,
     healthPollSec,
     ingestToken,
+    terminalUrlTemplate,
+    evidenceGatePassed: parseBoolean(env.EVIDENCE_GATE_PASSED, 'EVIDENCE_GATE_PASSED'),
     teamSelfReset: parseBoolean(env.TEAM_SELF_RESET, 'TEAM_SELF_RESET'),
     trustProxy: parseBoolean(env.TRUST_PROXY, 'TRUST_PROXY'),
     cookieSecure: parseBoolean(env.COOKIE_SECURE, 'COOKIE_SECURE'),

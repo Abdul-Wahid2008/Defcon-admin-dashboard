@@ -85,6 +85,12 @@ export const AUTHZ: Record<string, AuthzCase[]> = {
     { method: 'GET', params: T1, admin: 'allow', operator: 'allow', team: 'allow', teamOther: 'deny' },
   ],
   '/api/teams/[teamId]/health/run': [{ method: 'POST', params: T1, ...organizerOnly, frozen: 'exempt' }], // read-refresh of health, not a state change
+  '/api/teams/[teamId]/services/[key]/restart': [
+    { method: 'POST', params: { ...T1, key: 'docuvault' }, ...organizerOnly },
+  ],
+  '/api/teams/[teamId]/services/[key]/reset': [
+    { method: 'POST', params: { ...T1, key: 'docuvault' }, body: { reason: 'matrix test reset', confirmTeamId: 'team-01' }, ...organizerOnly },
+  ],
   '/api/teams/[teamId]/participants': [
     { method: 'GET', params: T1, admin: 'allow', operator: 'allow', team: 'allow', teamOther: 'deny' },
     { method: 'POST', params: T1, body: { name: 'Matrix Person' }, ...organizerOnly },
