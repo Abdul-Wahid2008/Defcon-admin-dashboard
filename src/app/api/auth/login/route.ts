@@ -1,4 +1,4 @@
-import { login, checkLoginRateLimit, recordLoginFailure, clearLoginAttempts, setSessionCookie } from '@/lib/server/auth';
+import { login, checkLoginRateLimit, recordLoginFailure, clearLoginAttempts, setSessionCookie, getClientIp } from '@/lib/server/auth';
 import { appendAudit } from '@/lib/server/audit';
 import { errorResponse, newRequestId, AppError } from '@/lib/server/errors';
 import { z } from 'zod';
@@ -12,7 +12,7 @@ const LoginBody = z.object({
 
 export async function POST(req: Request) {
   const requestId = newRequestId();
-  const ip = req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? '127.0.0.1';
+  const ip = getClientIp(req);
   let username = '';
   try {
     const body = await req.json().catch(() => ({}));
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
       status: 200,
       headers: { 'X-Request-Id': requestId },
     });
-    return setSessionCookie(res, token);
+    return setSessionCookie(res, token, req);
   } catch (e: any) {
     if (e?.code !== 'RATE_LIMITED') {
       recordLoginFailure(ip, username || 'unknown');

@@ -4,6 +4,8 @@ import { requestLifecycleAction, validateBulkConfirmation } from '@/lib/server/s
 import { errorResponse, newRequestId, AppError } from '@/lib/server/errors';
 import { BulkEnvActionRequestSchema } from '@/lib/schemas';
 import { normalizeError } from '@/lib/server/errors';
+import { can } from '@/lib/server/permissions';
+import { assertNotFrozen } from '@/lib/server/freeze';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +24,14 @@ export async function POST(req: Request) {
     }
 
     const { action, teamIds, confirm } = parsed.data;
+
+    // Bulk is organizer-only: refuse before the per-team loop so a team session never gets a 200 envelope.
+    const required = ({ start: 'env.start', stop: 'env.stop', reset: 'env.reset' } as const)[action as 'start' | 'stop' | 'reset'];
+    if (!required || !can(user, required)) {
+      throw new AppError('FORBIDDEN', 'Insufficient permissions.', { required });
+    }
+
+    assertNotFrozen(user, { action: action === 'start' ? 'env.start' : 'env.stop', targetType: 'team', requestId });
 
     validateBulkConfirmation(action, teamIds, confirm);
 

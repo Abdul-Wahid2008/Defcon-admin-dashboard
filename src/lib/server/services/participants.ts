@@ -1,4 +1,5 @@
 import 'server-only';
+import { assertNotFrozen } from '../freeze';
 import { getAdapter } from '../adapters';
 import { can } from '../permissions';
 import { AppError } from '../errors';
@@ -35,6 +36,7 @@ export async function addParticipant(
     });
     throw new AppError('FORBIDDEN', 'Insufficient permissions.', { required: 'credential.manage' });
   }
+  assertNotFrozen(user, { action: 'participant.add', targetType: 'participant', targetId: teamId, requestId: opts.requestId });
 
   const adapter = getAdapter();
   const { participant, credential } = await adapter.addParticipant(teamId, name);
@@ -72,6 +74,7 @@ export async function removeParticipant(
     });
     throw new AppError('FORBIDDEN', 'Insufficient permissions.', { required: 'credential.manage' });
   }
+  assertNotFrozen(user, { action: 'participant.remove', targetType: 'participant', targetId: participantId, requestId: opts.requestId });
 
   const adapter = getAdapter();
   await adapter.removeParticipant(teamId, participantId);
@@ -100,6 +103,7 @@ export async function rotateCredentials(
     });
     throw new AppError('FORBIDDEN', 'Insufficient permissions.', { required: 'credential.manage' });
   }
+  assertNotFrozen(user, { action: 'credential.rotate', targetType: 'participant', targetId: teamId, requestId: opts.requestId });
 
   const adapter = getAdapter();
   const credentials = await adapter.rotateCredentials(teamId, participantId);

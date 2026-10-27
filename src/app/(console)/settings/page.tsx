@@ -1,12 +1,17 @@
 'use client';
 
 import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, FlaskConical, Info, Save, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDemoFailNext, useDemoInject, useDemoReseed, useMeta, useSettings, useTeam, useTeams, useUpdateSettings } from '@/lib/queries';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PageHeader, QueryState } from '@/components/console/DashboardPrimitives';
+import { Input } from '@/components/ui/input';
+import { apiMe } from '@/lib/api-client';
+import { apiSetFrozen } from '@/lib/api-admin';
+import { OrganizerAccounts } from '@/components/settings/OrganizerAccounts';
 
 const STATUS_OPTIONS = [
   ['not_started', 'Not started'],
@@ -28,6 +33,14 @@ export default function SettingsPage() {
   const [demoAction, setDemoAction] = useState('reset');
   const [demoCheck, setDemoCheck] = useState<'reachability' | 'functional'>('reachability');
   const [status, setStatus] = useState<string | null>(null);
+  const qc = useQueryClient();
+  const me = useQuery({ queryKey: ['me'], queryFn: apiMe, staleTime: 60_000 });
+  const isAdmin = me.data?.user.role === 'organizer_admin';
+  const [freezeText, setFreezeText] = useState('');
+  const freeze = useMutation({
+    mutationFn: (frozen: boolean) => apiSetFrozen(frozen, frozen ? freezeText : undefined),
+    onSuccess: (r) => { setFreezeText(''); toast.success(r.frozen ? 'Mutations frozen' : 'Mutations unfrozen'); void qc.invalidateQueries({ queryKey: ['meta'] }); },
+  });
   const selectedStatus = status ?? settings.data?.competitionStatus ?? 'not_started';
 
   return (
@@ -57,6 +70,21 @@ export default function SettingsPage() {
             </Card>
 
             <div className="space-y-4">
+              {isAdmin && <Card className="console-surface">
+                <CardHeader className="border-b border-[var(--border)]"><CardTitle>Mutation freeze</CardTitle></CardHeader>
+                <CardContent className="space-y-3 pt-4 text-sm">
+                  <p className="text-[var(--muted)]">{meta.data.frozen ? 'Mutations are frozen. Team edits, start, stop, reset, credential changes and settings are refused. Reads and the audit log still work.' : 'While frozen, every change is refused with MUTATIONS_FROZEN. Use it for the last minutes of the event or during an incident.'}</p>
+                  {meta.data.frozen ? (
+                    <Button variant="outline" disabled={freeze.isPending} onClick={() => freeze.mutate(false)}>{freeze.isPending ? 'Unfreezing…' : 'Unfreeze mutations'}</Button>
+                  ) : (
+                    <div className="flex items-end gap-2">
+                      <label className="grid flex-1 gap-1 text-xs font-medium" htmlFor="freeze-confirm">Type FREEZE to confirm<Input id="freeze-confirm" value={freezeText} onChange={(e) => setFreezeText(e.target.value)} autoComplete="off" /></label>
+                      <Button variant="destructive" disabled={freezeText !== 'FREEZE' || freeze.isPending} onClick={() => freeze.mutate(true)}>{freeze.isPending ? 'Freezing…' : 'Freeze mutations'}</Button>
+                    </div>
+                  )}
+                  {freeze.error && <p role="alert" className="text-[var(--bad)]">{freeze.error.message}</p>}
+                </CardContent>
+              </Card>}
               <Card className="console-surface">
                 <CardHeader className="border-b border-[var(--border)]"><CardTitle className="flex items-center gap-2"><Info size={17} className="text-[var(--accent)]" />Runtime metadata</CardTitle></CardHeader>
                 <CardContent className="space-y-3 pt-4 text-sm">
@@ -81,6 +109,7 @@ export default function SettingsPage() {
               </Card>}
             </div>
           </div>
+          {isAdmin && <div className="mt-4 grid gap-4 lg:grid-cols-2"><OrganizerAccounts currentUserId={me.data?.user.id} /></div>}
         </div>
       )}
     </QueryState>

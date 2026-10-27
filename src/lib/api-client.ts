@@ -42,7 +42,7 @@ export class ApiError extends Error {
   }
 }
 
-async function handleResponse<T>(res: Response): Promise<T> {
+export async function handleResponse<T>(res: Response): Promise<T> {
   if (res.ok) {
     if (res.status === 204) return undefined as T;
     return res.json() as T;
@@ -63,7 +63,7 @@ async function handleResponse<T>(res: Response): Promise<T> {
   );
 }
 
-function defaultHeaders(idempotencyKey?: string): Record<string, string> {
+export function defaultHeaders(idempotencyKey?: string): Record<string, string> {
   const h: Record<string, string> = {
     'Content-Type': 'application/json',
   };

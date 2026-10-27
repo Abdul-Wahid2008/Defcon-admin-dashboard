@@ -1,4 +1,5 @@
 import 'server-only';
+import { csvRow } from '../../csv';
 import { dbHelper } from '../db';
 import { can } from '../permissions';
 import { AppError } from '../errors';
@@ -177,10 +178,10 @@ export function exportAuditCsv(user: SessionUser, query: AuditQuery): string {
   );
 
   const header = 'id,ts,actor_name,actor_role,action,target_type,target_id,outcome,message,request_id,correlation_id\n';
-  const lines = rows.map((r) => [
-    r.id, r.ts, `"${r.actor_name}"`, r.actor_role, r.action,
-    r.target_type, r.target_id || '', r.outcome, `"${r.message}"`,
-    r.request_id || '', r.correlation_id || '',
-  ].join(','));
+  const lines = rows.map((r) => csvRow([
+    r.id, r.ts, r.actor_name, r.actor_role, r.action,
+    r.target_type, r.target_id, r.outcome, r.message,
+    r.request_id, r.correlation_id,
+  ]));
   return header + lines.join('\n');
 }

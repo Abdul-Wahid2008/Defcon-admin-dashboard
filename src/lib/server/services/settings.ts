@@ -1,4 +1,5 @@
 import 'server-only';
+import { assertNotFrozen } from '../freeze';
 import { dbHelper } from '../db';
 import { can } from '../permissions';
 import { AppError } from '../errors';
@@ -29,6 +30,7 @@ export function updateSettings(
     });
     throw new AppError('FORBIDDEN', 'Insufficient permissions.', { required: 'settings.update' });
   }
+  assertNotFrozen(user, { action: 'settings.update', targetType: 'settings', requestId: opts.requestId });
 
   if (patch.competitionStatus) {
     dbHelper.run(
@@ -47,4 +49,34 @@ export function updateSettings(
   });
 
   return getSettings(user);
+}
+
+/** Admin-only toggle. Freezing needs the typed word FREEZE; unfreezing never needs a mutation to be allowed. */
+export function setFrozen(
+  user: SessionUser,
+  input: { frozen: boolean; confirm?: string },
+  opts: { requestId: string },
+) {
+  if (!can(user, 'settings.update')) {
+    appendAudit({
+      actorId: user.id, actorName: user.displayName, actorRole: user.role,
+      action: 'settings.freeze', targetType: 'settings', outcome: 'denied',
+      message: 'Unauthorized freeze toggle', requestId: opts.requestId,
+    });
+    throw new AppError('FORBIDDEN', 'Insufficient permissions.', { required: 'settings.update' });
+  }
+  if (input.frozen && input.confirm !== 'FREEZE') {
+    throw new AppError('CONFIRMATION_MISMATCH', 'Type "FREEZE" to confirm.', { expected: 'FREEZE' });
+  }
+  dbHelper.run(
+    `INSERT INTO settings (key, value) VALUES ('mutations_frozen', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    input.frozen ? '1' : '0',
+  );
+  appendAudit({
+    actorId: user.id, actorName: user.displayName, actorRole: user.role,
+    action: 'settings.freeze', targetType: 'settings', outcome: 'success',
+    message: input.frozen ? 'Mutations frozen' : 'Mutations unfrozen', requestId: opts.requestId,
+    details: { frozen: input.frozen },
+  });
+  return { frozen: input.frozen };
 }

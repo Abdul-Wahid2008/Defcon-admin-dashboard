@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   return new Response(null, {
     status: 204,
     headers: {
-      'Set-Cookie': clearSessionCookie(),
+      'Set-Cookie': clearSessionCookie(req),
       'X-Request-Id': requestId,
     },
   });

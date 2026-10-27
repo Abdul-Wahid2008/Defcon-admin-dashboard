@@ -14,6 +14,7 @@ vi.mock('next/headers', () => ({
 }));
 
 import { createSession, type SessionUser } from '../src/lib/server/auth';
+import { ensureUserRow } from './helpers/users';
 import { POST as injectFault } from '../src/app/api/demo/inject/route';
 import { POST as failNext } from '../src/app/api/demo/fail-next/route';
 import { POST as reseed } from '../src/app/api/demo/reseed/route';
@@ -54,6 +55,8 @@ const previousDemoControls = process.env.DEMO_CONTROLS;
 
 beforeAll(() => {
   process.env.SESSION_SECRET = 'r'.repeat(48); // test-only session signing key
+  ensureUserRow(admin);
+  ensureUserRow(operator);
   // Release default: demo controls disabled.
   delete process.env.DEMO_CONTROLS;
 });

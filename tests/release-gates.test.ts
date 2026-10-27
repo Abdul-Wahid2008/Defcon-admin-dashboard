@@ -1,3 +1,4 @@
+import { ensureUserRow } from './helpers/users';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 // requireUser reads cookies() outside a Next request scope in tests,
@@ -94,6 +95,7 @@ describe('unauthenticated requests return the documented 401 shape', () => {
 
   beforeAll(() => {
     process.env.SESSION_SECRET = 'r'.repeat(48); // test-only session signing key
+    ensureUserRow(admin);
   });
 
   afterAll(() => {

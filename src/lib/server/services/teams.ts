@@ -1,4 +1,5 @@
 import 'server-only';
+import { assertNotFrozen } from '../freeze';
 import { getAdapter } from '../adapters';
 import { can } from '../permissions';
 import { AppError } from '../errors';
@@ -63,6 +64,7 @@ export async function createTeam(
     });
     throw new AppError('FORBIDDEN', 'Insufficient permissions.', { required: 'team.create' });
   }
+  assertNotFrozen(user, { action: 'team.create', targetType: 'team', requestId: opts.requestId });
 
   // Idempotency check
   if (opts.idempotencyKey) {
@@ -141,6 +143,7 @@ export async function importTeams(
     });
     throw new AppError('FORBIDDEN', 'Insufficient permissions.', { required: 'team.create' });
   }
+  assertNotFrozen(user, { action: 'team.create', targetType: 'team', requestId: opts.requestId });
 
   const seen = new Set<string>();
   const created: Array<{ team: TeamDetail; credentials: IssuedCredential[] }> = [];
@@ -203,6 +206,7 @@ export async function updateTeam(
     });
     throw new AppError('FORBIDDEN', 'Insufficient permissions.', { required: 'team.update' });
   }
+  assertNotFrozen(user, { action: 'team.update', targetType: 'team', targetId: teamId, requestId: opts.requestId });
 
   // Check for name uniqueness if renaming
   if (patch.name) {
@@ -257,6 +261,7 @@ export async function requestLifecycleAction(
     });
     throw new AppError('FORBIDDEN', 'Insufficient permissions.', { required });
   }
+  assertNotFrozen(user, { action: auditAction, targetType: 'team', targetId: teamId, requestId: opts.requestId });
 
   // Delete requires typed confirmation
   if (action === 'delete') {

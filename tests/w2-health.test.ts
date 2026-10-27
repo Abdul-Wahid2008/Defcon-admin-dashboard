@@ -22,6 +22,7 @@ import { machineCan } from '../src/lib/server/permissions';
 import { GET as getMeta } from '../src/app/api/meta/route';
 import { GET as ingestGet, POST as ingestPost } from '../src/app/api/ingest/check-results/route';
 import { createSession } from '../src/lib/server/auth';
+import { ensureUserRow } from './helpers/users';
 import { getOverview } from '../src/lib/server/services/overview';
 
 const T0 = Date.parse('2026-10-27T10:00:00Z');
@@ -542,6 +543,7 @@ describe('config and /api/meta', () => {
     useScoreboard();
     vi.stubEnv('INGEST_TOKEN', TOKEN);
     vi.stubEnv('SESSION_SECRET', 's'.repeat(40));
+    ensureUserRow({ id: 'u', username: 'a', displayName: 'A', role: 'organizer_admin' });
     cookieState.token = await createSession({ id: 'u', username: 'a', displayName: 'A', role: 'organizer_admin' });
     const body = await (await getMeta(new Request('http://localhost/api/meta'))).json() as Record<string, unknown>;
     cookieState.token = undefined;
