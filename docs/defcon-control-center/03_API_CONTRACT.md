@@ -59,7 +59,8 @@ interface PendingAction {
 
 interface Check { type: CheckType; status: CheckStatus; detail: string | null; lastCheckedAt: string | null }
 // detail carries the checker verdict text, e.g. 'OFFLINE: connection refused' / 'MUMBLE: login failed' (A17)
-interface Service { key: string; name: string; port: number; placeholder: boolean; checks: Check[] }  // mock: 5 per environment from services.manifest.ts (D14)
+interface Service { key: string; name: string; port: number; placeholder: boolean; checks: Check[]; flagstores?: FlagstoreResult[] }  // v1.2: one per entry of config/services.json (default 4), 3 flagstores each
+interface FlagstoreResult { key: 'flag0'|'flag1'|'flag2'; verdict: 'OK'|'MUMBLE'|'OFFLINE'|'INTERNAL_ERROR'|'UNKNOWN'; message: string|null; round: number|null; checkedAt: string|null }  // UNCONFIRMED A24/A25
 
 interface ResourceUsage {
   cpu:       { usedPct: number; limitCores: number };
@@ -70,7 +71,7 @@ interface ResourceUsage {
 }
 
 // Terminal endpoint (A15). url is sensitive: expose only on team detail, never in lists/audit/logs.
-interface Terminal { kind: 'ttyd'; port: number; url: string | null; isMock: boolean }
+interface Terminal { kind: 'ttyd'; mode: 'per_team'|'shared'; port: number; url: string | null; isMock: boolean }  // port = ttydBase + team seq (config/services.json, UNCONFIRMED A23)
 
 interface Environment {
   lifecycleState: LifecycleState;
@@ -259,3 +260,5 @@ Anything the orchestrator cannot supply is shown as "not available" in the UI (`
 ## 6. Change log
 
 **v1.1 (17 Oct 2026) — additive only; nothing renamed.** Added: `Terminal` type and `Environment.terminal`; `Service.placeholder`; `Alert.kind = 'checker_error'`; `/api/meta` `adapter` may be `'docker-compose'` (badge `PARTIAL`); `POST /api/teams/import` (P2); `POST /api/environments/bulk` (P2); audit CSV export promoted to P1; overview example numbers aligned with the 24-team seed (21 running, 2 stopped, 1 failed; 5 services each).
+
+**v1.2 W1 (27 Oct 2026) — CONTRACT CHANGE, additive only.** `Service.flagstores?` (`FlagstoreResult[]`, 3 per service) and `Terminal.mode` (`'per_team'|'shared'`, default `per_team`). Service ports now follow `10000 + seq*10 + portOffset`; terminal port `7600 + seq`. Service keys come from `config/services.json` (default `docuvault, pulsechat, swiftshop, service-4`); the old `funsplash, svc-3..5` keys no longer exist. All UNCONFIRMED (docs/12 C3, C6, A23, A24).

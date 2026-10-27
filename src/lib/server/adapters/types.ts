@@ -29,12 +29,24 @@ export interface Check {
   lastCheckedAt: string | null;
 }
 
+export type FlagstoreKey = 'flag0' | 'flag1' | 'flag2';
+export type FlagstoreVerdict = 'OK' | 'MUMBLE' | 'OFFLINE' | 'INTERNAL_ERROR' | 'UNKNOWN';
+
+export interface FlagstoreResult {
+  key: FlagstoreKey;
+  verdict: FlagstoreVerdict;
+  message: string | null;
+  round: number | null;
+  checkedAt: string | null;
+}
+
 export interface Service {
   key: string;
   name: string;
   port: number;
   placeholder: boolean;
   checks: Check[];
+  flagstores?: FlagstoreResult[];
 }
 
 export interface ResourceUsage {
@@ -47,6 +59,7 @@ export interface ResourceUsage {
 
 export interface Terminal {
   kind: 'ttyd';
+  mode: 'per_team' | 'shared';
   port: number;
   url: string | null;
   isMock: boolean;

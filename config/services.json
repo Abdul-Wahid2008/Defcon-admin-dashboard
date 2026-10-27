@@ -1,0 +1,11 @@
+{
+  "_note": "All service names and port offsets are UNCONFIRMED (docs/12 C3, A23). Edit here only; nothing else hard-codes the manifest.",
+  "ports": { "serviceBase": 10000, "serviceStride": 10, "ttydBase": 7600, "softTeamCap": 20 },
+  "terminalMode": "per_team",
+  "services": [
+    { "key": "docuvault", "name": "DocuVault", "portOffset": 0, "flagstores": 3, "placeholder": false, "nameConfirmed": false },
+    { "key": "pulsechat", "name": "PulseChat / CampusPortal (unconfirmed)", "portOffset": 2, "flagstores": 3, "placeholder": true, "nameConfirmed": false },
+    { "key": "swiftshop", "name": "SwiftShop", "portOffset": 3, "flagstores": 3, "placeholder": false, "nameConfirmed": false },
+    { "key": "service-4", "name": "Service 4", "portOffset": 4, "flagstores": 3, "placeholder": true, "nameConfirmed": false }
+  ]
+}

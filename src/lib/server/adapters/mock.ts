@@ -19,8 +19,10 @@ import {
   TeamQuery,
   Health,
   Service,
+  FlagstoreKey,
+  FlagstoreVerdict,
 } from './types';
-import { SERVICES_MANIFEST, SERVICES_PER_TEAM } from './mock/services.manifest';
+import { getEventConfig, servicePort, ttydPort, teamCapWarning } from '../../event-config';
 import { MOCK_DURATIONS, loadConfig } from '../../config';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
@@ -101,7 +103,7 @@ export class MockAdapter implements EnvironmentAdapter {
     const activeParticipants = participants.filter(p => p.active);
 
     const terminal = (env.lifecycle_state === 'running' && env.terminal_url)
-      ? { kind: 'ttyd' as const, port: 7681, url: env.terminal_url, isMock: true }
+      ? { kind: 'ttyd' as const, mode: getEventConfig().terminalMode, port: ttydPort(team.seq), url: env.terminal_url, isMock: true }
       : null;
 
     const pending = env.pending_action ? {
@@ -188,6 +190,18 @@ export class MockAdapter implements EnvironmentAdapter {
           lastCheckedAt: row.last_checked_at,
         });
       }
+    }
+    const flagRows = dbHelper.all<{ service_key: string; flagstore: FlagstoreKey; verdict: FlagstoreVerdict; message: string | null; round: number | null; checked_at: string | null }>(
+      `SELECT service_key, flagstore, verdict, message, round, checked_at
+       FROM flagstore_results WHERE team_id = ? ORDER BY service_key, flagstore`,
+      teamId
+    );
+    for (const f of flagRows) {
+      const svc = serviceMap.get(f.service_key);
+      if (!svc) continue;
+      (svc.flagstores ??= []).push({
+        key: f.flagstore, verdict: f.verdict, message: f.message, round: f.round, checkedAt: f.checked_at,
+      });
     }
     return Array.from(serviceMap.values());
   }
@@ -478,12 +492,19 @@ export class MockAdapter implements EnvironmentAdapter {
     );
 
     // Insert services and checks
-    for (let i = 0; i < SERVICES_PER_TEAM; i++) {
-      const svc = SERVICES_MANIFEST[i];
+    const warn = teamCapWarning(seq);
+    if (warn) console.warn(warn);
+    for (const svc of getEventConfig().services) {
       dbHelper.run(
         `INSERT INTO services (team_id, key, name, port, placeholder) VALUES (?, ?, ?, ?, ?)`,
-        teamId, svc.key, svc.name, svc.port, svc.placeholder ? 1 : 0
+        teamId, svc.key, svc.name, servicePort(seq, svc.portOffset), svc.placeholder ? 1 : 0
       );
+      for (const fs of ['flag0', 'flag1', 'flag2']) {
+        dbHelper.run(
+          `INSERT INTO flagstore_results (team_id, service_key, flagstore, verdict) VALUES (?, ?, ?, 'UNKNOWN')`,
+          teamId, svc.key, fs
+        );
+      }
       dbHelper.run(
         `INSERT INTO checks (team_id, service_key, check_type, status, last_checked_at) VALUES (?, ?, 'reachability', 'unknown', ?)`,
         teamId, svc.key, nowTs

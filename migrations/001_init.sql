@@ -59,7 +59,7 @@ CREATE TABLE environments (
 
 CREATE TABLE services (
   team_id TEXT NOT NULL REFERENCES teams(id),
-  key     TEXT NOT NULL,                              -- manifest key, e.g. 'docuvault' | 'funsplash' | 'svc-3'
+  key     TEXT NOT NULL,                              -- manifest key, from config/services.json, e.g. 'docuvault'
   name    TEXT NOT NULL,
   port    INTEGER NOT NULL,
   placeholder INTEGER NOT NULL DEFAULT 0,             -- 1 = not a real challenge service yet (A9)

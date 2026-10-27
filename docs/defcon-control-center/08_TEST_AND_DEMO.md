@@ -71,7 +71,7 @@ Single happy path mirroring the demo script, run against a freshly seeded DB wit
 |---|---|---|---|
 | 0:00 | Overview | "This is the DEFCON organizer console. It's running on a built-in simulated backend, as the badge shows, so nothing here touches real containers yet." | Badge, stat cards, health donut, environment grid (one down, one failed, two degraded) |
 | 0:30 | Find a team | "Organizers can find any of the 24 teams instantly." | Teams page → search `team-13` → open the team that's **down** |
-| 0:50 | Team detail | "Health is the spec's two checks per service: reachability and functional tests. In the real event those verdicts come from each service's checker." | Services table (5 services): `funsplash` reachability failing; terminal endpoint shown (simulated); alert in feed; resource bars; accepted patch v3 |
+| 0:50 | Team detail | "Health is the spec's two checks per service: reachability and functional tests. In the real event those verdicts come from each service's checker." | Services table (4 services): `docuvault` reachability failing; terminal endpoint shown (simulated); alert in feed; resource bars; accepted patch v3 |
 | 1:10 | Create a team | "Creating a team provisions its environment and issues terminal credentials once." | Create "Demo Squad" → reveal dialog → tick saved → close → team shows Provisioning → Running |
 | 1:50 | Reset with safety | "Reset is distinct from stop and delete, and the dialog says what's preserved: flags, scores, patches, audit, app data." | Open Reset dialog on `team-19` (failed) → confirm → Resetting… → back to Running; success toast arrives only at the end |
 | 2:20 | Permissions | "Roles are enforced on the server." | Browser B (operator): Delete button disabled with tooltip; (optional) show 403 |

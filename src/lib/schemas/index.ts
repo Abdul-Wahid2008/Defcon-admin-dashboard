@@ -52,11 +52,21 @@ export type Check = z.infer<typeof CheckSchema>;
 
 export const TerminalSchema = z.object({
   kind: z.literal('ttyd'),
+  mode: z.enum(['per_team', 'shared']),
   port: z.number().int(),
   url: z.string().nullable(),
   isMock: z.boolean(),
 });
 export type Terminal = z.infer<typeof TerminalSchema>;
+
+export const FlagstoreResultSchema = z.object({
+  key: z.enum(['flag0', 'flag1', 'flag2']),
+  verdict: z.enum(['OK', 'MUMBLE', 'OFFLINE', 'INTERNAL_ERROR', 'UNKNOWN']),
+  message: z.string().nullable(),
+  round: z.number().int().nullable(),
+  checkedAt: z.string().datetime({ offset: true }).nullable(),
+});
+export type FlagstoreResult = z.infer<typeof FlagstoreResultSchema>;
 
 export const ServiceSchema = z.object({
   key: z.string(),
@@ -64,6 +74,7 @@ export const ServiceSchema = z.object({
   port: z.number().int(),
   placeholder: z.boolean(),
   checks: z.array(CheckSchema),
+  flagstores: z.array(FlagstoreResultSchema).optional(),
 });
 export type Service = z.infer<typeof ServiceSchema>;
 

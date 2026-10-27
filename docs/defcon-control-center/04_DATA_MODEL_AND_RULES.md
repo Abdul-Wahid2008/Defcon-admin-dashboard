@@ -161,7 +161,7 @@ CREATE TABLE environments (
 
 CREATE TABLE services (
   team_id TEXT NOT NULL REFERENCES teams(id),
-  key     TEXT NOT NULL,                              -- manifest key, e.g. 'docuvault' | 'funsplash' | 'svc-3'
+  key     TEXT NOT NULL,                              -- manifest key from config/services.json, e.g. 'docuvault' | 'pulsechat' | 'swiftshop' | 'service-4'
   name    TEXT NOT NULL,
   port    INTEGER NOT NULL,
   placeholder INTEGER NOT NULL DEFAULT 0,             -- 1 = not a real challenge service yet (A9)
@@ -279,15 +279,15 @@ While `lifecycle_state='running'` the environment exposes `terminal = { kind:'tt
 
 ### 6.10 Service manifest (D14)
 
-`src/lib/server/adapters/mock/services.manifest.ts` exports the five default services: `docuvault` (port 8001), `funsplash` (8002), `svc-3` (8003), `svc-4` (8004), `svc-5` (8005). The first two are real candidate names from the club; **all ports are MOCK placeholders**; `svc-3..5` have `placeholder=true`. `SERVICES_PER_TEAM` (default 5, allowed 5–6) selects how many manifest entries are used; adding a sixth is a manifest edit only. Provisioning inserts one `services` row and two `checks` rows (reachability, functional) per manifest entry.
+**v1.2 (supersedes the five-service manifest; `funsplash` was never a DEFCON service).** The only manifest is `config/services.json`, validated fail-closed by `src/lib/event-config.ts` (zod: unique keys, unique `portOffset`, offset < stride, `flagstores` = 3). Defaults, **all names UNCONFIRMED** (`nameConfirmed:false`): `docuvault` (+0), `pulsechat` (+2, placeholder, shown as "PulseChat / CampusPortal (unconfirmed)"), `swiftshop` (+3), `service-4` (+4, placeholder). Port = `10000 + seq*10 + portOffset`; ttyd port = `7600 + seq`; constants live in the config (UNCONFIRMED A23). Creating a team with `seq > ports.softTeamCap` (20) logs a warning, it does not fail. `terminalMode` (`per_team`|`shared`) is config too (C6). Provisioning inserts per manifest entry: one `services` row, two `checks` rows (reachability, functional) and three `flagstore_results` rows (`flag0..2`, verdict `UNKNOWN`). The mock does not yet refresh `flagstore_results` when checks change (W2 owns health).
 
 ## 7. Seed data (`npm run seed`; `SEED_TEAMS` default 24)
 
 - 2 users (admin, operator) from env; hashes created at seed time.
 - 24 fictional teams (`team-01` … `team-24`) with fictional names (e.g. "Null Pointers", "Packet Pirates", "Root Cause", "Zero Day Zealots", "Stack Smashers", "Byte Bandits", "Shell Shockers", "Cipher Syndicate", "Kernel Panic", "Ghost Protocol", "Red Herring", "Port Scanners", "Sudo Squad", "Hash Collision", "Rubber Duckies", "Lambda Lurkers", "Buffer Overflowers", "Daemon Hunters", "Fork Bomb", "Segfault Society", "Trojan Horsepower", "Phantom Pings", "Rootkit Rebels", "Brute Force Brigade"); all clearly fake demo data.
 - 4 participants each (A5): "Participant 1–4", usernames per 6.6, passwords random (never displayed; rotate to reveal).
-- Five services per team from the manifest (§6.10), each with reachability + functional checks (10 checks per team); running environments get a fake terminal URL (§6.9).
-- State mix: 18 running healthy, 2 running degraded (functional fail on `docuvault`; `team-05` and `team-17`), 1 running down (reachability fail on `funsplash`, `team-13`), 2 stopped, 1 failed (`team-19`, reason "reset failed (simulated)").
+- Four services per team from the manifest (§6.10), each with reachability + functional checks (8 checks per team) and 3 flagstore rows (12 per team); `external_team_id = String(seq)` (MOCK); running environments get a fake terminal URL (§6.9).
+- State mix: 18 running healthy, 2 running degraded (functional fail on the first non-placeholder manifest service, `docuvault` by default, flagstore `flag1` = MUMBLE; `team-05` and `team-17`), 1 running down (reachability fail on the same service, all 3 flagstores OFFLINE, `team-13`), 2 stopped, 1 failed (`team-19`, reason "reset failed (simulated)").
 - Accepted patch versions random 1–5; `last_deploy_result` mostly `accepted`, a couple `rolled_back`/`rejected` (display only).
 - Seed audit history (~40 rows over the last 6 hours, actor `admin`/`operator`/`system`) so the audit page is not empty on first open. Mark `details.seeded = true`.
 - Seed alerts matching the degraded/down/failed teams.
@@ -307,3 +307,14 @@ While `lifecycle_state='running'` the environment exposes `terminal = { kind:'tt
 10. Health is `unknown` whenever lifecycle ≠ `running`.
 11. Every non-deleted environment has exactly the manifest's services, two checks each; `placeholder` mirrors the manifest.
 12. `terminal.url` is non-null only while lifecycle = `running`, and never appears outside the team-detail response.
+
+## 9. Migration 002 (v1.2 W1, `migrations/002_v1_2.sql`)
+
+Runner: `src/lib/migrate.ts` (`PRAGMA user_version`; used by `db.ts`, `scripts/seed.ts` and tests). Applies `NNN_*.sql` in order; 001 runs bare (it contains PRAGMAs), later files run in a transaction; any failure throws (fail closed). Existing v1 databases upgrade in place.
+
+- `teams.external_team_id TEXT` (NULL allowed) + partial unique index `uq_teams_external_team_id` (SQLite cannot `ADD COLUMN ... UNIQUE`).
+- `users.session_epoch INTEGER NOT NULL DEFAULT 0`, `users.must_change_password INTEGER NOT NULL DEFAULT 0`, `users.last_login_at TEXT`.
+- `flagstore_results(team_id, service_key, flagstore CHECK IN ('flag0','flag1','flag2'), verdict CHECK IN ('OK','MUMBLE','OFFLINE','INTERNAL_ERROR','UNKNOWN'), message, round, checked_at, PRIMARY KEY(team_id, service_key, flagstore), FOREIGN KEY (team_id, service_key) REFERENCES services ON DELETE CASCADE)`. Cascade keeps the existing `DELETE FROM services` in reseed/tests working.
+- `health_source_state(source PK, last_round, last_fetch_at, last_ok_at, last_error, last_etag)`.
+- `settings` defaults (INSERT OR IGNORE): `stale_after_sec=270`, `round_sec=90`, `mutations_frozen='0'`.
+- Audit triggers are untouched; `tests/w1-manifest.test.ts` asserts UPDATE/DELETE on `audit_log` still abort after migration.

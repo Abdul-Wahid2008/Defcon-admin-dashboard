@@ -115,7 +115,7 @@ P1/P2 criteria are tracked in `06`.
 | A6 | Deleting a team keeps its audit history and score/submission records (archived, not purged) | Hard-delete everything but audit |
 | A7 | Soft cap of 30 teams: creating the 31st shows a warning, not a block (spec says "20–30 expected") | Hard cap |
 | A8 | Health = derived from two check types per service: *reachability* (stopped/unreachable) and *functional* (workflow test), per spec page 3; the verdicts come from the per-service checker (A17) | n/a |
-| A9 | **Five** services per environment in the mock (group chat: "5–6 services"). Seed manifest: `docuvault` (exists in the club repo), `funsplash` (in progress), plus three clearly-labelled placeholders; all ports are placeholders. The real list comes from the challenge catalogue (unresolved in spec) | Data-driven: edit `services.manifest.ts` only |
+| A9 | **Five** services per environment in the mock (group chat: "5–6 services"). Seed manifest: `docuvault` (exists in the club repo), `funsplash` (in progress), plus three clearly-labelled placeholders; all ports are placeholders. The real list comes from the challenge catalogue (unresolved in spec) | Data-driven: edit `config/services.json` only (v1.2; `funsplash` removed, see doc 12 C3) |
 | A10 | Mock resource limits (CPU 1.0, memory 1024 MB, processes 256, storage 2048 MB) are placeholders; spec only says limits exist | Replace with real limits |
 | A11 | Mock durations: provision 6 s, start 3 s, stop 2 s, reset 5 s, delete 3 s | Cosmetic |
 | A12 | Organizer roles: `organizer_admin` (everything) and `organizer_operator` (no delete, no settings, no demo controls) | Collapse to one role |

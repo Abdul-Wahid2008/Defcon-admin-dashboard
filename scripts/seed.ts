@@ -8,6 +8,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { migrate } from '../src/lib/migrate';
+import { getEventConfig, servicePort, teamCapWarning } from '../src/lib/event-config';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -25,13 +27,11 @@ if ((ADMIN_PASS === 'change-me' || OP_PASS === 'change-me') && !ALLOW_DEFAULTS) 
   process.exit(1);
 }
 
-const SERVICES_MANIFEST = [
-  { key: 'docuvault', name: 'DocuVault', port: 8001, placeholder: 0 },
-  { key: 'funsplash', name: 'FUnsplash', port: 8002, placeholder: 0 },
-  { key: 'svc-3', name: 'Service 3', port: 8003, placeholder: 1 },
-  { key: 'svc-4', name: 'Service 4', port: 8004, placeholder: 1 },
-  { key: 'svc-5', name: 'Service 5', port: 8005, placeholder: 1 },
-];
+const SERVICES_MANIFEST = getEventConfig().services;
+// The service that the degraded/down seed scenarios hit: first non-placeholder in the manifest.
+const SCENARIO_SERVICE = (SERVICES_MANIFEST.find(m => !m.placeholder) ?? SERVICES_MANIFEST[0]).key;
+const FLAGSTORES = ['flag0', 'flag1', 'flag2'] as const;
+const MOCK_ROUND = 42; // MOCK
 
 const TEAM_NAMES = [
   'Null Pointers', 'Packet Pirates', 'Root Cause', 'Zero Day Zealots',
@@ -66,16 +66,12 @@ const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
-const version = db.pragma('user_version', { simple: true }) as number;
-if (version === 0) {
-  const sql = fs.readFileSync(path.join(__dirname, '..', 'migrations', '001_init.sql'), 'utf8');
-  db.exec(sql);
-  db.pragma('user_version = 1');
-  console.log('  ✓ Database schema created');
-}
+migrate(db, path.join(__dirname, '..', 'migrations'));
+console.log('  ✓ Database schema up to date');
 
 // ── Wipe mock tables (preserve audit structure) ───────────────────────────────
 db.exec(`
+  DELETE FROM flagstore_results;
   DELETE FROM checks;
   DELETE FROM services;
   DELETE FROM participants;
@@ -83,7 +79,7 @@ db.exec(`
   DELETE FROM teams;
   DELETE FROM alerts;
   DELETE FROM users;
-  DELETE FROM settings;
+  DELETE FROM settings WHERE key = 'competition_status';
   DELETE FROM idempotency_keys;
 `);
 // Keep audit_log (append-only — we'll add new seed rows)
@@ -101,7 +97,7 @@ db.prepare(`INSERT INTO users (id,username,password_hash,display_name,role,activ
 console.log(`  ✓ Users seeded (${ADMIN_USER}, ${OP_USER})`);
 
 // ── Settings ──────────────────────────────────────────────────────────────────
-db.prepare(`INSERT INTO settings (key,value) VALUES ('competition_status','not_started')`).run();
+db.prepare(`INSERT OR REPLACE INTO settings (key,value) VALUES ('competition_status','not_started')`).run();
 
 // ── Teams ─────────────────────────────────────────────────────────────────────
 const numTeams = Math.min(SEED_TEAMS, TEAM_NAMES.length);
@@ -152,9 +148,12 @@ for (let i = 0; i < numTeams; i++) {
 
   const activeSessions = lifecycleState === 'running' ? crypto.randomInt(0, 7) : 0;
 
-  db.prepare(`INSERT INTO teams (id,seq,name,notes,account_status,created_at,updated_at)
-    VALUES (?,?,?,?,?,?,?)`)
-    .run(teamId, seq, teamName, '', 'active', createdAt, updatedAt);
+  const capWarn = teamCapWarning(seq);
+  if (capWarn) console.warn(`  ! ${capWarn}`);
+  // MOCK: external_team_id mirrors seq so the seed can exercise the A31 mapping.
+  db.prepare(`INSERT INTO teams (id,seq,name,notes,account_status,created_at,updated_at,external_team_id)
+    VALUES (?,?,?,?,?,?,?,?)`)
+    .run(teamId, seq, teamName, '', 'active', createdAt, updatedAt, String(seq));
 
   db.prepare(`INSERT INTO environments
     (team_id,lifecycle_state,accepted_patch_version,last_deploy_result,last_deploy_at,
@@ -174,10 +173,10 @@ for (let i = 0; i < numTeams; i++) {
       .run(pId, teamId, `Participant ${p}`, username, hash, createdAt);
   }
 
-  // 5 services + 10 checks
+  // services + 2 checks + 3 flagstore verdicts each
   for (const svc of SERVICES_MANIFEST) {
     db.prepare(`INSERT INTO services (team_id,key,name,port,placeholder) VALUES (?,?,?,?,?)`)
-      .run(teamId, svc.key, svc.name, svc.port, svc.placeholder);
+      .run(teamId, svc.key, svc.name, servicePort(seq, svc.portOffset), svc.placeholder ? 1 : 0);
 
     // Determine check status
     let reachStatus = 'pass', funcStatus = 'pass';
@@ -185,10 +184,10 @@ for (let i = 0; i < numTeams; i++) {
 
     if (lifecycleState !== 'running') {
       reachStatus = 'unknown'; funcStatus = 'unknown';
-    } else if (stateKind === 'running_down' && svc.key === 'funsplash') {
+    } else if (stateKind === 'running_down' && svc.key === SCENARIO_SERVICE) {
       reachStatus = 'fail'; funcStatus = 'unknown';
       reachDetail = 'OFFLINE: connection refused';
-    } else if (stateKind === 'running_degraded' && svc.key === 'docuvault') {
+    } else if (stateKind === 'running_degraded' && svc.key === SCENARIO_SERVICE) {
       funcStatus = 'fail';
       funcDetail = 'MUMBLE: login workflow failed';
     }
@@ -197,6 +196,16 @@ for (let i = 0; i < numTeams; i++) {
       .run(teamId, svc.key, reachStatus, reachDetail, updatedAt);
     db.prepare(`INSERT INTO checks (team_id,service_key,check_type,status,detail,last_checked_at,forced_fail) VALUES (?,?,'functional',?,?,?,0)`)
       .run(teamId, svc.key, funcStatus, funcDetail, updatedAt);
+
+    // Flagstore verdicts consistent with the checks (docs/12 §7): OFFLINE->reach fail; MUMBLE->func fail.
+    FLAGSTORES.forEach((fsKey, fi) => {
+      let verdict = 'OK', message: string | null = null;
+      if (lifecycleState !== 'running') verdict = 'UNKNOWN';
+      else if (reachStatus === 'fail') { verdict = 'OFFLINE'; message = 'connection refused'; }
+      else if (funcStatus === 'fail' && fi === 1) { verdict = 'MUMBLE'; message = 'login workflow failed'; }
+      db.prepare(`INSERT INTO flagstore_results (team_id,service_key,flagstore,verdict,message,round,checked_at) VALUES (?,?,?,?,?,?,?)`)
+        .run(teamId, svc.key, fsKey, verdict, message, verdict === 'UNKNOWN' ? null : MOCK_ROUND, verdict === 'UNKNOWN' ? null : updatedAt);
+    });
   }
 }
 
@@ -204,11 +213,11 @@ for (let i = 0; i < numTeams; i++) {
 // team-05 & team-17: degraded (docuvault functional fail)
 for (const t of ['team-05', 'team-17']) {
   db.prepare(`INSERT INTO alerts (id,team_id,severity,kind,dedupe_key,message,created_at) VALUES (?,?,'warning','service_degraded',?,?,?)`)
-    .run(newAlertId(), t, `${t}:docuvault:functional`, `docuvault functional check failed on ${t}`, isoHoursAgo(0.5));
+    .run(newAlertId(), t, `${t}:${SCENARIO_SERVICE}:functional`, `${SCENARIO_SERVICE} functional check failed on ${t}`, isoHoursAgo(0.5));
 }
-// team-13: down (funsplash reachability fail)
+// team-13: down (scenario service reachability fail)
 db.prepare(`INSERT INTO alerts (id,team_id,severity,kind,dedupe_key,message,created_at) VALUES (?,?,'critical','service_down',?,?,?)`)
-  .run(newAlertId(), 'team-13', 'team-13:funsplash:reachability', 'funsplash is unreachable on team-13', isoHoursAgo(0.3));
+  .run(newAlertId(), 'team-13', `team-13:${SCENARIO_SERVICE}:reachability`, `${SCENARIO_SERVICE} is unreachable on team-13`, isoHoursAgo(0.3));
 // team-19: failed
 db.prepare(`INSERT INTO alerts (id,team_id,severity,kind,dedupe_key,message,created_at) VALUES (?,?,'critical','environment_failed',?,?,?)`)
   .run(newAlertId(), 'team-19', 'team-19:reset:failure', 'reset failed (simulated) for team-19', isoHoursAgo(0.2));
@@ -260,7 +269,7 @@ for (let i = 0; i < 40; i++) {
 
 console.log(`  ✓ ${numTeams} teams seeded`);
 console.log(`  ✓ ${numTeams * 4} participants seeded`);
-console.log(`  ✓ ${numTeams * 5} services seeded (${numTeams * 10} checks)`);
+console.log(`  ✓ ${numTeams * SERVICES_MANIFEST.length} services seeded (${numTeams * SERVICES_MANIFEST.length * 2} checks, ${numTeams * SERVICES_MANIFEST.length * 3} flagstore rows)`);
 console.log(`  ✓ Alerts seeded`);
 console.log(`  ✓ ~40 audit rows seeded`);
 console.log('\nSeed complete. Run: npm run dev');

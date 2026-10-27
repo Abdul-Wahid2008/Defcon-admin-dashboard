@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     dbHelper.run('DELETE FROM environments');
     dbHelper.run('DELETE FROM teams');
     dbHelper.run('DELETE FROM alerts');
-    dbHelper.run('DELETE FROM settings');
+    dbHelper.run("DELETE FROM settings WHERE key = 'competition_status'"); // keep migration-002 defaults
     dbHelper.run('DELETE FROM idempotency_keys');
 
     appendAudit({

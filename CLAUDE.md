@@ -3,13 +3,13 @@
 > Also provided as `AGENTS.md` for other coding tools. Keep the two identical.
 
 ## STATUS (update at the end of every work session)
-- Date/slice: 27 Oct 2026 — v1.2 in progress on branch `release/v1.2`; slice W0 (baseline, check-env, version single-source, status sync) done. Head: see `git log` (last feature commit before W0: acd43f9).
-- Done: P1–P17 (v1.1) plus W0. Teams pages share `src/components/teams/CredentialsReveal.tsx` for one-time credential reveal.
-- Validation gate (27 Oct): `npm run typecheck` 0 · `npm run lint` 0 errors (legacy warnings only) · `npm test` 74/74 across 9 files (63 + 11 check-env) · `npm run build` 0 · authenticated headless-Chrome QA of /teams and /teams/team-01 at 1280×800 and 1024×768 on a temp DB: 24 rows, zero console errors/exceptions.
+- Date/slice: 27 Oct 2026 — v1.2 in progress on branch `release/v1.2`; slice W1 (config-driven manifest, flagstores, migration 002, seed) done after W0. Head: see `git log`.
+- Done: P1–P17 (v1.1) plus W0, W1. Manifest = `config/services.json` via `src/lib/event-config.ts` (names UNCONFIRMED); migrations run through `src/lib/migrate.ts` (001, 002). Teams pages share `src/components/teams/CredentialsReveal.tsx` for one-time credential reveal.
+- Validation gate (27 Oct): `npm run typecheck` 0 · `npm run lint` 0 errors (legacy warnings only) · `npm test` 81/81 across 10 files (74 + 7 in w1-manifest) · `npm run build` 0 · authenticated headless-Chrome QA of /teams and /teams/team-01 at 1280×800 and 1024×768 on a temp DB: 24 rows, zero console errors/exceptions.
 - Runtime: `ADAPTER=mock` → `SIMULATED`; no real adapter; no real health source. Never claim `LIVE`.
 - Release gate: `npm run check-env` (pure logic in `src/lib/check-env.ts`) fails on short/placeholder SESSION_SECRET, DEMO_CONTROLS or ALLOW_DEFAULT_PASSWORDS true, DB_PATH unset or `:memory:`, default/unset organizer passwords, invalid ADAPTER. `npm run start:release` = check-env then `next start`. A local `.env` with `DEMO_CONTROLS=true` makes `next start` fail closed; release deployments ship `DEMO_CONTROLS=false`.
 - Version: single source is `package.json` (1.2.0-rc.1), served by `/api/meta`.
-- Known gaps (v1.2 roadmap, see docs/defcon-control-center/12 and 14): stale services manifest (W1), no real health source (W2), roles/freeze/security headers (W3), real lifecycle adapter (W4), UI copy pass (W5–W6), soak/perf (W7). Club inputs still missing: template.compose.yml, scoreboard sample, verdict list, reset semantics.
+- Known gaps (v1.2 roadmap, see docs/defcon-control-center/12 and 14): no real health source (W2; mock `flagstore_results` are not refreshed when checks change), roles/freeze/security headers (W3), real lifecycle adapter (W4), UI copy pass (W5–W6), soak/perf (W7). Club inputs still missing: template.compose.yml, scoreboard sample, verdict list, reset semantics.
 - Known bugs: Tailwind v4/Turbopack non-blocking CSS parser warnings on cold builds; legacy explicit-`any` lint warnings; keyboard/screen-reader QA is manual.
 - Security hardening: typed startup config requires SESSION_SECRET (32+), durable production DB_PATH, supported adapter config; login redirects same-origin only; state-changing API requests require same-origin Origin.
 - UI hardening: semantic `--accent` and `--muted` tokens must not be redefined as surface colors; use dedicated surface tokens for Tailwind mappings.

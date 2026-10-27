@@ -1,8 +1,7 @@
 import 'server-only';
 import Database from 'better-sqlite3';
-import fs from 'node:fs';
-import path from 'node:path';
 import { loadConfig } from '../config';
+import { migrate } from '../migrate';
 
 type SqliteValue = string | number | bigint | Buffer | null;
 type SqliteParam = SqliteValue | SqliteValue[];
@@ -18,26 +17,7 @@ const db = new Database(loadConfig().dbPath);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
-/**
- * Simple migration runner.
- * In a real app, we'd use a migrations table with versions.
- * For this project, we use the user_version pragma as a simple lock.
- */
-function initializeDatabase() {
-  const version = db.pragma('user_version', { simple: true }) as number;
-  if (version === 0) {
-    const migrationPath = path.join(process.cwd(), 'migrations', '001_init.sql');
-    const sql = fs.readFileSync(migrationPath, 'utf8');
-    try {
-      db.exec(sql);
-    } catch (e) {
-      console.warn('Database initialization warning:', e);
-    }
-    db.pragma('user_version = 1');
-  }
-}
-
-initializeDatabase();
+migrate(db);
 
 export const dbHelper = {
   /**
