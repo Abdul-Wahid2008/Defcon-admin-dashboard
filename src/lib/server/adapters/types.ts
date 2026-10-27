@@ -151,6 +151,9 @@ export interface Alert {
   message: string;
   createdAt: string;
   resolvedAt: string | null;
+  ackedAt?: string | null;
+  ackedBy?: string | null;
+  ackNote?: string | null;
 }
 
 export interface Page<T> {
@@ -266,6 +269,8 @@ export interface OverviewData {
     }[];
   }[];
   event: EventClock;
+  /** Open alerts nobody has acknowledged yet (the sidebar badge). */
+  openAlertCount: number;
   recentAlerts: Alert[];
   recentActivity: AuditEntry[];
   healthSource: HealthSourceStatusDto;

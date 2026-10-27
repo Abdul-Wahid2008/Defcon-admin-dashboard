@@ -20,10 +20,71 @@ import { RelativeTime } from '@/components/ui/relative-time';
 import { formatTimestamp } from '@/lib/format';
 import { isResetConfirmed, resetCopy } from '@/lib/reset-copy';
 import { ResetFields } from '@/components/teams/ResetFields';
-import { apiServiceAction } from '@/lib/api-admin';
+import { apiSaveNotes, apiServiceAction } from '@/lib/api-admin';
+import { ApiError } from '@/lib/api-client';
+import { pushRecentTeam } from '@/lib/recent-teams';
 import { useQueryClient } from '@tanstack/react-query';
 
 type ActionKind = 'start' | 'stop' | 'reset';
+
+/**
+ * Notes save on blur. The request carries the notes this editor last loaded; if someone else changed them meanwhile the
+ * server answers CONFLICT with their text and nothing is overwritten until the organizer chooses.
+ */
+function NotesCard({ teamId, serverNotes }: { teamId: string; serverNotes: string }) {
+  const qc = useQueryClient();
+  const [text, setText] = useState(serverNotes);
+  const [base, setBase] = useState(serverNotes);
+  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [conflict, setConflict] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  // Follow changes from other organizers only while this editor has no unsaved edits.
+  const [seenServer, setSeenServer] = useState(serverNotes);
+  if (serverNotes !== seenServer) {
+    setSeenServer(serverNotes); // adjusting state during render, the documented pattern for "props changed"
+    if (text === base && conflict === null) { setText(serverNotes); setBase(serverNotes); }
+  }
+
+  const save = async (value: string, expected: string) => {
+    setState('saving'); setMessage(null);
+    try {
+      await apiSaveNotes(teamId, value.trim(), expected);
+      setBase(value.trim()); setText(value.trim()); setConflict(null); setState('saved');
+      void qc.invalidateQueries({ queryKey: ['team', teamId] });
+      void qc.invalidateQueries({ queryKey: ['audit'] });
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'CONFLICT' && typeof e.details?.currentNotes === 'string') {
+        setConflict(e.details.currentNotes); setState('idle');
+      } else {
+        setState('error'); setMessage((e as Error).message);
+      }
+    }
+  };
+
+  return (
+    <Card className="console-surface">
+      <CardHeader className="border-b border-[var(--border)]"><CardTitle className="flex items-center justify-between">Notes <span className="text-xs font-normal text-[var(--text-subtle)]" aria-live="polite">{state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved' : state === 'error' ? 'Not saved' : text !== base ? 'Unsaved, saves when you leave the box' : ''}</span></CardTitle></CardHeader>
+      <CardContent className="space-y-2 pt-3">
+        <label className="sr-only" htmlFor="team-notes-inline">Team notes</label>
+        <textarea id="team-notes-inline" value={text} maxLength={500} onChange={(e) => { setText(e.target.value); setState('idle'); }}
+          onBlur={() => { if (text.trim() !== base && conflict === null) void save(text, base); }}
+          placeholder="Operational notes, contacts, what was tried" className="min-h-24 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] p-2 text-sm" />
+        {state === 'error' && <p role="alert" className="text-sm text-[var(--bad)]">{message}</p>}
+        {conflict !== null && (
+          <div role="alert" className="rounded-lg border border-[var(--warn)]/50 bg-[var(--warn)]/10 p-3 text-sm">
+            <p className="font-medium text-[var(--warn)]">Someone else changed these notes.</p>
+            <p className="mt-1 whitespace-pre-wrap text-[var(--muted)]">Their version: {conflict || '(empty)'}</p>
+            <div className="mt-2 flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => { setText(conflict); setBase(conflict); setConflict(null); }}>Use their version</Button>
+              <Button size="sm" onClick={() => void save(text, conflict)}>Overwrite with mine</Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 /** Failing services first: reachability fail, then functional fail, then unknown/stale. */
 function serviceRank(service: { stale?: boolean; checks: { type: string; status: string }[] }): number {
@@ -41,13 +102,12 @@ function TeamDetailsForm({
   onOpenDelete,
 }: {
   team: { id: string; name: string; notes: string; accountStatus: string; createdAt: string; updatedAt: string };
-  onUpdate: (patch: { name?: string; notes?: string }) => void;
+  onUpdate: (patch: { name?: string }) => void;
   isUpdating: boolean;
   onOpenStatus: () => void;
   onOpenDelete: () => void;
 }) {
   const [name, setName] = useState(team.name);
-  const [notes, setNotes] = useState(team.notes);
 
   return (
     <Card className="console-surface">
@@ -64,24 +124,14 @@ function TeamDetailsForm({
             maxLength={60}
           />
         </label>
-        <label className="block text-sm font-medium" htmlFor="team-notes">
-          Notes
-          <textarea
-            id="team-notes"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            maxLength={500}
-            className="mt-1 min-h-24 w-full rounded-lg border border-[var(--border)] bg-[var(--panel-2)] p-2 text-sm"
-            placeholder="Add operational notes or team contacts..."
-          />
-        </label>
+        
         <p className="text-xs text-[var(--muted)]">
           Created {formatTimestamp(team.createdAt)} · Updated {formatTimestamp(team.updatedAt)}
         </p>
         <div className="flex flex-wrap gap-2">
           <Button
-            onClick={() => onUpdate({ name: name.trim(), notes: notes.trim() })}
-            disabled={!name.trim() || isUpdating || (name.trim() === team.name && notes.trim() === team.notes)}
+            onClick={() => onUpdate({ name: name.trim() })}
+            disabled={!name.trim() || isUpdating || name.trim() === team.name}
           >
             {isUpdating ? 'Saving…' : 'Save details'}
           </Button>
@@ -132,6 +182,7 @@ export default function TeamDetailPage() {
   const team = query.data;
   const metaQuery = useMeta();
   const staleAfter = metaQuery.data?.health.staleAfterSec;
+  useEffect(() => { if (team) pushRecentTeam({ id: team.id, name: team.name }); }, [team?.id, team?.name]); // eslint-disable-line react-hooks/exhaustive-deps
   const caps = metaQuery.data?.capabilities;
   const qc = useQueryClient();
   const [resetReason, setResetReason] = useState('');
@@ -274,7 +325,7 @@ export default function TeamDetailPage() {
           {team.environment.lastDeploy && <div className="flex justify-between"><span className="text-[var(--muted)]">Last deploy</span><span className="font-mono text-xs">{team.environment.lastDeploy.result} · v{team.environment.lastDeploy.version}</span></div>}
           {team.environment.terminal?.url ? <div className="border-t border-[var(--border)] pt-3"><div className="mb-1 text-xs text-[var(--muted)]">{team.environment.terminal.isMock ? 'Terminal (simulated placeholder)' : 'Terminal'}: available, {team.environment.terminal.mode === 'per_team' ? 'per team' : 'shared'}, port {team.environment.terminal.port}</div>{showTerminal ? <div className="flex items-center gap-2"><a className="min-w-0 flex-1 break-all font-mono text-xs text-[var(--accent)] hover:underline" href={team.environment.terminal.url} target="_blank" rel="noreferrer noopener">{team.environment.terminal.url}</a><button type="button" className="rounded p-1.5 text-[var(--muted)] hover:bg-[var(--panel-2)] hover:text-[var(--accent)]" aria-label="Copy terminal link" onClick={() => navigator.clipboard.writeText(team.environment.terminal?.url ?? '')}><Copy size={14} /></button><ExternalLink size={13} className="shrink-0 text-[var(--muted)]" aria-hidden="true" /></div> : <Button size="sm" variant="outline" onClick={() => setShowTerminal(true)}>Show terminal link</Button>}</div> : <p className="border-t border-[var(--border)] pt-3 text-xs text-[var(--muted)]">Terminal is not available while this environment is not running.</p>}
         </CardContent></Card>
-        <div className="space-y-4 xl:col-span-2"><Card className="console-surface"><CardHeader className="border-b border-[var(--border)]"><CardTitle className="flex items-center justify-between">Services <Button size="sm" variant="outline" onClick={() => setTab('services')}>Open services</Button></CardTitle></CardHeader><CardContent className="pt-3"><ul className="divide-y divide-[var(--border)] text-sm">{team.environment.services.map((service) => { const reach = service.checks.find((c) => c.type === 'reachability'); const functional = service.checks.find((c) => c.type === 'functional'); return <li key={service.key} className="flex flex-wrap items-center justify-between gap-2 py-2"><span className="font-medium">{service.name}</span><span className="flex items-center gap-3"><FlagstoreDots flagstores={service.flagstores} stale={service.stale} /><CheckStatus status={reach?.status ?? 'unknown'} detail={reach?.detail} /><CheckStatus status={functional?.status ?? 'unknown'} detail={functional?.detail} /></span></li>; })}</ul></CardContent></Card><Card className="console-surface"><CardHeader className="border-b border-[var(--border)]"><CardTitle className="flex items-center justify-between">Resource usage <span className="text-xs font-normal text-[var(--muted)]">{team.environment.resources?.isMock ? 'Simulated values' : 'Runtime values'}</span></CardTitle></CardHeader><CardContent className="pt-4"><ResourceBars resources={team.environment.resources} /></CardContent></Card></div>
+        <div className="space-y-4 xl:col-span-2"><Card className="console-surface"><CardHeader className="border-b border-[var(--border)]"><CardTitle className="flex items-center justify-between">Services <Button size="sm" variant="outline" onClick={() => setTab('services')}>Open services</Button></CardTitle></CardHeader><CardContent className="pt-3"><ul className="divide-y divide-[var(--border)] text-sm">{team.environment.services.map((service) => { const reach = service.checks.find((c) => c.type === 'reachability'); const functional = service.checks.find((c) => c.type === 'functional'); return <li key={service.key} className="flex flex-wrap items-center justify-between gap-2 py-2"><span className="font-medium">{service.name}</span><span className="flex items-center gap-3"><FlagstoreDots flagstores={service.flagstores} stale={service.stale} /><CheckStatus status={reach?.status ?? 'unknown'} detail={reach?.detail} /><CheckStatus status={functional?.status ?? 'unknown'} detail={functional?.detail} /></span></li>; })}</ul></CardContent></Card><Card className="console-surface"><CardHeader className="border-b border-[var(--border)]"><CardTitle className="flex items-center justify-between">Resource usage <span className="text-xs font-normal text-[var(--muted)]">{team.environment.resources?.isMock ? 'Simulated values' : 'Runtime values'}</span></CardTitle></CardHeader><CardContent className="pt-4"><ResourceBars resources={team.environment.resources} /></CardContent></Card><NotesCard teamId={team.id} serverNotes={team.notes} /></div>
       </div>}
 
       {tab === 'services' && <div><Card className="console-surface"><CardHeader className="border-b border-[var(--border)]"><CardTitle className="flex items-center justify-between">Services <Button size="sm" variant="outline" onClick={() => health.mutate(team.id)} disabled={health.isPending || team.lifecycleState !== 'running'}>{health.isPending ? 'Checking…' : 'Run check now'}</Button></CardTitle></CardHeader><CardContent className="overflow-x-auto pt-4"><Table className="text-[13px] [&_td]:px-2 [&_th]:px-2"><TableHeader><TableRow><TableHead>Service</TableHead><TableHead>Reachability</TableHead><TableHead>Functional</TableHead><TableHead>Flagstores</TableHead><TableHead>Detail</TableHead><TableHead>Last checked</TableHead>{caps?.serviceLevelReset && <TableHead>Actions</TableHead>}</TableRow></TableHeader><TableBody>{[...team.environment.services].sort((a, b) => serviceRank(b) - serviceRank(a)).map((service) => { const reach = service.checks.find((c) => c.type === 'reachability'); const functional = service.checks.find((c) => c.type === 'functional'); const failing = reach?.status === 'fail' || functional?.status === 'fail'; return <TableRow key={service.key} className={failing ? 'bg-[var(--bad)]/5' : undefined}><TableCell className="max-w-[200px] whitespace-normal"><div className="font-medium">{service.name}</div><div className="font-mono text-xs text-[var(--muted)]">:{service.port}{service.placeholder ? ' · placeholder' : ''}</div></TableCell><TableCell><CheckStatus status={reach?.status ?? 'unknown'} detail={reach?.detail} /></TableCell><TableCell><CheckStatus status={functional?.status ?? 'unknown'} detail={functional?.detail} /></TableCell><TableCell><FlagstoreDots flagstores={service.flagstores} stale={service.stale} />{service.stale && <div className="mt-1 text-xs text-[var(--warn)]">Stale (over {staleAfter ?? 270} s)</div>}</TableCell><TableCell className="max-w-[140px] truncate text-xs text-[var(--muted)]" title={reach?.detail ?? functional?.detail ?? ''}>{reach?.detail ?? functional?.detail ?? 'No checker detail'}</TableCell><TableCell><RelativeTime ts={reach?.lastCheckedAt ?? functional?.lastCheckedAt} /></TableCell>{caps?.serviceLevelReset && <TableCell><div className="flex gap-1"><Button size="sm" variant="ghost" disabled={!serviceActionable} title={serviceActionable ? undefined : serviceBlockReason} onClick={() => { setSvcError(null); setServiceDialog({ key: service.key, name: service.name, kind: 'restart' }); }}><RotateCw size={13} />Restart</Button><Button size="sm" variant="ghost" disabled={!serviceActionable} title={serviceActionable ? undefined : serviceBlockReason} onClick={() => { setSvcError(null); setSvcReason(''); setSvcTyped(''); setServiceDialog({ key: service.key, name: service.name, kind: 'reset' }); }}><RotateCcw size={13} />Reset</Button></div></TableCell>}</TableRow>; })}</TableBody></Table></CardContent></Card></div>}

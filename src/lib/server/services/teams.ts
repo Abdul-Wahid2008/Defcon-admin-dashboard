@@ -195,7 +195,7 @@ export async function updateTeam(
   user: SessionUser,
   teamId: string,
   patch: UpdateTeamInput,
-  opts: { requestId: string },
+  opts: { requestId: string; expectedNotes?: string },
 ) {
   if (!can(user, 'team.update', { teamId })) {
     appendAudit({
@@ -220,6 +220,11 @@ export async function updateTeam(
   const adapter = getAdapter();
   const prev = await adapter.getTeam(teamId);
   if (!prev) throw new AppError('NOT_FOUND', `Team ${teamId} not found.`);
+
+  // Conflict-safe notes: the client sends the notes it loaded; if someone else changed them since, refuse and return theirs.
+  if (opts.expectedNotes !== undefined && patch.notes !== undefined && prev.notes !== opts.expectedNotes) {
+    throw new AppError('CONFLICT', 'The notes were changed by someone else. Review their version before saving.', { currentNotes: prev.notes });
+  }
 
   const team = await adapter.updateTeam(teamId, patch);
 

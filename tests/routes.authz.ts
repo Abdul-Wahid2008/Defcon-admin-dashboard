@@ -38,6 +38,7 @@ const adminOnly = { admin: 'allow', operator: 'deny', team: 'deny' } as const;
 
 export const AUTHZ: Record<string, AuthzCase[]> = {
   '/api/alerts': [{ method: 'GET', ...organizerOnly }],
+  '/api/alerts/[id]/ack': [{ method: 'POST', params: { id: 'a_missing' }, body: {}, ...organizerOnly }],
   '/api/audit': [{ method: 'GET', ...organizerOnly }],
   '/api/audit/export.csv': [{ method: 'GET', ...organizerOnly }],
 

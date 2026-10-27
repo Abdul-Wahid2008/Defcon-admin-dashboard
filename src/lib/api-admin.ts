@@ -58,3 +58,24 @@ export async function apiServiceAction(
   });
   return handleResponse<{ correlationId: string; estimatedEndsAt: string }>(res);
 }
+
+// Alerts and notes (v1.2 W6)
+export const apiAckAlert = (id: string, input: { note?: string; resolve?: boolean }) =>
+  post<{ id: string; status: string }>(`/api/alerts/${encodeURIComponent(id)}/ack`, input);
+
+export async function apiSaveNotes(teamId: string, notes: string, expectedNotes: string) {
+  const res = await fetch(`/api/teams/${encodeURIComponent(teamId)}`, {
+    method: 'PATCH',
+    headers: defaultHeaders(),
+    body: JSON.stringify({ notes, expectedNotes }),
+    credentials: 'same-origin',
+  });
+  return handleResponse<{ notes: string; updatedAt: string }>(res);
+}
+
+export async function apiRunCheck(teamId: string) {
+  const res = await fetch(`/api/teams/${encodeURIComponent(teamId)}/health/run`, {
+    method: 'POST', headers: defaultHeaders(), credentials: 'same-origin',
+  });
+  return handleResponse<{ health: string }>(res);
+}

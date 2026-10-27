@@ -296,3 +296,9 @@ Anything the orchestrator cannot supply is shown as "not available" in the UI (`
 - `OverviewData.grid[].services[]` `{key,name,reachability,functional,stale,flagstores[]}` (stale-aware) feeds the teams × services matrix. `OverviewData.event` `{phase|null, currentRound|null, roundSec, startedAt|null, source, phaseMinutes}`; phase is derived from the admin-set `event_start_iso` and phase lengths 45/165/30 min (settings `phase_*_min`; UNCONFIRMED, docs/12 C8). `phase=null` means "Event clock not set".
 - `GET/PATCH /api/settings` carry `eventStartIso` (ISO string or null to clear; admin only, audited as `settings.update`).
 - `/api/meta.capabilities.fullyReal` (false for every adapter today); the LIVE badge needs `EVIDENCE_GATE_PASSED=true` **and** `fullyReal`.
+
+### v1.2 W6 — operator workflows (CONTRACT CHANGE, additive)
+- `POST /api/alerts/{id}/ack` `{note?: ≤300 chars, resolve?: boolean}` (permission `alert.ack`; frozen → 423) → `{id, status: acknowledged|resolved|already_acknowledged|already_resolved}`. Audit action `alert.ack` (actor = the organizer, `details {alertId, kind, resolved, note}`). Acknowledging keeps the alert open and keeps its dedupe key, so repeats of the same failure create no new row; a manual resolve is overridden by the next health batch if the failure is still present (a new alert opens, audited as `alert.open`).
+- `Alert` gains `ackedAt`, `ackedBy`, `ackNote`; `OverviewData.openAlertCount` = open and unacknowledged alerts (sidebar badge). Migration 004 adds `alerts.acked_at/acked_by/ack_note`.
+- `PATCH /api/teams/{id}` accepts `expectedNotes`: when it differs from the stored notes the call fails with 409 `CONFLICT` and `details.currentNotes`; nothing is written.
+- UI only: overview `?view=incidents`, command palette (Ctrl/Cmd+K), shortcut help (`?`), recent teams (browser localStorage, convenience only), bulk dialog with per-team progress.

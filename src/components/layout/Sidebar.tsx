@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Users, ScrollText, Settings, Shield, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useMeta } from '@/lib/queries';
+import { useMeta, useOverview } from '@/lib/queries';
 
 interface NavItem {
   href: string;
@@ -27,6 +27,7 @@ interface SidebarProps {
 export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
   const { data: meta } = useMeta();
+  const openAlerts = useOverview().data?.openAlertCount ?? 0;
 
   const visibleItems = NAV_ITEMS.filter(
     item => !item.adminOnly || role === 'organizer_admin',
@@ -71,6 +72,7 @@ export function Sidebar({ role }: SidebarProps) {
             >
               <Icon size={16} aria-hidden="true" />
               {item.label}
+              {item.href === '/overview' && openAlerts > 0 && <span className="ml-auto rounded-full bg-[var(--bad)] px-1.5 text-[11px] font-semibold tabular-nums text-[var(--bg)]" aria-label={`${openAlerts} unacknowledged alerts`}>{openAlerts}</span>}
             </Link>
           );
         })}

@@ -6,8 +6,11 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowDown, ArrowUp, ArrowUpDown, FileUp, MoreHorizontal, Plus, Search, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
+import { apiListTeams } from '@/lib/api-client';
+import { useRecentTeams } from '@/lib/recent-teams';
 import { useBulkEnvironmentAction, useCreateTeam, useImportTeams, useTeams } from '@/lib/queries';
-import type { IssuedCredential, TeamImportResponse, TeamSummary } from '@/lib/schemas';
+import type { BulkEnvActionResponse, IssuedCredential, TeamImportResponse, TeamSummary } from '@/lib/schemas';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -167,20 +170,74 @@ function ImportDialog({ onClose, onCredentials }: { onClose: () => void; onCrede
 
 function BulkDialog({ action, teams, onClose }: { action: 'start' | 'stop'; teams: TeamSummary[]; onClose: () => void }) {
   const [confirmation, setConfirmation] = useState('');
+  const [result, setResult] = useState<BulkEnvActionResponse | null>(null);
+  const [requestedAt, setRequestedAt] = useState(0);
+  const announced = useRef(false);
+  // Names are captured when the dialog opens: the list behind it refetches and the selection may no longer match its filter.
+  const [names] = useState(() => new Map(teams.map((t) => [t.id, t.name])));
   const bulk = useBulkEnvironmentAction();
   const expected = action === 'start' ? 'START ALL' : 'STOP ALL';
+  const finalState = action === 'start' ? 'running' : 'stopped';
   const requiresConfirmation = teams.length >= 5;
   const submit = () => bulk.mutate({ action, teamIds: teams.map((team) => team.id), ...(requiresConfirmation ? { confirm: confirmation } : {}) }, {
-    onSuccess: (result) => { const accepted = result.results.filter((item) => item.status === 'accepted').length; const rejected = result.results.filter((item) => item.status === 'rejected').length; toast.success(`${accepted} accepted, ${result.results.length - accepted - rejected} no-op, ${rejected} rejected`); onClose(); },
+    onSuccess: (r) => { setRequestedAt(Date.now()); setResult(r); },
   });
+
+  // After the request, follow every accepted team until its polled state matches the expected outcome.
+  const progress = useQuery({
+    queryKey: ['bulk-progress', action, teams.map((t) => t.id)],
+    queryFn: () => apiListTeams({ pageSize: 100 }),
+    enabled: !!result,
+    refetchInterval: 2000,
+  });
+  const rows = useMemo(() => (result?.results ?? []).map((r) => {
+    const live = progress.data?.items.find((t) => t.id === r.teamId);
+    const fresh = (progress.dataUpdatedAt ?? 0) > requestedAt; // ignore a list fetched before the request
+    let status: 'done' | 'working' | 'failed' | 'refused' | 'noop' = 'working';
+    if (r.status === 'rejected') status = 'refused';
+    else if (r.status === 'noop') status = 'noop';
+    else if (live && fresh && !live.pending) status = live.lifecycleState === finalState ? 'done' : live.lifecycleState === 'failed' ? 'failed' : 'working';
+    return { ...r, name: names.get(r.teamId) ?? r.teamId, status };
+  }), [result, progress.data, progress.dataUpdatedAt, requestedAt, finalState, names]);
+
+  const settled = !!result && rows.every((r) => r.status !== 'working');
+  useEffect(() => {
+    if (!settled || announced.current) return;
+    announced.current = true;
+    const done = rows.filter((r) => r.status === 'done').length;
+    const bad = rows.filter((r) => r.status === 'failed' || r.status === 'refused');
+    if (bad.length === 0) toast.success(`${done} environment${done === 1 ? '' : 's'} ${finalState}${rows.length - done ? `, ${rows.length - done} already were` : ''}`);
+    else toast.error(`${bad.length} of ${rows.length} did not ${action}: ${bad.map((r) => r.teamId).join(', ')}`, { duration: Infinity });
+  }, [settled, rows, finalState, action]);
+
+  const label: Record<string, string> = { done: `Now ${finalState}`, working: 'In progress', failed: 'Failed. Open the team for the reason', refused: 'Refused', noop: `Already ${finalState}` };
   return <Overlay onClose={onClose} labelledBy="bulk-dialog-title" describedBy="bulk-dialog-description">
-    <h2 id="bulk-dialog-title" className="mb-2 text-lg font-semibold">{action === 'start' ? 'Start' : 'Stop'} selected environments?</h2>
-    <p id="bulk-dialog-description" className="text-sm text-[var(--muted)]">This will process {teams.length} selected team(s) independently using the same single-team rules.</p>
-    {action === 'stop' && <p className="mt-2 text-sm text-[var(--warn)]">Environments are retained; active terminal sessions will end.</p>}
-    {requiresConfirmation && <label className="mt-4 block text-sm">Type <strong>{expected}</strong> to confirm<Input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} className="mt-1" /></label>}
-    {bulk.error && <p className="mt-3 text-sm text-[var(--bad)]">{bulk.error.message}</p>}
-    <div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={onClose}>Cancel</Button><Button disabled={bulk.isPending || (requiresConfirmation && confirmation !== expected)} onClick={submit}>{bulk.isPending ? 'Processing…' : ` ${action === 'start' ? 'Start' : 'Stop'} environments`}</Button></div>
+    <h2 id="bulk-dialog-title" className="mb-2 text-lg font-semibold">{action === 'start' ? 'Start' : 'Stop'} {teams.length === 1 ? teams[0].id : `${teams.length} environments`}?</h2>
+    {!result ? <>
+      <p id="bulk-dialog-description" className="text-sm text-[var(--muted)]">Each selected team is processed on its own with the single-team rules. Progress for every team is shown here.</p>
+      {action === 'stop' && <p className="mt-2 text-sm text-[var(--warn)]">Environments are retained; active terminal sessions will end.</p>}
+      {requiresConfirmation && <label className="mt-4 block text-sm">Type <strong>{expected}</strong> to confirm<Input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} className="mt-1 border-[var(--border-strong)] bg-[var(--surface-inset)]" /></label>}
+      {bulk.error && <p role="alert" className="mt-3 text-sm text-[var(--bad)]">{bulk.error.message}</p>}
+      <div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={onClose}>Cancel</Button><Button disabled={bulk.isPending || (requiresConfirmation && confirmation !== expected)} onClick={submit}>{bulk.isPending ? 'Sending…' : `${action === 'start' ? 'Start' : 'Stop'} ${teams.length === 1 ? 'environment' : 'environments'}`}</Button></div>
+    </> : <>
+      <p id="bulk-dialog-description" className="text-sm text-[var(--muted)]" aria-live="polite">{settled ? 'Finished.' : `Waiting for ${rows.filter((r) => r.status === 'working').length} of ${rows.length} to reach ${finalState}…`}</p>
+      <ul className="mt-3 max-h-72 divide-y divide-[var(--border)] overflow-auto rounded border border-[var(--border)] text-sm" aria-label="Progress per team">
+        {rows.map((r) => <li key={r.teamId} className="flex items-center justify-between gap-3 px-3 py-1.5"><span><span className="font-mono text-xs text-[var(--text-subtle)]">{r.teamId}</span> {r.name}</span><span className={r.status === 'done' ? 'text-[var(--ok)]' : r.status === 'failed' || r.status === 'refused' ? 'text-[var(--bad)]' : 'text-[var(--muted)]'}>{label[r.status]}{r.status === 'refused' && r.code ? ` (${r.code})` : ''}</span></li>)}
+      </ul>
+      <div className="mt-4 flex justify-end"><Button onClick={onClose}>{settled ? 'Close' : 'Close and keep waiting in the background'}</Button></div>
+    </>}
   </Overlay>;
+}
+
+function RecentStrip() {
+  const recent = useRecentTeams();
+  if (!recent.length) return null;
+  return (
+    <nav aria-label="Recently opened teams" className="mb-3 flex flex-wrap items-center gap-2 text-xs text-[var(--text-subtle)]">
+      <span>Recent:</span>
+      {recent.map((t) => <Link key={t.id} href={`/teams/${t.id}`} className="rounded border border-[var(--border)] px-2 py-0.5 hover:border-[var(--accent)] hover:text-[var(--accent)]"><span className="font-mono">{t.id}</span> {t.name}</Link>)}
+    </nav>
+  );
 }
 
 function SortHead({ field, label, sort, onSort }: { field: string; label: string; sort: string; onSort: (next: string) => void }) {
@@ -304,6 +361,7 @@ export default function TeamsPage() {
     <PageHeader title="Teams" description={page ? `Showing ${page.total ? ((page.page - 1) * page.pageSize) + 1 : 0}–${Math.min(page.page * page.pageSize, page.total)} of ${page.total}` : undefined} onRefresh={() => query.refetch()} refreshing={query.isFetching}>
       <Button variant="outline" onClick={() => setShowImport(true)}><Upload size={15} />Import CSV</Button><Button onClick={() => setShowCreate(true)}><Plus size={15} />Create team</Button>
     </PageHeader>
+    <RecentStrip />
     <Card className="console-surface"><CardContent className="p-4">
       <div className="mb-4 flex flex-wrap gap-3"><div className="relative min-w-[240px] flex-1"><Search size={15} className="absolute left-3 top-2.5 text-[var(--muted)]" /><Input className="pl-9" value={search} onChange={(e) => { setSearch(e.target.value); setPageNumber(1); }} id="teams-search" placeholder="Search by team name or ID ( / )" aria-label="Search teams" /></div><select aria-label="Filter by lifecycle state" value={state} onChange={(e) => { setState(e.target.value); setPageNumber(1); }} className="h-8 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-3 text-sm"><option value="">All states</option><option value="running">Running</option><option value="stopped">Stopped</option><option value="failed">Failed</option><option value="starting">Starting</option><option value="stopping">Stopping</option></select><select aria-label="Filter by health" value={healthFilter} onChange={(e) => { setHealthFilter(e.target.value); setPageNumber(1); }} className="h-8 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-3 text-sm"><option value="">All health</option><option value="healthy">Healthy</option><option value="degraded">Degraded</option><option value="down">Down</option><option value="unknown">Unknown</option></select><select aria-label="Filter by account status" value={accountFilter} onChange={(e) => { setAccountFilter(e.target.value); setPageNumber(1); }} className="h-8 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-3 text-sm"><option value="">All accounts</option><option value="active">Active</option><option value="suspended">Suspended</option></select>{(search || state || healthFilter || accountFilter || sort !== 'id' || pageNumber > 1) && <Button size="sm" variant="ghost" onClick={() => { setSearch(''); setTerm(''); setState(''); setHealthFilter(''); setAccountFilter(''); setSort('id'); setPageNumber(1); }}>Clear filters</Button>}</div>
       {selectedTeams.length > 0 && <div className="mb-4 flex items-center justify-between rounded border border-[var(--accent)] bg-[var(--panel-2)] p-3 text-sm"><span aria-live="polite">{selectedTeams.length} of {page?.total ?? 0} selected</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setBulkAction('start')}>Start selected</Button><Button size="sm" variant="outline" onClick={() => setBulkAction('stop')}>Stop selected</Button><Button size="sm" variant="ghost" onClick={() => setSelected([])}>Clear</Button></div></div>}

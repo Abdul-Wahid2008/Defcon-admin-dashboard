@@ -188,6 +188,9 @@ export const AlertSchema = z.object({
   message: z.string(),
   createdAt: z.string().datetime({ offset: true }),
   resolvedAt: z.string().datetime({ offset: true }).nullable(),
+  ackedAt: z.string().nullable().optional(),
+  ackedBy: z.string().nullable().optional(),
+  ackNote: z.string().nullable().optional(),
 });
 export type Alert = z.infer<typeof AlertSchema>;
 
@@ -237,6 +240,7 @@ export const OverviewDataSchema = z.object({
       flagstores: z.array(z.enum(['OK', 'MUMBLE', 'OFFLINE', 'INTERNAL_ERROR', 'UNKNOWN'])),
     })),
   })),
+  openAlertCount: z.number().int(),
   event: z.object({
     phase: z.enum(['not_started', 'peace', 'battle', 'freeze', 'ended']).nullable(),
     currentRound: z.number().int().nullable(),

@@ -973,15 +973,8 @@ export class MockAdapter implements EnvironmentAdapter {
       grid,
       healthSource,
       event: getEventClock(Date.parse(nowTs), healthSource),
-      recentAlerts: recentAlerts.map(a => ({
-        id: a.id,
-        teamId: a.team_id,
-        severity: a.severity,
-        kind: a.kind,
-        message: a.message,
-        createdAt: a.created_at,
-        resolvedAt: a.resolved_at,
-      })),
+      openAlertCount: dbHelper.get<{ n: number }>(`SELECT COUNT(*) AS n FROM alerts WHERE resolved_at IS NULL AND acked_at IS NULL`)?.n ?? 0,
+      recentAlerts: recentAlerts.map(a => this.toAlert(a)),
       recentActivity: recentActivity.map((r: any) => ({
         id: r.id,
         ts: r.ts,
@@ -1000,6 +993,21 @@ export class MockAdapter implements EnvironmentAdapter {
     };
   }
 
+  private toAlert(a: any): Alert {
+    return {
+      id: a.id,
+      teamId: a.team_id,
+      severity: a.severity,
+      kind: a.kind,
+      message: a.message,
+      createdAt: a.created_at,
+      resolvedAt: a.resolved_at,
+      ackedAt: a.acked_at ?? null,
+      ackedBy: a.acked_by ?? null,
+      ackNote: a.ack_note ?? null,
+    };
+  }
+
   async listAlerts(q: { status?: 'open' | 'resolved'; limit?: number }): Promise<Alert[]> {
     const limit = Math.min(q.limit || 20, 200);
     let where = '';
@@ -1010,15 +1018,7 @@ export class MockAdapter implements EnvironmentAdapter {
       `SELECT * FROM alerts ${where} ORDER BY resolved_at IS NOT NULL, created_at DESC LIMIT ?`,
       limit
     );
-    return rows.map(a => ({
-      id: a.id,
-      teamId: a.team_id,
-      severity: a.severity,
-      kind: a.kind,
-      message: a.message,
-      createdAt: a.created_at,
-      resolvedAt: a.resolved_at,
-    }));
+    return rows.map(a => this.toAlert(a));
   }
 
   // Demo controls

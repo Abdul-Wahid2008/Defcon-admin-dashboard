@@ -1,14 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { AlertCircle, ArrowRight, Info, TriangleAlert } from 'lucide-react';
-import { useOverview } from '@/lib/queries';
+import { ArrowRight, Info, TriangleAlert } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { useMeta, useOverview } from '@/lib/queries';
 import type { OverviewData } from '@/lib/schemas';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ActivityList, PageHeader, QueryState } from '@/components/console/DashboardPrimitives';
-import { ServiceMatrix } from '@/components/overview/ServiceMatrix';
+import { ServiceMatrix, teamSeverity } from '@/components/overview/ServiceMatrix';
+import { IncidentList } from '@/components/overview/IncidentList';
+import { AlertsPanel } from '@/components/overview/AlertsPanel';
 import { SourceFreshness } from '@/components/status/SourceFreshness';
-import { RelativeTime } from '@/components/ui/relative-time';
 import { formatTimestamp } from '@/lib/format';
 
 const PHASE_LABEL: Record<NonNullable<OverviewData['event']['phase']>, string> = {
@@ -63,6 +65,8 @@ function Stat({ label, value, href, tone }: { label: string; value: number; href
 export default function OverviewPage() {
   const query = useOverview();
   const data = query.data;
+  const meta = useMeta();
+  const incidents = useSearchParams().get('view') === 'incidents';
 
   return (
     <QueryState loading={query.isLoading} error={query.error} onRetry={() => query.refetch()}>
@@ -95,15 +99,18 @@ export default function OverviewPage() {
 
           <Card className="console-surface mb-4">
             <CardHeader className="border-b border-[var(--border)]">
-              <CardTitle className="flex items-center justify-between">
-                <span>Teams × services</span>
+              <CardTitle className="flex flex-wrap items-center justify-between gap-2">
+                <span role="tablist" aria-label="Overview view" className="flex gap-1">
+                  <Link role="tab" aria-selected={!incidents} href="/overview" className={`rounded px-2 py-1 text-sm ${!incidents ? 'bg-[var(--panel-2)] text-[var(--accent)]' : 'text-[var(--muted)] hover:text-[var(--text)]'}`}>Teams × services</Link>
+                  <Link role="tab" aria-selected={incidents} href="/overview?view=incidents" className={`rounded px-2 py-1 text-sm ${incidents ? 'bg-[var(--panel-2)] text-[var(--accent)]' : 'text-[var(--muted)] hover:text-[var(--text)]'}`}>Incidents <span className="tabular-nums">({data.grid.filter(t => teamSeverity(t) > 0).length})</span></Link>
+                </span>
                 <span className="text-xs font-normal tabular-nums text-[var(--text-subtle)]">
                   {data.services.failingReachability} reachability and {data.services.failingFunctional} functional failures
                 </span>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-3">
-              <ServiceMatrix grid={data.grid} />
+              {incidents ? <IncidentList grid={data.grid} serviceActions={!!meta.data?.capabilities.serviceLevelReset} /> : <ServiceMatrix grid={data.grid} />}
             </CardContent>
           </Card>
 
@@ -112,28 +119,11 @@ export default function OverviewPage() {
               <CardHeader className="border-b border-[var(--border)]">
                 <CardTitle className="flex items-center justify-between">
                   <span>Alerts</span>
-                  <span className="text-xs font-normal tabular-nums text-[var(--text-subtle)]">{data.recentAlerts.filter(a => !a.resolvedAt).length} open</span>
+                  <span className="text-xs font-normal tabular-nums text-[var(--text-subtle)]">{data.openAlertCount} unacknowledged</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-2">
-                {data.recentAlerts.length ? (
-                  <ul className="divide-y divide-[var(--border)]">
-                    {data.recentAlerts.slice(0, 10).map((alert) => (
-                      <li key={alert.id} className="flex gap-3 py-2.5">
-                        <AlertCircle size={16} className={`mt-0.5 shrink-0 ${alert.resolvedAt ? 'text-[var(--idle)]' : alert.severity === 'critical' ? 'text-[var(--bad)]' : alert.severity === 'warning' ? 'text-[var(--warn)]' : 'text-[var(--text-subtle)]'}`} aria-hidden="true" />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm">{alert.message}{alert.resolvedAt && <span className="ml-2 text-xs text-[var(--text-subtle)]">resolved</span>}</div>
-                          <div className="mt-0.5 flex items-center gap-2 text-xs text-[var(--text-subtle)]">
-                            {alert.teamId ? <Link className="font-mono text-[var(--accent)] hover:underline" href={`/teams/${alert.teamId}`}>{alert.teamId}</Link> : 'System'}
-                            <span aria-hidden="true">·</span><RelativeTime ts={alert.createdAt} />
-                          </div>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="py-6 text-sm text-[var(--muted)]">No open alerts.</p>
-                )}
+                <AlertsPanel alerts={data.recentAlerts} />
               </CardContent>
             </Card>
 

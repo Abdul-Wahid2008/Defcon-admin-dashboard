@@ -10,6 +10,8 @@ const PatchTeamBody = z.object({
   name: z.string().min(2).max(60).optional(),
   notes: z.string().max(500).optional(),
   accountStatus: z.enum(['active', 'suspended']).optional(),
+  /** The notes value the client last loaded; a mismatch means someone else edited them (409 CONFLICT). */
+  expectedNotes: z.string().max(500).optional(),
 });
 
 export async function GET(
@@ -45,7 +47,8 @@ export async function PATCH(
         fieldErrors: parsed.error.flatten().fieldErrors,
       });
     }
-    const team = await updateTeam(user, teamId, parsed.data, { requestId });
+    const { expectedNotes, ...patch } = parsed.data;
+    const team = await updateTeam(user, teamId, patch, { requestId, expectedNotes });
     return Response.json(team, { headers: { 'X-Request-Id': requestId } });
   } catch (e) {
     return errorResponse(e, requestId);
