@@ -1,6 +1,6 @@
 {
   "name": "defcon-control-center",
-  "version": "0.1.0",
+  "version": "1.2.0-rc.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -10,7 +10,9 @@
     "test": "vitest run",
     "seed": "tsx --tsconfig tsconfig.scripts.json scripts/seed.ts",
     "reset-demo": "tsx --tsconfig tsconfig.scripts.json scripts/reset-demo.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check-env": "tsx --tsconfig tsconfig.scripts.json scripts/check-env.ts",
+    "start:release": "npm run check-env && next start"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

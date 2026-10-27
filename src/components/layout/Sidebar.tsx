@@ -47,7 +47,7 @@ export function Sidebar({ role }: SidebarProps) {
           <p className="text-sm font-semibold leading-tight text-[var(--text)]">
             DEFCON Control Center
           </p>
-          <p className="mt-1 font-mono text-[10px] text-[var(--muted)]">control plane · v{meta?.version ?? '1.1.0'}</p>
+          <p className="mt-1 font-mono text-[10px] text-[var(--muted)]">control plane · v{meta?.version ?? '…'}</p>
           </div>
         </div>
       </div>
