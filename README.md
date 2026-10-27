@@ -15,7 +15,7 @@ The default adapter is a persistent SQLite-backed mock state machine. It is inte
 ## Development
 
 ```powershell
-npm install --legacy-peer-deps   # a vitest peer range on @types/node needs this flag; `npm ci` works from the lockfile
+npm ci --ignore-scripts   # verified in a fresh clone; plain `npm ci` tries to compile better-sqlite3 (needs Visual Studio C++ build tools) although the package ships a Windows prebuilt binary
 $env:SESSION_SECRET = "replace-with-a-random-secret-at-least-32-characters"
 $env:DB_PATH = "data/defcon.db"
 $env:ADAPTER = "mock"
@@ -80,7 +80,7 @@ This procedure was rehearsed on a temporary, explicitly named test database (`da
 - **Roles**: `organizer_admin` and `organizer_operator` (moderator); operators cannot delete teams or change settings. Admin can manage organizer accounts and sessions through the API.
 - **Freeze**: Settings, admin only, type `FREEZE`. Mutating routes then return `423 MUTATIONS_FROZEN`; reads, the audit log and "Run check" keep working.
 - **Release gate**: `npm run check-env` (also run by `npm run start:release`) refuses weak or placeholder secrets, demo flags, default passwords, an unset or in-memory `DB_PATH`, and invalid adapter or health settings. A local `.env` with `DEMO_CONTROLS=true` makes `next start` fail closed.
-- **Windows start**: `npm ci`, set the release environment, `npm run build`, `npm run start:release`. Event-day procedures: [`docs/EVENT_RUNBOOK.md`](docs/EVENT_RUNBOOK.md).
+- **Windows start**: `npm ci --ignore-scripts`, set the release environment, `npm run build`, `npm run start:release`. Event-day procedures: [`docs/EVENT_RUNBOOK.md`](docs/EVENT_RUNBOOK.md).
 
 ## Verification and production start
 

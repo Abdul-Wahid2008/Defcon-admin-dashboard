@@ -325,6 +325,7 @@ describe('lazy pull, staleness and frozen detection', () => {
     const svc = (await adapter.getTeam(teamId))!.environment.services.find(s => s.key === 'docuvault')!;
     expect(svc.stale).toBe(true);
     expect(svc.checks.every(c => c.status === 'unknown' && c.detail === 'stale')).toBe(true);
+    expect((svc.flagstores ?? []).every(f => f.verdict === 'UNKNOWN')).toBe(true); // a stale OK verdict must not stay green
     expect((await adapter.getTeam(teamId))!.health).toBe('unknown');
   });
 

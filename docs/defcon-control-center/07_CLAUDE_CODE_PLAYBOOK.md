@@ -1,5 +1,7 @@
 # 07 — AI CODING PLAYBOOK (Claude Code first, free fallbacks, Ollama)
 
+> **v1.2 (27 Oct 2026): the slice prompts are now `13_CLAUDE_CODE_MASTERPROMPT.md` + `14_PROMPT_PACK_W0_W9.md`.** P1–P17 below are historical (v1.1, all done).
+
 ## 0. Slice numbering is authoritative
 
 **P1–P15 in §4 (plus P1b, and the conditional P16–P17) are the only slice names.** `BUILD_STATUS.md` must use exactly these. Status on 17 Oct: **P1 ✅, P3 ✅**; next **P1b** (schema delta v1.1), then **P2 Database and migration**, then P4 → P5 → P6. An earlier BUILD_STATUS.md used a different list (e.g. "P2 Mock Backend & Adapter") and pointed at `§5`, which is the review checklist — the prompts live in `§4`. If an AI tool proposes its own roadmap, reject it and paste the corrected status file.

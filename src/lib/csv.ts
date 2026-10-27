@@ -4,7 +4,7 @@
  */
 export function csvCell(value: unknown): string {
   let text = value === null || value === undefined ? '' : String(value);
-  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  if (/^\s*[=+\-@]|^[\t\r]/.test(text)) text = `'${text}`;
   return `"${text.replace(/"/g, '""')}"`;
 }
 

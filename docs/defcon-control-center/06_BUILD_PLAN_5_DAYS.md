@@ -1,5 +1,7 @@
 # 06 — FIVE-DAY BUILD PLAN
 
+> **v1.2 (27 Oct 2026): superseded for planning by slices W0–W9** (`14_PROMPT_PACK_W0_W9.md`, roadmap in `12_V1_2_RECONCILIATION_AND_ROADMAP.md` §10). W0–W7 and W9 are done, W8 (club evidence gate) is blocked on club inputs. Status: `BUILD_STATUS.md`. The five-day plan below is kept as history.
+
 **Assumed calendar** (replace with the real deadline the moment you know it): Day 1 Sat 17 Oct · Day 2 Sun 18 · Day 3 Mon 19 · Day 4 Tue 20 (**feature freeze at end of day**) · Day 5 Wed 21 (rehearsal + fixes only) · Thu 22 Oct emergency buffer.
 
 **Capacity assumption:** about 6–8 productive hours per day with AI doing most typing. Each day has an **exit check** — if it fails at day's end, apply the cut list (§4) immediately rather than carrying debt forward.

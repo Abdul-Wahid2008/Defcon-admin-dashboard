@@ -264,6 +264,8 @@ describe('CSV hardening', () => {
     expect(csvCell('+SUM(A1)')).toBe(`"'+SUM(A1)"`);
     expect(csvCell('-2')).toBe(`"'-2"`);
     expect(csvCell('@cmd')).toBe(`"'@cmd"`);
+    expect(csvCell(' =1+1')).toBe(`"' =1+1"`);
+    expect(csvCell('\n=1+1')).toBe(`"'\n=1+1"`);
     expect(csvCell('\tTAB')).toBe(`"'\tTAB"`);
     expect(csvCell('\rCR')).toBe(`"'\rCR"`);
     expect(csvCell('say "hi", ok')).toBe('"say ""hi"", ok"');

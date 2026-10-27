@@ -127,6 +127,21 @@ P1/P2 criteria are tracked in `06`.
 | A18 | Topology is unclear: spec says one container per team; the pasted compose shows `attackbox` + a `cloudflared` container, and the vulnerable services' placement is not stated. The dashboard treats an "environment" as one logical unit with N services | Lifecycle semantics may need per-container detail |
 | A19 | The console will be used **live** during the 4-hour event, not only demoed, so once P0 is green real control matters more than polish | n/a |
 
+### v1.2 additions (27 Oct 2026): A20–A31, all UNCONFIRMED (source: doc 12 §2)
+
+- A20 One EC2 host (32 GB/16 vCPU) runs ≤20 team stacks + EnoEngine (event-flow draft).
+- A21 nginx serves `/data/scoreboard.json` (and `attack.json`) from EnoEngine — **format unverified**.
+- A22 Round = 90 s.
+- A23 Port formulas: ttyd `7600+id`; service `10000+id*10+offset`.
+- A24 Three flagstores per service.
+- A25 Checker verdicts follow enochecker3 (`OK/MUMBLE/OFFLINE/INTERNAL_ERROR`) — **verify against the club checker**.
+- A26 Reset is admin/operator-only.
+- A27 Dashboard runs on a private network path only (LAN/VPN/SG-restricted), never public.
+- A28 Team roster arrives by CSV/JSON export from registration.
+- A29 Memory cap 1024 MB/team.
+- A30 "Moderator" = `organizer_operator`.
+- A31 Engine team id ↔ dashboard `team-NN` needs an explicit `external_team_id`.
+
 ## 7. Architecture
 
 ### 7.1 Layers

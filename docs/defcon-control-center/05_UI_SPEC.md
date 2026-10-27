@@ -157,3 +157,10 @@ Keyboard reachability for all actions; dialogs trap focus and restore it; `aria-
 ## 9. Component inventory (build order)
 
 `AdapterBadge`, `StateBadge`, `HealthBadge`, `Sidebar`, `Topbar`, `StatCard`, `StateDonut`, `HealthGrid`, `AlertsFeed`, `ActivityList`, `TeamsTable`, `TeamFilters`, `CreateTeamDialog`, `CredentialsRevealDialog`, `ActionBar`, `ConfirmActionDialog`, `DeleteTeamDialog`, `ServiceChecks`, `ResourceBars`, `ParticipantsPanel`, `AuditTable`, `AuditFilters`, `EmptyState`, `ErrorState`, `RelativeTime`, `CopyButton`, `DemoControls`.
+
+## v1.2 additions (built in W5–W6; see BUILD_STATUS.md)
+
+- **Overview matrix** (`/overview`): teams × services with R/F checks and three flagstore dots, worst first; **Incidents** view (`/overview?view=incidents`) lists only teams with a failed environment or failing/stale services, each with the problem in words and the action that applies.
+- **Event clock**, health-source freshness banner, and a SIMULATED/PARTIAL banner that names the health and lifecycle sources.
+- **Command palette** (Ctrl/Cmd+K, `?` for shortcuts), recently opened teams, alert acknowledge with a note, conflict-safe team notes, bulk start/stop with per-team progress.
+- **Copy rules**: plain and specific, no marketing adjectives, no emoji, no placeholder text; reset wording follows `/api/meta.capabilities.resetKind`; stale data reads "unknown", never green; admin-only controls are disabled with a reason (Delete for operators, W9).

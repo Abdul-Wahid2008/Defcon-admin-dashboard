@@ -15,12 +15,13 @@ Say what the badge says. Do not describe SIMULATED data as real.
 ## 1. Start order (Windows, demo machine)
 
 1. Pre-flight on the machine: nothing else on the dashboard port; `data/` on durable disk; power connected.
-2. Release `.env` (never committed): `SESSION_SECRET` (64+ random hex), `DB_PATH` set to a real file, `DEMO_CONTROLS=false`, `ALLOW_DEFAULT_PASSWORDS=false`, non-default `ORGANIZER_ADMIN_PASSWORD` / `ORGANIZER_OPERATOR_PASSWORD`, `ADAPTER` and `HEALTH_SOURCE` chosen. For ingest: `INGEST_TOKEN` of 32+ characters. For scoreboard: `HEALTH_SCOREBOARD_URL` (+ `HEALTH_ALLOWED_HOSTS` if the host differs).
-3. First time on this DB only: `npm run seed` (demo data) or import the real roster from the Teams page (`external_team_id` as third CSV column).
-4. `npm run build` (once per code change), then `npm run start:release`. It runs `check-env` first and refuses to start on a weak or unsafe config; read its message, fix `.env`, retry.
-5. Open the console, log in as admin, confirm the badge matches what you intend, open Settings and check health source freshness and the event clock.
-6. Start the backup task (section 5) and take one manual backup: `npm run backup`.
-7. Log in as operator in a second browser and confirm Delete is disabled for that role.
+2. Fresh checkout only: `npm ci --ignore-scripts` (plain `npm ci` tries to compile better-sqlite3 and fails without Visual Studio C++ build tools).
+3. Release `.env` (never committed): `SESSION_SECRET` (64+ random hex), `DB_PATH` set to a real file, `DEMO_CONTROLS=false`, `ALLOW_DEFAULT_PASSWORDS=false`, non-default `ORGANIZER_ADMIN_PASSWORD` / `ORGANIZER_OPERATOR_PASSWORD`, `ADAPTER` and `HEALTH_SOURCE` chosen. For ingest: `INGEST_TOKEN` of 32+ characters. For scoreboard: `HEALTH_SCOREBOARD_URL` (+ `HEALTH_ALLOWED_HOSTS` if the host differs).
+4. First time on this DB only: `npm run seed` (demo data; it reads the process environment, not `.env`, so export the `.env` values first) or import the real roster from the Teams page (`external_team_id` as third CSV column).
+5. `npm run build` (once per code change), then `npm run start:release` (set `PORT` if 3000 is taken; it defaults to 3000). It runs `check-env` first and refuses to start on a weak or unsafe config; read its message, fix `.env`, retry.
+6. Open the console, log in as admin, confirm the badge matches what you intend, open Settings and check health source freshness and the event clock.
+7. Start the backup task (section 5) and take one manual backup: `npm run backup`.
+8. Log in as operator in a second browser and confirm Delete is disabled for that role.
 
 Do not change the adapter mode during the event. If an integration is unavailable, keep the known-good SIMULATED/PARTIAL release and say so.
 
@@ -62,7 +63,7 @@ Stale means the source has not delivered a result within `stale_after_sec` (defa
 ## 6. Rollback to the last tag
 
 1. `npm run backup`, then stop the server.
-2. `git status` must be clean. `git checkout v1.2.0-rc.1` (the last tag), `npm ci`, `npm run build`, `npm run start:release`.
+2. `git status` must be clean. `git checkout v1.2.0-rc.1` (the last tag), `npm ci --ignore-scripts`, `npm run build`, `npm run start:release`.
 3. Migrations only move forward. Rolling code back over a newer database is safe only if no newer migration ran since the tag; if one did, restore a backup taken before it.
 4. Record what was rolled back and why in the event notes.
 

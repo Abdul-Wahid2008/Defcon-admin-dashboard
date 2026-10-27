@@ -1,12 +1,12 @@
-# BUILD STATUS (27 Oct 2026, verified on the real repo; W7 added at the end of the session)
+# BUILD STATUS (27 Oct 2026, verified on the real repo; W7, W8 and W9 added at the end of the session)
 
-Previous version (W1 only) is in git history (`c3fda66`). This file covers W2–W6, written after all five were built, reviewed and committed.
+Previous version (W1 only) is in git history (`c3fda66`). This file covers W2–W9. W2–W6 were written after those five slices were built, reviewed and committed; W7–W9 were added later the same day.
 
 ## Snapshot
 - Branch `release/v1.2`, version `1.2.0-rc.1`. **Not pushed.** Working tree is clean after the final commit of this session.
-- Done: P1–P17 (v1.1), W0, W1, **W2 health source, W3 security/roles/freeze/accounts, W4 lifecycle capabilities + service actions + agent client, W5 overview matrix + UI copy, W6 operator workflows**. W7 (perf/backup/soak tools) done except the 60-minute soak (10 min run). Not started: W8 (evidence gate with the club), W9 (final hardening, tag, freeze). The tonight dry-run (doc 12 §11) has not been done: it needs the club's real `scoreboard.json` URL and a roster.
+- Done: P1–P17 (v1.1), W0, W1, **W2 health source, W3 security/roles/freeze/accounts, W4 lifecycle capabilities + service actions + agent client, W5 overview matrix + UI copy, W6 operator workflows**. **W7 perf/backup/soak tools (the 60-minute soak was not run; 10 + 20 minutes were), W9 final hardening, runbook and tag.** **W8 (club evidence gate) was NOT executed: it is blocked on club inputs.** The tonight dry-run (doc 12 §11) has not been done: it needs the club's real `scoreboard.json` URL and a roster.
 - Runtime default is unchanged: `ADAPTER=mock` + `HEALTH_SOURCE=mock` → badge **SIMULATED**. `HEALTH_SOURCE=scoreboard|ingest` or `ADAPTER=real|docker-compose` → **PARTIAL**. **LIVE cannot be shown today**: it needs `EVIDENCE_GATE_PASSED=true` and an adapter reporting `capabilities.fullyReal`, and none does.
-- Gates at the end of the session: `npm run typecheck` 0 errors · `npm run lint` 0 errors, 64 warnings (58 before this work; the 6 new ones are unused-variable / `any` warnings in new code and tests, not fixed) · `npm test` **388/388 in 18 files** (was 81/81 in 10 files) · `npm run build` exit 0.
+- Gates at the end of the session (final code, tag `v1.2.0-rc.1`): `npm run typecheck` 0 · `npm run lint` 0 errors, 64 warnings · `npm test` **389/389 in 18 files** (authz matrix 185) · `npm run build` exit 0 · `npm audit --omit=dev` 0 vulnerabilities · fresh-clone rehearsal passed (details under W9).
 - Commits since `c3fda66` (oldest first):
   - `7b01967` feat(health): scoreboard/ingest health source with staleness (W2)
   - `b108ca8` fix(health): apply W2 review findings
@@ -15,7 +15,12 @@ Previous version (W1 only) is in git history (`c3fda66`). This file covers W2–
   - `17ac8ef` feat(lifecycle): capability-driven reset, service actions, agent client (W4)
   - `f6751bd` feat(ui): overview matrix, event clock, teams table, tabs, copy pass (W5) + W4 review fixes
   - `90b452b` feat(ops): incident view, command palette, alert ack, notes conflict guard, bulk progress (W6)
-  - plus the final commit with W5/W6 review fixes, roster `external_team_id`, docs and this file.
+  - `2c4c3de` feat(ui): W5/W6 review findings, roster `external_team_id`, BUILD_STATUS for W2–W6
+  - `f0f897b` perf: online backup, load/soak tools, `synchronous=NORMAL` (W7)
+  - `51eaab7` chore(release): W8 status, runbook, README v1.2, `shadcn` to devDependencies (W8/W9)
+  - `2b32acd` fix(ui): Delete disabled for non-admin
+  - `fe991c8` fix(lifecycle): clear `failure_reason` on a later success
+  - final commit `chore(release): v1.2.0-rc.1 hardening and runbook` (review fixes, docs, this file), tagged `v1.2.0-rc.1`.
 - Size of the change: 124+ files, about 5.9k lines added. 10 new API routes (route files: 24 → 34), 3 new migrations (003, 004 plus W2 had none beyond 002), 7 new test files.
 
 ---
@@ -82,6 +87,23 @@ Previous version (W1 only) is in git history (`c3fda66`). This file covers W2–
 - Consistency: removed the grid/gradient/shadow on data views, `tabular-nums` on tables, `--idle` → `#94A3B8`, a unit test fails on marketing words in `src/`, and a test fails on hard-coded "SIMULATED" outside the badge components.
 - Evidence: a contrast scan of every text node on `/teams` found exactly 2 failures (the idle colour), fixed; `/` focus, header sort toggling (`?sort=state` → `-state`) and row tabindex checked in the browser; zero console errors. Screenshots `docs/qa/w5-after/`: overview at 1280×800, 1024×768, 1920×1080; teams and team services at 1280. **Not done:** 1440×900 shots, 1920 for teams/detail, a Lighthouse run. `next build` (Turbopack) prints no per-route JS sizes; total client chunks are about 1.4 MB uncompressed. Tab order, dialog focus and Esc were checked for the new dialogs only, not for the whole app.
 
+---
+
+## W6 — Operator workflows
+
+- **Incidents** (`/overview?view=incidents`): only teams with a failed environment, failing or stale services, worst first, each with the problem in words ("DocuVault: reachability fail (flag0 OFFLINE, …)"), Open team, Run check, and Restart <service> for failing services when the adapter supports it (the server still enforces permissions). Verified in a browser.
+- **Command palette** (Ctrl/Cmd+K): recent teams, pages (Incidents; Settings only for admins), teams, "Run check" for running teams; **`?`** opens a shortcut list. A first version crashed on open (cmdk needs a `<Command>` root; the console `CommandDialog` does not add one) — found only by opening it in a browser, fixed and re-verified (open, filter, Esc closes, help opens/closes, zero console errors).
+- **Alerts**: `POST /api/alerts/[id]/ack {note?, resolve?}` (permission `alert.ack`, freeze, audit `alert.ack` with the note). Acknowledge keeps the alert open and stops it counting; resolve closes it and the next real health result reopens it if the failure persists. `openAlertCount` drives a sidebar badge (verified 4 → 3 after an acknowledge, with the audit row). Migration 004.
+- **Notes**: inline card on the team page, autosaves on blur, conflict-safe (`expectedNotes`; a mismatch is 409 with the other organizer's text, and the UI offers "Use their version" or "Overwrite with mine"). Verified in a browser by editing behind the editor's back. Recently opened teams: browser-local list (palette + teams page strip).
+- **Bulk start/stop**: the dialog now stays open and shows per-team progress (In progress → Now running/stopped, Failed, Refused with code, Could not confirm); the success toast appears only when every accepted team's polled state matches, otherwise a persistent error lists the teams that did not. Verified on the two stopped seed teams.
+- Audit CSV export with the current filters was already in place; verified it passes the filters and goes through the new CSV guard (unit-tested).
+- Roster: `external_team_id` is now an optional third CSV column and an optional field on create/import (duplicates skipped or 409), because health rows are matched on it — without it the real dry-run could not have mapped any team.
+
+**W5+W6 review (one combined review, 11 findings).** Applied: unacknowledged alerts could be unreachable (list ordering, limit 25, archived teams excluded from list and badge); false "acknowledged" toast on `already_*`; bulk dialog could hang forever (now "Could not confirm") and its key changed under the user (ids snapshotted); notes saved mid-typing were overwritten; manual-resolve copy now states the condition; Run check refreshes the overview and says "simulated check" under mock health; overview view switch is a `nav` with `aria-current` instead of fake tabs; NaN page/unvalidated sort from the URL; list key collision. Not applied: team-detail tabs still lack the full ARIA tabs pattern (no `tabpanel`, no arrow keys); the notes compare-and-set is two awaits (safe with better-sqlite3, would need one SQL statement for an async adapter); several UI flows are covered only by the browser runs above, not by component tests.
+Note: W5 and W6 got one combined review, not one each as doc 13 asks.
+
+---
+
 ## W7 — Performance, reliability, soak (27 Oct 2026)
 
 **Approach: measure first.** The baseline already beat every target, so no query rewrite was made. Numbers below are from a production build (`next start`, port 3100), temp DB `data/w7.db` seeded with 30 teams (`SEED_TEAMS=30`; seed team names extended from 24 to 30), 3 simulated organizers, mock adapter, this Windows laptop.
@@ -112,18 +134,61 @@ First-load JS per page (all chunks referenced by the served HTML, production bui
 
 ---
 
-## W6 — Operator workflows
+## W8 — Evidence gate with the club (27 Oct 2026): NOT EXECUTED, blocked on the club
 
-- **Incidents** (`/overview?view=incidents`): only teams with a failed environment, failing or stale services, worst first, each with the problem in words ("DocuVault: reachability fail (flag0 OFFLINE, …)"), Open team, Run check, and Restart <service> for failing services when the adapter supports it (the server still enforces permissions). Verified in a browser.
-- **Command palette** (Ctrl/Cmd+K): recent teams, pages (Incidents; Settings only for admins), teams, "Run check" for running teams; **`?`** opens a shortcut list. A first version crashed on open (cmdk needs a `<Command>` root; the console `CommandDialog` does not add one) — found only by opening it in a browser, fixed and re-verified (open, filter, Esc closes, help opens/closes, zero console errors).
-- **Alerts**: `POST /api/alerts/[id]/ack {note?, resolve?}` (permission `alert.ack`, freeze, audit `alert.ack` with the note). Acknowledge keeps the alert open and stops it counting; resolve closes it and the next real health result reopens it if the failure persists. `openAlertCount` drives a sidebar badge (verified 4 → 3 after an acknowledge, with the audit row). Migration 004.
-- **Notes**: inline card on the team page, autosaves on blur, conflict-safe (`expectedNotes`; a mismatch is 409 with the other organizer's text, and the UI offers "Use their version" or "Overwrite with mine"). Verified in a browser by editing behind the editor's back. Recently opened teams: browser-local list (palette + teams page strip).
-- **Bulk start/stop**: the dialog now stays open and shows per-team progress (In progress → Now running/stopped, Failed, Refused with code, Could not confirm); the success toast appears only when every accepted team's polled state matches, otherwise a persistent error lists the teams that did not. Verified on the two stopped seed teams.
-- Audit CSV export with the current filters was already in place; verified it passes the filters and goes through the new CSV guard (unit-tested).
-- Roster: `external_team_id` is now an optional third CSV column and an optional field on create/import (duplicates skipped or 409), because health rows are matched on it — without it the real dry-run could not have mapped any team.
+No input from the club exists in the repository (`docs/club-inputs/` holds only its README): no `template.compose.yml`, no real `scoreboard.json`, no verdict list, no roster export, no agent or named owner, and no recorded authorisation for a destructive test. So **no real read and no real mutation was performed, and no evidence is claimed.** Steps 1–3 of the slice (map the compose template, compare 3 teams against the club's view for 10 minutes, one test team through start/stop/restart/reset) are all still to do.
 
-**W5+W6 review (one combined review, 11 findings).** Applied: unacknowledged alerts could be unreachable (list ordering, limit 25, archived teams excluded from list and badge); false "acknowledged" toast on `already_*`; bulk dialog could hang forever (now "Could not confirm") and its key changed under the user (ids snapshotted); notes saved mid-typing were overwritten; manual-resolve copy now states the condition; Run check refreshes the overview and says "simulated check" under mock health; overview view switch is a `nav` with `aria-current` instead of fake tabs; NaN page/unvalidated sort from the URL; list key collision. Not applied: team-detail tabs still lack the full ARIA tabs pattern (no `tabpanel`, no arrow keys); the notes compare-and-set is two awaits (safe with better-sqlite3, would need one SQL statement for an async adapter); several UI flows are covered only by the browser runs above, not by component tests.
-Note: W5 and W6 got one combined review, not one each as doc 13 asks.
+What was done instead (all recorded, nothing invented):
+- `docs/club-evidence/2026-10-27-w8-status.md`: the missing inputs, what was verified without club access, and the exact steps to run W8 once inputs arrive.
+- `docs/defcon-control-center/10_INTEGRATION_COORDINATION_PLAN.md` §6 release decision record filled: every Evidence cell is "none"; Mock = yes for all rows; Real read = provisional only for health and team identity; Real mutation = agent client vs `scripts/fake-agent.ts` only (start/stop/reset), none for delete/credentials. Release mode: **SIMULATED by default, PARTIAL with a real health source, LIVE not permitted.**
+- `config/services.json`: unchanged, every entry still `nameConfirmed=false`.
+- Badge honesty verified end to end on the fresh clone (W9): with default sources `/api/meta` returns `badge: SIMULATED, adapter mock, sources health/lifecycle mock, fullyReal false`, and starting the server with `EVIDENCE_GATE_PASSED=true` **still** returns `SIMULATED`.
+- Unsupported actions: reset wording and service-level actions follow `/api/meta.capabilities`; the agent adapter starts conservative (`serviceLevelReset=false`, `resetKind=recreate_pristine`, `fullyReal=false`) until the agent answers `GET /v1/capabilities` (`tests/w4-lifecycle.test.ts`). Under the mock the reset dialog says "restored to the latest accepted patch (v2), not the original vulnerable baseline" because `resetKind=restore_patch` there (seen in the browser).
+
+---
+
+## W9 — Final hardening and freeze (27 Oct 2026)
+
+**Full gate (final code, before the tag)**
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | 0 errors |
+| `npm run lint` | 0 errors, 64 warnings (legacy `any`; unchanged from before W7) |
+| `npm test` | **389/389 in 18 files** (388 before W9; +1 regression test for the stale failure reason; two existing tests got one extra assertion each) |
+| Authz matrix (`tests/authz-matrix.test.ts`) | 185/185 |
+| `npm run build` | exit 0 |
+| `npm audit --omit=dev` | **0 vulnerabilities** (was 2 via `shadcn`; `shadcn` is a CLI nothing imports at runtime and moved to devDependencies) |
+| `npm run check-env` on the `.env.example` copy | **fails as it must**: placeholder `SESSION_SECRET`, default admin and operator passwords |
+| `check-env` on a real release env | passes; with `CHECK_RELEASE=1` and `HEALTH_SOURCE=mock` it is refused ("not allowed in a release"); with `HEALTH_SOURCE=ingest` and a 48-hex `INGEST_TOKEN` it passes |
+
+**Fresh-clone rehearsal** (new folder under `%TEMP%`, `git clone` of `release/v1.2`, not the working tree)
+- `npm ci` **fails on this machine**: better-sqlite3 13.0.3 runs `node-gyp rebuild` and there is no Visual Studio C++ toolchain. The package ships a Windows prebuilt binary, and `npm ci --ignore-scripts` works (SQLite 3.53.4 loads, `tsx` runs). README and runbook now say `npm ci --ignore-scripts`. (npm 11.19.1 also lists better-sqlite3, esbuild and unrs-resolver as install scripts "not yet covered by allowScripts"; not changed.) `npm install --package-lock-only` needs `--legacy-peer-deps` because of an existing `vitest@5` peer range on `@types/node`.
+- Release `.env` with random secrets (never printed or committed), seed (24 teams), `npm run build` 18 s, `PORT=3100 npm run start:release` (check-env ran first and passed). Port 3000 and `data/defcon.db` untouched.
+- **3-minute demo script (docs/08 §3) run twice** with Playwright on the production build at 1280×800: login, overview (SIMULATED badge, simulated-health banner, 24 teams, 4 incidents), teams list (24 rows), team-13 detail (Down, DocuVault failing), create team with masked one-time credentials, tick "saved" and close, team provisions to Running, reset team-19 (failed), operator login, audit. Run 1 took 25.4 s of scripted time and run 2 24.7 s, both with **zero console errors** apart from one deliberate 403 probe in run 1. The 1024×768 audit screenshot was checked: sidebar and filters fit, and the table scrolls horizontally with the Message column clipped (desktop-first; not changed). The creation of a new team's Provisioning step was seen in the list on run 1 ("Provisioning…") and in the API on run 2 (`pending:provision` then `running`).
+- **Success toast only after the final state**: reset showed an info toast "Reset requested for team-19" while Resetting and the success toast "team-19 reset complete — running" only once the polled state was Running (17.2 s in run 1, 19.6 s in run 2).
+- Operator: Delete disabled with title "Only administrators can delete teams."; `DELETE /api/teams/team-13` as operator returns **403 FORBIDDEN** (`required: team.delete`), the team stays running, and the audit has a `denied` row (`env.delete`, organizer_operator).
+- Audit pairs: `env.reset` has a `requested` row (admin) and a `success` row (system) with the same correlation id (`c_434747c834ae`, `c_e35d1a3900b9`).
+- A harness slip, not an app bug: a first attempt at run 2 hung on a list row that was on page 2 (26 teams, page size 25); the stopped script kept running for a moment and reset team-13 instead of team-19, which is why team-13 shows healthy afterwards in that rehearsal DB. The DB was re-seeded before the rehearsal that is reported above.
+- **Backup/restore once, on the clone**: `npm run backup` while the server was running, row counts of 9 tables identical to live, `integrity_check` ok, `user_version` 4; then a real restore (server stopped, backup copied over `DB_PATH`, `-wal`/`-shm` deleted, restarted): `/api/meta` ok, admin login 200, 24 teams, audit total 163 (162 backed up plus the new login).
+- **Load test, 2 × 10 minutes on the final build** (24-team seed): window 1 overview p95 15.3 ms, teams p95 13.1 ms, payload 20.1 KB, 0 5xx; window 2 overview p95 13.5 ms, teams p95 10.8 ms, 0 5xx. Memory: **+14.8%** in window 1 (100 to 115 MB, includes warm-up) and **+0.6%** in window 2 (115 to 116 MB). The 60-minute soak was still NOT run; this is 20 minutes, and the plateau is evidence, not proof. Window 1 overlapped with a vitest run and the reviewer; latency was unaffected.
+- The rehearsal ran on commit `fe991c8`; the review fixes (stale flagstore verdicts, CSV guard) and docs came after, and were verified by the unit tests, typecheck, lint and build only, not by a second browser pass.
+
+**Bugs found by running the product and fixed (each committed)**
+1. `2b32acd` Delete was enabled for the operator in the UI (the server already refused it). Now disabled with an explanation. Found only because the demo script says it must be disabled.
+2. `fe991c8` A team that recovered kept showing "Environment needs attention. reset failed (simulated)" while Running and Healthy, because the success path never cleared `failure_reason` (mock and agent adapters share it). Fixed; the regression test fails without the fix (verified by reverting).
+3. Review fixes (below): flagstore verdicts on a stale service now read UNKNOWN instead of OK; the CSV guard now also catches a leading space or newline before `=`, `+`, `-` or `@`.
+
+**W9 review (fresh subagent over `c3fda66..HEAD`, static, 7 findings, no blockers; it also ran the suite: 389/389).**
+- Applied: stale flagstore verdicts, CSV leading-whitespace guard (tests added).
+- Not applied, with reasons: (a) `POST /health/run` has no freeze check: this is a recorded decision (Run check only refreshes data) and the runbook says so; (b) the adapter call runs before the `requested` audit row in `requestLifecycleAction` and the service actions, so a process crash in between would leave an action without a requested row: changing audit ordering is out of bounds for a freeze slice, logged as a known limit; (c) team-role sessions skip the epoch check: team logins are not enabled, noted; (d) three routes read bodies with a hand check instead of one zod schema: not exploitable; (e) two assertions in `permissions.test.ts` and `config.test.ts` were rewritten for documented decisions (team `env.reset` only with `TEAM_SELF_RESET`; `ADAPTER=real` is now valid with the agent adapter), and the reviewer confirmed nothing was weakened.
+- Verified fine by the reviewer: route order everywhere (login and ingest are justified special cases), `can()` before the freeze check, denied rows, bearer-only ingest with constant-time compare, 256 KB body cap and 200-row cap, scoreboard fetch limited by host allow-list, `redirect:'error'`, 5 s timeout and 2 MB cap, unknown health values never `pass`, plaintext passwords only in create/reset responses, no secret logging, no emoji, marketing words or lorem text in the copy. It did not read the UI beyond a copy grep and did not read `apply.ts` in full.
+
+**Docs and release files**
+- `docs/EVENT_RUNBOOK.md`: start order, who holds which secret, freeze procedure, what to say when health is stale, backup cadence, rollback to the last tag, incident table, escalation placeholders (names and phones left blank on purpose), honest limits.
+- README: v1.2 section (sources, capabilities, roles, freeze, ingest, release gate, Windows start), online backup with the Task Scheduler line (written, **not registered** on any machine), restore, load tools, `npm ci --ignore-scripts`.
+- `09_CHANGELOG.md` v1.2.0-rc.1 entry; `01_BLUEPRINT` A20–A31 (UNCONFIRMED); `05_UI_SPEC` v1.2 additions; `06` and `07` marked as superseded by the W0–W9 prompt pack; `10_INTEGRATION_COORDINATION_PLAN` §6 filled. Docs 02, 03, 04 and 08 already carried v1.2 content from earlier slices (grep-checked, not re-audited line by line).
+- Tag `v1.2.0-rc.1` created on the final commit; **not pushed**.
 
 ---
 
@@ -165,11 +230,11 @@ Note: W5 and W6 got one combined review, not one each as doc 13 asks.
 9. Mock health never refreshes flagstore results, so under `HEALTH_SOURCE=mock` the flagstore chips are seed data (labelled via the SIMULATED banner).
 10. `/api/meta` is public for the badge; `terminal.url` is still in the authenticated team payload.
 11. Roster arrives only by CSV/JSON import (no Supabase/TeamSource); the per-IP login bucket is disabled without `TRUST_PROXY`, so brute-force protection there rests on the pair and username limits.
-12. W7 (soak, backup cron, load test), W8, W9 are not started. No 60-minute polling soak, no 20–30 team load test, no backup drill since W1.
+12. Soak and backup: the 60-minute soak was not run (10 + 20 minutes were; memory plateaued), the Task Scheduler backup line is documented but not registered anywhere, and no 30-team full-event load test was run beyond 10 minutes. W8 (club evidence gate) is not executed. The audit `requested` row is written after the adapter call, so a crash in between would leave an action without it (known, not changed at freeze). `POST /health/run` is allowed while frozen by decision. Team-role sessions skip the epoch check (team logins are off).
 
 **Tooling and test**
 13. 64 lint warnings (0 errors). CSP keeps `'unsafe-inline'` scripts (Next inline hydration + a statically prerendered login page).
-14. `npm audit --omit=dev`: 2 transitive findings via `shadcn` (see W3).
+14. `npm audit --omit=dev`: 0 vulnerabilities after `shadcn` moved to devDependencies (W9). A plain `npm ci` fails on Windows without Visual Studio C++ build tools (better-sqlite3 compiles instead of using its prebuilt binary); use `npm ci --ignore-scripts`. `npm install` needs `--legacy-peer-deps` (vitest peer range).
 15. UI flows covered only by browser runs, not component tests: ack dialog, notes conflict UI, bulk dialog, palette selection. The browser checks were run by me through scripted DOM events and screenshots; **keyboard-only and screen-reader passes were not done**, and no real-key presses beyond the `/` and Ctrl+K dispatches.
 16. Lighthouse not run; 1440×900 screenshots not taken.
 17. `next dev` reloads in a loop if a tool writes files inside the repo; browser QA was therefore done on production builds (the three reset-dialog variants needed a dev server and screenshots were written outside the repo for those).
@@ -201,16 +266,17 @@ Note: W5 and W6 got one combined review, not one each as doc 13 asks.
 11. Move `shadcn` to `devDependencies` to clear the production audit findings?
 12. Should operators keep `service.reset`, and should "Run check now" be blocked during a freeze?
 13. Combined W5+W6 review instead of two: acceptable, or should I run a separate one?
-14. Next: do the dry-run as soon as item 1 arrives, then W7 (soak/backup) before W8/W9.
+14. Next: dry-run as soon as item 1 arrives, then W8 with the club. W7 and W9 are done (see their sections); the 60-minute soak and the backup task registration remain for the demo machine.
 
 ## Hazards
 - Port 3000 and `data/defcon.db` belong to a pre-existing server and were never touched. During this session one broad `pkill -f "next start"` was attempted and **blocked by the permission system before it ran**; afterwards servers were stopped only by the PID listening on 3100/3101/3200. QA used ports 3100, 3101, 3200 and temp DBs `data/w2qa.db`, `w3qa.db`, `w4qa.db`, `w6qa.db` (gitignored, left on disk).
 - The local `.env` has `DEMO_CONTROLS=true`, which makes `next start` fail closed; pass explicit env as in the rehearsal steps.
 - `.playwright-mcp/` (browser tool output) is gitignored and can be deleted.
+- W9 rehearsal artifacts: a fresh clone under `%TEMP%\dcc-clone-*` (deleted at the end), temp DBs `data/w7.db`, `data/w7-backups/` and earlier `w2qa`/`w3qa`/`w4qa`/`w6qa` (gitignored, left on disk), random rehearsal credentials only in `%TEMP%` files that were deleted. Ports used: 3100 only; port 3000 and `data/defcon.db` were never touched.
 
 ## Next step
 1. Get the club inputs (questions 1–2, 5–6) and do the dry-run (doc 12 §11): import the real roster with `external_team_id`, point `HEALTH_SCOREBOARD_URL` at the real file, fix the parser, compare 3 teams against the club's scoreboard, record `docs/club-evidence/2026-10-27-dryrun.md`.
-2. W7 remainder: run the full 60-minute `npm run soak` (with `LT_PID`) and register the Task Scheduler backup on the demo machine; optionally soak with the fake scoreboard as health source.
-3. W8 evidence gate with one real team once an agent exists; only then consider `EVIDENCE_GATE_PASSED=true`.
-4. W9: final hardening, tag, freeze.
-To resume: `git status`; `npm run typecheck && npm test` (expect 388/388); read this file and docs 12–15; QA on ports 3100/3101 only, on a production build.
+2. Run **W8** with the club (steps in `docs/club-evidence/2026-10-27-w8-status.md`); only then consider `EVIDENCE_GATE_PASSED=true`.
+3. On the demo machine: run the full 60-minute `npm run soak` (with `LT_PID`), register the Task Scheduler backup, fill the escalation table in `docs/EVENT_RUNBOOK.md`, do one rehearsal from the runbook.
+4. Decide whether to push `release/v1.2` and `v1.2.0-rc.1` (nothing has been pushed), and whether the freeze/deadline is known yet.
+To resume: `git status`; `npm run typecheck && npm test` (expect 389/389); read this file, `docs/EVENT_RUNBOOK.md` and docs 12–15; QA on ports 3100/3101 only, on a production build; install with `npm ci --ignore-scripts`.

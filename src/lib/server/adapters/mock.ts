@@ -237,6 +237,8 @@ export class MockAdapter implements EnvironmentAdapter {
         if (!isStale(lastChecked, nowMs)) continue;
         svc.stale = true;
         svc.checks = svc.checks.map(c => ({ ...c, status: 'unknown', detail: 'stale' }));
+        // a stale flagstore verdict must not read as OK to a client that ignores svc.stale
+        if (svc.flagstores) svc.flagstores = svc.flagstores.map(f => ({ ...f, verdict: 'UNKNOWN' as FlagstoreVerdict }));
       }
     }
     return services;
