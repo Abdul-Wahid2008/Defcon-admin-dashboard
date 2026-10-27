@@ -4,7 +4,7 @@ import type { ChangeEvent, ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Download, Eye, EyeOff, FileUp, Plus, Search, Upload, X } from 'lucide-react';
+import { FileUp, Plus, Search, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBulkEnvironmentAction, useCreateTeam, useImportTeams, useTeams } from '@/lib/queries';
 import type { IssuedCredential, TeamImportResponse, TeamSummary } from '@/lib/schemas';
@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { HealthBadge } from '@/components/status/HealthBadge';
 import { StateBadge } from '@/components/status/StateBadge';
 import { PageHeader, QueryState } from '@/components/console/DashboardPrimitives';
+import { CredentialsReveal } from '@/components/teams/CredentialsReveal';
 import { RelativeTime } from '@/components/ui/relative-time';
 
 type ImportRow = { name: string; participantNames?: string[] };
@@ -130,29 +131,6 @@ function Overlay({
       {children}
     </CardContent></Card>
   </div>;
-}
-
-function CredentialsReveal({ credentials, onClose }: { credentials: IssuedCredential[]; onClose: () => void }) {
-  const [saved, setSaved] = useState(false);
-  const [visible, setVisible] = useState<string[]>([]);
-  const allVisible = visible.length === credentials.length;
-  const toggleVisible = (participantId: string) => setVisible((current) => current.includes(participantId) ? current.filter((id) => id !== participantId) : [...current, participantId]);
-  const copy = (value: string) => { void navigator.clipboard.writeText(value); toast.success('Copied'); };
-  const copyAll = () => copy(credentials.map((item) => `${item.username}\t${item.password}`).join('\n'));
-  const download = () => {
-    const csv = ['participant_id,username,password', ...credentials.map((item) => `${item.participantId},${item.username},${item.password}`)].join('\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    const link = document.createElement('a'); link.href = url; link.download = 'defcon-credentials.csv'; link.click(); URL.revokeObjectURL(url);
-  };
-  return <Overlay labelledBy="credentials-dialog-title" describedBy="credentials-dialog-description">
-    <h2 id="credentials-dialog-title" className="mb-2 text-lg font-semibold">Credentials — save these now</h2>
-    <p id="credentials-dialog-description" className="mb-4 text-sm text-[var(--bad)]">Passwords are shown only once and cannot be retrieved later.</p>
-    <div className="mb-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => setVisible(allVisible ? [] : credentials.map((item) => item.participantId))}>{allVisible ? <EyeOff size={14} /> : <Eye size={14} />}{allVisible ? 'Hide all' : 'Reveal all'}</Button><Button size="sm" variant="outline" onClick={copyAll}>Copy all</Button><Button size="sm" variant="outline" onClick={() => window.print()}>Print</Button></div><div className="overflow-x-auto rounded border border-[var(--border)]"><Table><TableHeader><TableRow><TableHead>Participant</TableHead><TableHead>Username</TableHead><TableHead>Password</TableHead><TableHead /></TableRow></TableHeader><TableBody>
-      {credentials.map((credential) => <TableRow key={credential.participantId}><TableCell>{credential.participantId}</TableCell><TableCell className="font-mono">{credential.username}</TableCell><TableCell><span className="font-mono">{visible.includes(credential.participantId) ? credential.password : '••••••••••••'}</span><button type="button" className="ml-2 rounded p-1 text-[var(--muted)] hover:text-[var(--accent)]" onClick={() => toggleVisible(credential.participantId)} aria-label={`${visible.includes(credential.participantId) ? 'Hide' : 'Reveal'} password for ${credential.username}`}>{visible.includes(credential.participantId) ? <EyeOff size={14} /> : <Eye size={14} />}</button></TableCell><TableCell><Button size="sm" variant="ghost" onClick={() => copy(`${credential.username}\t${credential.password}`)}>Copy</Button></TableCell></TableRow>)}
-    </TableBody></Table></div>
-    <label className="mt-4 flex items-center gap-2 text-sm"><input type="checkbox" checked={saved} onChange={(event) => setSaved(event.target.checked)} /> I have saved these credentials</label>
-    <div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={download}><Download size={15} />Download CSV</Button><Button disabled={!saved} onClick={onClose}>Close</Button></div>
-  </Overlay>;
 }
 
 function ImportDialog({ onClose, onCredentials }: { onClose: () => void; onCredentials: (response: TeamImportResponse) => void }) {

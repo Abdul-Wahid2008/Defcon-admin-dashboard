@@ -14,6 +14,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { HealthBadge } from '@/components/status/HealthBadge';
 import { StateBadge } from '@/components/status/StateBadge';
 import { ActivityList, CheckStatus, PageHeader, QueryState, ResourceBars } from '@/components/console/DashboardPrimitives';
+import { CredentialsReveal } from '@/components/teams/CredentialsReveal';
 import { RelativeTime } from '@/components/ui/relative-time';
 import { formatTimestamp } from '@/lib/format';
 
@@ -231,9 +232,12 @@ export default function TeamDetailPage() {
       <Dialog open={!!statusDialog} onOpenChange={(open) => !open && setStatusDialog(null)}>
         <DialogContent><DialogHeader><DialogTitle>{statusDialog === 'suspended' ? 'Suspend team account?' : 'Reactivate team account?'}</DialogTitle><DialogDescription>{statusDialog === 'suspended' ? 'Suspended teams are marked inactive. The terminal gateway will enforce this once integrated.' : 'Reactivate this team account for organizer-managed access.'}</DialogDescription></DialogHeader>{update.error && <p role="alert" className="text-sm text-[var(--bad)]">{update.error.message}</p>}<DialogFooter><DialogClose render={<Button variant="outline" />}>Cancel</DialogClose><Button onClick={() => { if (statusDialog) update.mutate({ teamId: team.id, patch: { accountStatus: statusDialog } }, { onSuccess: () => setStatusDialog(null) }); }} disabled={update.isPending}>{update.isPending ? 'Saving…' : statusDialog === 'suspended' ? 'Suspend' : 'Reactivate'}</Button></DialogFooter></DialogContent>
       </Dialog>
-      <Dialog open={!!credentialDialog} onOpenChange={(open) => !open && setCredentialDialog(null)}>
-        <DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Save credentials now</DialogTitle><DialogDescription>These passwords are shown once and cannot be retrieved later.</DialogDescription></DialogHeader><div className="overflow-x-auto rounded border border-[var(--border)]"><Table><TableHeader><TableRow><TableHead>Participant</TableHead><TableHead>Username</TableHead><TableHead>Password</TableHead></TableRow></TableHeader><TableBody>{credentialDialog?.map((credential) => <TableRow key={credential.participantId}><TableCell>{credential.participantId}</TableCell><TableCell className="font-mono">{credential.username}</TableCell><TableCell className="font-mono">{credential.password}</TableCell></TableRow>)}</TableBody></Table></div><DialogFooter><DialogClose render={<Button>Close</Button>} /></DialogFooter></DialogContent>
-      </Dialog>
+      {credentialDialog && (
+        <CredentialsReveal
+          credentials={credentialDialog}
+          onClose={() => setCredentialDialog(null)}
+        />
+      )}
     </div>}
   </QueryState>;
 }
