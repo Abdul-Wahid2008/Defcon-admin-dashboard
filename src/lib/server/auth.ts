@@ -26,17 +26,20 @@ export interface SessionUser {
 }
 
 // ── Login limiter (in memory; resets on restart) ─────────────────────────────
-// Three independent fixed-window limits:
+// Fixed-window limits that BLOCK:
 //   ip+username  5 failures / 5 min  → locked 1 min
 //   ip           30 failures / 10 min
-//   username     10 failures / 10 min → locked 5 min across all IPs (an attacker can lock a real account out for 5 min)
+// and one that only SLOWS: failures against a username (from any address) add an increasing delay to the next
+// attempts (see loginDelayMs) but never hard-block it, so someone on the network cannot lock an organizer out.
+// Without TRUST_PROXY every caller shares the 'direct' address, so the ip+username lock is then shared too:
+// `npm run unlock` clears it (docs/EVENT_RUNBOOK.md).
 type Bucket = { count: number; resetAt: number };
 const pairAttempts = new Map<string, Bucket>();
 const ipAttempts = new Map<string, Bucket>();
 const userAttempts = new Map<string, Bucket>();
 const PAIR = { max: 5, window: 5 * 60_000, lock: 60_000 };
 const IP = { max: 30, window: 10 * 60_000 };
-const USER = { max: 10, window: 10 * 60_000, lock: 5 * 60_000 };
+const USER = { window: 10 * 60_000, freeAttempts: 4, stepMs: 250, maxDelayMs: 3000 };
 
 // Every attempt (not just failures) costs a bcrypt hash, so a flood of attempts for many different usernames would
 // saturate the CPU and slow the whole console. One global ceiling; existing sessions are unaffected when it trips.
@@ -75,7 +78,6 @@ export function checkLoginRateLimit(ip: string, username: string, now = Date.now
     retryAfterSec(pairAttempts, `${ip}:${u}`, PAIR.max, now),
     // Without TRUST_PROXY every caller shares the 'direct' bucket, so a per-IP ceiling would lock everyone out.
     ip === 'direct' ? 0 : retryAfterSec(ipAttempts, ip, IP.max, now),
-    retryAfterSec(userAttempts, u, USER.max, now),
   );
   if (retryAfter > 0) {
     throw new AppError('RATE_LIMITED', `Too many login attempts. Retry after ${retryAfter}s.`, { retryAfter });
@@ -88,19 +90,35 @@ export function checkLoginRateLimit(ip: string, username: string, now = Date.now
   }
 }
 
+/** Extra wait before checking the password of a username that keeps failing: 250 ms per failure past the 4th, capped at 3 s. */
+export function loginDelayMs(username: string, now = Date.now()): number {
+  const entry = userAttempts.get(username.toLowerCase());
+  if (!entry || now >= entry.resetAt) return 0;
+  return Math.min(USER.maxDelayMs, Math.max(0, entry.count - USER.freeAttempts) * USER.stepMs);
+}
+
 export function recordLoginFailure(ip: string, username: string, now = Date.now()): void {
   const u = username.toLowerCase();
   const pair = bump(pairAttempts, `${ip}:${u}`, PAIR.window, now);
   if (pair.count >= PAIR.max) pair.resetAt = now + PAIR.lock;
   if (ip !== 'direct') bump(ipAttempts, ip, IP.window, now);
-  const user = bump(userAttempts, u, USER.window, now);
-  if (user.count >= USER.max) user.resetAt = now + USER.lock;
+  bump(userAttempts, u, USER.window, now);
 }
 
 export function clearLoginAttempts(ip: string, username: string): void {
   const u = username.toLowerCase();
   pairAttempts.delete(`${ip}:${u}`);
   userAttempts.delete(u);
+}
+
+/** Bearer token for the unlock route. Shared by the route and scripts/unlock.ts, which has the same SESSION_SECRET in .env. */
+export function unlockToken(secret = process.env.SESSION_SECRET ?? ''): string {
+  return crypto.createHmac('sha256', secret).update('unlock-login-limiter').digest('hex');
+}
+
+/** Clears every login counter (used by the unlock endpoint and by tests). */
+export function resetLoginLimiter(): void {
+  resetLoginLimiterForTests();
 }
 
 export function resetLoginLimiterForTests(): void {

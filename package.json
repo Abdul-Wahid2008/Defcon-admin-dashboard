@@ -15,7 +15,9 @@
     "start:release": "npm run check-env && next start",
     "loadtest": "tsx --tsconfig tsconfig.scripts.json scripts/loadtest.ts",
     "backup": "tsx --tsconfig tsconfig.scripts.json scripts/backup.ts",
-    "soak": "tsx --tsconfig tsconfig.scripts.json scripts/soak.ts"
+    "soak": "tsx --tsconfig tsconfig.scripts.json scripts/soak.ts",
+    "unlock": "tsx --tsconfig tsconfig.scripts.json scripts/unlock.ts",
+    "qa:layout": "tsx --tsconfig tsconfig.scripts.json scripts/qa-layout.ts"
   },
   "engines": {
     "node": ">=20.12"

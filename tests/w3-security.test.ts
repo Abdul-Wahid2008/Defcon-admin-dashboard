@@ -9,7 +9,7 @@ vi.mock('next/headers', () => ({
 }));
 
 import {
-  checkLoginRateLimit, clearLoginAttempts, createSession, getClientIp, login, recordLoginFailure,
+  checkLoginRateLimit, clearLoginAttempts, loginDelayMs, resetLoginLimiter, createSession, getClientIp, login, recordLoginFailure,
   requireUser, resetLoginLimiterForTests, setSessionCookie, clearSessionCookie, type SessionUser,
 } from '../src/lib/server/auth';
 import { dbHelper } from '../src/lib/server/db';
@@ -218,10 +218,33 @@ describe('login limiter', () => {
     expect(() => checkLoginRateLimit('2.2.2.2', 'fresh-name', T + 10 * 60_000 + 1)).not.toThrow();
   });
 
-  it('locks a username for 5 minutes after 10 failures from any addresses', () => {
-    for (let i = 0; i < 10; i++) recordLoginFailure(`10.0.0.${i}`, 'Victim', T);
-    expect(() => checkLoginRateLimit('99.9.9.9', 'victim', T + 1000)).toThrow(/Too many/);
-    expect(() => checkLoginRateLimit('99.9.9.9', 'victim', T + 5 * 60_000 + 1)).not.toThrow();
+  it('never hard-blocks a username across addresses: failures from other IPs only add a delay', () => {
+    for (let i = 0; i < 40; i++) recordLoginFailure(`10.0.0.${i}`, 'Victim', T);
+    expect(() => checkLoginRateLimit('99.9.9.9', 'victim', T + 1000)).not.toThrow();
+    expect(loginDelayMs('victim', T + 1000)).toBe(3000);
+    expect(loginDelayMs('victim', T + 10 * 60_000 + 1)).toBe(0);
+  });
+
+  it('delay grows 250 ms per failure after the 4th and is capped at 3 s', () => {
+    for (let i = 0; i < 4; i++) recordLoginFailure('8.8.8.8', 'dave', T);
+    expect(loginDelayMs('dave', T)).toBe(0);
+    recordLoginFailure('8.8.4.4', 'dave', T);
+    expect(loginDelayMs('dave', T)).toBe(250);
+    expect(loginDelayMs('someone-else', T)).toBe(0);
+  });
+
+  it('an attacker IP cannot lock another IP out of the admin login', () => {
+    for (let i = 0; i < 100; i++) { try { checkLoginRateLimit('6.6.6.6', 'admin', T); } catch { /* locked */ } recordLoginFailure('6.6.6.6', 'admin', T); }
+    expect(() => checkLoginRateLimit('6.6.6.6', 'admin', T + 10)).toThrow(/Too many/);
+    expect(() => checkLoginRateLimit('10.1.1.1', 'admin', T + 10)).not.toThrow();
+  });
+
+  it('resetLoginLimiter clears pair, ip and username counters', () => {
+    for (let i = 0; i < 5; i++) recordLoginFailure('5.5.5.5', 'erin', T);
+    expect(() => checkLoginRateLimit('5.5.5.5', 'erin', T + 10)).toThrow(/Too many/);
+    resetLoginLimiter();
+    expect(() => checkLoginRateLimit('5.5.5.5', 'erin', T + 10)).not.toThrow();
+    expect(loginDelayMs('erin', T + 10)).toBe(0);
   });
 
   it('a successful login clears the pair and username counters', () => {

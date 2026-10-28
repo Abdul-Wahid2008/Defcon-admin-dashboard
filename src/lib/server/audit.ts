@@ -3,7 +3,7 @@ import { dbHelper } from './db';
 import crypto from 'node:crypto';
 
 export type AuditAction =
-  | 'auth.login' | 'auth.login_failed' | 'auth.logout' | 'audit.access_denied'
+  | 'auth.login' | 'auth.login_failed' | 'auth.limiter_reset' | 'auth.logout' | 'audit.access_denied'
   | 'team.create' | 'team.update' | 'team.suspend' | 'team.reactivate' | 'team.delete'
   | 'env.provision' | 'env.start' | 'env.stop' | 'env.reset' | 'env.delete'
   | 'participant.add' | 'participant.remove' | 'credential.issue' | 'credential.rotate'

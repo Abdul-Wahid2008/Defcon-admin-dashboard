@@ -178,10 +178,34 @@ html { color-scheme: dark; }
 }
 
 /* ── Scrollbar styling ────────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--panel); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+/* The page scrollbar always reserves its gutter so pages with and without scrolling align. */
+.console-scroll { scrollbar-gutter: stable; }
+
+/* One page container shared by the topbar, banners and content: same edges at every width. */
+:root { --page-gutter: clamp(16px, 2vw, 32px); --page-max: 1680px; }
+.page-container {
+  width: 100%;
+  max-width: var(--page-max);
+  margin-inline: auto;
+  padding-inline: var(--page-gutter);
+}
+
+/* Teams table: checkbox + team name stay left, row actions stay right while the middle columns scroll. */
+.sticky-cols tr > :first-child { position: sticky; left: 0; z-index: 1; width: 40px; min-width: 40px; background: var(--panel); }
+.sticky-cols tr > :nth-child(2) { position: sticky; left: 40px; z-index: 1; background: var(--panel); }
+.sticky-cols tr > :last-child { position: sticky; right: 0; z-index: 1; background: var(--panel); }
+.sticky-cols tbody tr:hover > *, .sticky-cols tbody tr:focus-visible > * { background: var(--panel-2); }
+
+/* Wide tables scroll inside their own container; shadows on the clipped edges show that more is off-screen. */
+[data-qa-scroll] {
+  min-width: 0;
+  background:
+    linear-gradient(to right, var(--panel) 30%, transparent) left center / 32px 100% no-repeat local,
+    linear-gradient(to left, var(--panel) 30%, transparent) right center / 32px 100% no-repeat local,
+    linear-gradient(to right, rgb(0 0 0 / 0.45), transparent) left center / 12px 100% no-repeat scroll,
+    linear-gradient(to left, rgb(0 0 0 / 0.45), transparent) right center / 12px 100% no-repeat scroll;
+}
 
 /* ── Focus ring ───────────────────────────────────────────────────────────── */
 :focus-visible {
@@ -282,7 +306,6 @@ html { color-scheme: dark; }
 
 @media (max-width: 767px) {
   .console-main { background: var(--bg); }
-  .console-content { padding: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .login-card, .login-brief { transition: none; }

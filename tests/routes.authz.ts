@@ -43,6 +43,8 @@ export const AUTHZ: Record<string, AuthzCase[]> = {
   '/api/audit/export.csv': [{ method: 'GET', ...organizerOnly }],
 
   '/api/auth/login': [{ method: 'POST', kind: 'public', body: {}, any: 400 }],
+  // Machine route for `npm run unlock`: bearer token derived from SESSION_SECRET; cookies never authenticate it.
+  '/api/auth/unlock-limiter': [{ method: 'POST', kind: 'machine', any: 401 }],
   '/api/auth/logout': [{ method: 'POST', kind: 'public', any: 204 }],
   '/api/auth/me': [{ method: 'GET', admin: 'allow', operator: 'allow', team: 'allow' }],
   '/api/auth/change-password': [{ method: 'POST', body: {}, admin: 400, operator: 400, team: 'deny', frozen: 'exempt' }], // own credentials, not event state

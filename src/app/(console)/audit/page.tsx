@@ -22,6 +22,7 @@ const PAGE_SIZE = 50;
 const ACTION_LABELS: Record<string, string> = {
   'auth.login': 'Login',
   'auth.login_failed': 'Failed login',
+  'auth.limiter_reset': 'Login limiter cleared',
   'auth.logout': 'Logout',
   'audit.access_denied': 'Access denied',
   'team.create': 'Create team',

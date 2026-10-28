@@ -92,10 +92,8 @@ export function Topbar({ title, user }: TopbarProps) {
   ];
 
   return (
-    <header
-      className="h-14 flex items-center gap-4 px-4 border-b shrink-0"
-      style={{ background: 'var(--panel)', borderColor: 'var(--border)' }}
-    >
+    <header className="h-14 border-b" style={{ background: 'var(--panel)', borderColor: 'var(--border)' }}>
+      <div className="page-container flex h-full items-center gap-4" data-qa="topbar-inner">
       <Sheet>
         <SheetTrigger render={<button className="grid size-8 place-items-center rounded-md text-[var(--muted)] hover:bg-[var(--panel-2)] hover:text-[var(--text)] md:hidden" aria-label="Open navigation" />}>
           <Menu size={18} aria-hidden="true" />
@@ -155,6 +153,7 @@ export function Topbar({ title, user }: TopbarProps) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+      </div>
       </div>
     </header>
   );

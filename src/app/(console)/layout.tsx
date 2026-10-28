@@ -35,14 +35,13 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
 
   return (
     <QueryProvider>
-      <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg)' }}>
+      <div className="flex h-dvh overflow-hidden" style={{ background: 'var(--bg)' }}>
         <Sidebar role={user.role} />
-        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-          <ConsoleClient user={user}>
-            <FrozenBanner />
-            <SimBanner />
-            <main className="console-main flex-1 overflow-y-auto">
-              <div className="console-content mx-auto w-full max-w-[1440px] px-6 py-6">
+        {/* One scroll region for topbar, banners and page, so they all share the same width (and scrollbar gutter). */}
+        <div className="console-scroll min-w-0 flex-1 overflow-y-auto">
+          <ConsoleClient user={user} banners={<><FrozenBanner /><SimBanner /></>}>
+            <main className="console-main">
+              <div className="console-content page-container py-6" data-qa="page-content">
                 {children}
               </div>
             </main>

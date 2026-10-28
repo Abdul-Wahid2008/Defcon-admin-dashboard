@@ -19,16 +19,20 @@ function getTitle(pathname: string): string {
 
 interface ConsoleClientProps {
   user: { id: string; username: string; displayName: string; role: string; mustChangePassword?: boolean };
+  banners?: React.ReactNode;
   children: React.ReactNode;
 }
 
-export default function ConsoleClient({ user, children }: ConsoleClientProps) {
+export default function ConsoleClient({ user, banners, children }: ConsoleClientProps) {
   const pathname = usePathname();
   return (
     <>
       {user.mustChangePassword && <PasswordChangeGate />}
       <CommandPalette role={user.role} />
-      <Topbar title={getTitle(pathname)} user={user} />
+      <div className="sticky top-0 z-30">
+        <Topbar title={getTitle(pathname)} user={user} />
+        {banners}
+      </div>
       {children}
     </>
   );

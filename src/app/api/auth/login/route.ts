@@ -1,5 +1,5 @@
 import { readJson } from '@/lib/server/limits';
-import { assertSameOrigin, login, checkLoginRateLimit, recordLoginFailure, clearLoginAttempts, setSessionCookie, getClientIp } from '@/lib/server/auth';
+import { assertSameOrigin, login, checkLoginRateLimit, loginDelayMs, recordLoginFailure, clearLoginAttempts, setSessionCookie, getClientIp } from '@/lib/server/auth';
 import { appendAudit } from '@/lib/server/audit';
 import { errorResponse, newRequestId, AppError } from '@/lib/server/errors';
 import { z } from 'zod';
@@ -28,6 +28,8 @@ export async function POST(req: Request) {
     username = parsed.data.username;
 
     checkLoginRateLimit(ip, username);
+    const delay = loginDelayMs(username);
+    if (delay > 0) await new Promise(r => setTimeout(r, delay));
 
     const { user, token } = await login(username, parsed.data.password);
     clearLoginAttempts(ip, username);

@@ -101,7 +101,7 @@ export function ServiceMatrix({ grid }: { grid: Team[] }) {
         <span>R = reachability, F = functional, dots = flag0 flag1 flag2. Sorted worst first.</span>
         <label className="flex items-center gap-2"><input type="checkbox" checked={problemsOnly} onChange={(e) => setProblemsOnly(e.target.checked)} />Show only teams with a problem</label>
       </div>
-      <div className="max-h-[560px] overflow-auto rounded-lg border border-[var(--border)]">
+      <div data-qa-scroll className="max-h-[560px] overflow-auto rounded-lg border border-[var(--border)]">
         <table className="w-full min-w-[820px] border-collapse text-[13px] tabular-nums">
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wide text-[var(--text-subtle)]">

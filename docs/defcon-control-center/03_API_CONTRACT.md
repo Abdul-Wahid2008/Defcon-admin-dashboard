@@ -312,3 +312,8 @@ Anything the orchestrator cannot supply is shown as "not available" in the UI (`
 - `POST /api/auth/logout` now revokes the presented token server-side (it stops working at once on every route); the user's other sessions are unaffected. `POST /api/auth/login` also has a global ceiling of 120 attempts per minute across all users and IPs (429 `RATE_LIMITED`); existing sessions are unaffected.
 - Session tokens carry a `jti`. Tokens issued before this change have none and are not individually revocable (they expire within 8 h).
 - Headers: the Content-Security-Policy is now per request with a script nonce (`script-src 'self' 'nonce-…' 'strict-dynamic'`, no `unsafe-inline` for scripts); `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy` are `same-origin`; `X-Powered-By` is removed.
+
+### U1 (28 Oct 2026) — CONTRACT CHANGE, additive
+- New machine route `POST /api/auth/unlock-limiter` (no body). `Authorization: Bearer <hex HMAC-SHA256(SESSION_SECRET, "unlock-login-limiter")>`; cookies never authenticate it. 200 `{ ok: true }` after clearing every in-memory login counter; 401 bad/missing token; 429 after 10 calls/min. Used only by `npm run unlock`.
+- New audit action `auth.limiter_reset` (actor `operator-console`, role `system`, target `system`).
+- `POST /api/auth/login`: failures against a username no longer hard-block it across addresses. Blocking limits are now ip+username (5 / 5 min → 1 min) and ip (30 / 10 min); username failures add 250 ms per failure after the 4th (cap 3 s) before the password check. `RATE_LIMITED` is unchanged.
