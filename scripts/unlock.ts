@@ -20,14 +20,18 @@ if (secret.length < 32) {
 const token = crypto.createHmac('sha256', secret).update('unlock-login-limiter').digest('hex');
 const base = process.env.UNLOCK_URL ?? `http://127.0.0.1:${process.env.PORT ?? 3000}`;
 
-try {
-  const res = await fetch(`${base}/api/auth/unlock-limiter`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-  if (!res.ok) {
-    console.error(`Unlock failed: HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
+async function main() {
+  try {
+    const res = await fetch(`${base}/api/auth/unlock-limiter`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) {
+      console.error(`Unlock failed: HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
+      process.exit(1);
+    }
+    console.log('Login limiter cleared.');
+  } catch (e) {
+    console.error(`Could not reach ${base}: ${(e as Error).message}`);
     process.exit(1);
   }
-  console.log('Login limiter cleared.');
-} catch (e) {
-  console.error(`Could not reach ${base}: ${(e as Error).message}`);
-  process.exit(1);
 }
+
+void main();

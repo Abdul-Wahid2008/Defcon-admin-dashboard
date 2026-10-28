@@ -417,3 +417,43 @@ Port 3000 and `data/defcon.db` untouched. I attempted `taskkill /IM chrome.exe` 
 
 ### Open / next
 Finish the prompt-17 items listed under "Not done"; run `npm run unlock` against a live server once; push or merge `release/v1.2-ui` when you decide (nothing pushed); then the dry-run with the club's scoreboard sample and W8.
+
+## U1 polish — remaining prompt-17 items, finished and verified (28 Oct 2026, still v1.2.0-rc.3)
+Commits `a55b024` (polish) and the follow-up with the reviewer fixes and the `npm run unlock` repair. Not pushed. This section supersedes the "Not done" paragraph and the "I did not run `npm run unlock`" sentence of the U1 section above.
+
+### What changed (prompt 17 step 2.4–2.8)
+- **Type scale, five sizes:** title 24 (`text-2xl`), section 16 (`text-base`), body 14 (`text-sm`), secondary 12 (`text-xs`), caption 11 (`text-caption`, new token in `globals.css`). Replaced every `text-[10px]`, `text-[11px]`, `text-[13px]`, `text-lg`, `text-xl`, `text-3xl` and the button `text-[0.8rem]`; login CSS sizes 9/10/13/15 px moved onto the scale. The login hero heading (clamp 42–64 px) is display type and exempt. Mono only for ids, ports, times (unchanged).
+- **Icons 16 px everywhere** (about 90 call sites, status badges, button default `size-4`). Exceptions: login brand mark (27 px) and the flagstore chips (12 px inside 11 px text; marked `data-qa-icon-exempt`). Global `svg.lucide { flex-shrink: 0 }`: the gate found icons being squeezed to 12 px inside wrapping flex rows at 1024.
+- **Tables:** body rows 44 px (`h-11`), header 36 px (`h-9`); matrix rows stay 36 px; header row sticky inside a height-limited container (Teams and Audit use `containerClassName="max-h-[calc(100dvh-…)]"`), corner cells above both axes, `scroll-padding-top` so a focused row is not hidden under the header; selected rows tinted (`data-state=selected`); hairline rows, no zebra; Participants column right-aligned; matrix headers no longer wrap; Audit has no second scroll wrapper.
+- **Cards:** one ring colour (`--border`) and no second border (`.console-surface` no longer adds one); one rhythm: a card header with a divider is followed by content that starts one `--card-spacing` (16 px) below it. Equal-height cards and aligned headings in one row are checked.
+- **Noise/consistency:** account status now shows icon + colour + text (Teams table and team detail, previously colour+text only); Audit filters are a grid (the Team select no longer wraps to its own line); sidebar subtitle reduced to the version (it wrapped as "v1.2.0-" / "rc.3").
+- **Root cause found by the new gate:** the service matrix's screen-reader-only spans were absolutely positioned relative to the page, so they escaped the scroll container and made the whole page scroll sideways at 1024. Fixed with `relative` on the matrix container.
+
+### `npm run qa:layout` now also checks (and each detector was proven with `QA_SELFTEST=1`, which injects violations)
+text contrast from computed colours (4.5:1, 3:1 for large text; elements over gradients/images are skipped), keyboard focus indicators (60 Tab stops per route, compares focused vs blurred style; fails if fewer than 3 stops land inside `<main>`, so it cannot pass blind), focused row hidden under the sticky header, equal card height and heading offset, wrapped buttons/tabs/badges/column headers/sidebar text, row height below 44 px, font size outside the five-size scale, icons not 16 px, plus a **frozen** pass (freeze banner alignment). Matrix: 7 widths × admin/operator/frozen × routes and every team tab.
+
+### Verification (final code)
+| Check | Result |
+|---|---|
+| `npm run typecheck` | 0 errors |
+| `npm run lint` | 0 errors, 71 warnings (64 legacy, rest in the new QA scripts) |
+| `npm test` | 409/409, 19 files |
+| `npm run build` | 0 |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| `npm run qa:layout` | PASS (7 widths, all routes, admin/operator/frozen, contrast, focus, scale, icons) |
+| `QA_SELFTEST=1 npm run qa:layout` | FAIL as intended: contrast, card-alignment, wrapped-control, no-focus-indicator all reported |
+| 10-minute soak on the polish build (`a55b024`), 3 organizers, 24 teams | overview p95 23.3 ms (p99 94.8), teams p95 19.5 ms, 29 stop + 29 start, 0 4xx/5xx/network errors, RSS 111 → 114 MB (+2.2%) |
+| Live `npm run unlock` (1-minute run on the final build, `TRUST_PROXY=true`) | 5 wrong logins from one address → 6th is 429; another address still 401; bad unlock token 401; `npm run unlock` prints "Login limiter cleared."; the locked address then gets 401 again |
+
+**Bug found by that live check and fixed:** `scripts/unlock.ts` used top-level `await`, which the CJS script build rejects, so `npm run unlock` crashed on every call (the unit tests could not catch it, and I had not run it live before). It now runs inside an async function. The 10-minute soak ran before this one-file fix; the fix touches only `scripts/unlock.ts`, `scripts/qa-*.{ts,js}` and one CSS line (`scroll-padding-top`), none of which changes server behaviour.
+
+### Reviewer (fresh subagent, read-only, nothing run)
+Applied: (1) sticky header could hide a focused row → `scroll-padding-top: 40px`; (2) focus gate only pressed 14 Tab stops and never reached table rows, and accepted any box-shadow as a ring → 60 stops, focused-vs-blurred comparison, blind-gate failure, under-header check; (3) row-height gate was 35.5 px against a 44 px spec → 43.5; (4, partly) contrast report cap raised from 8 to 20.
+Not applied, by choice: contrast gate skips elements over gradients (the login page) and input values/placeholders, and hover/selected states are not measured; a selected row has no extra hover tint (the unlayered selected rule wins); the card-spacing rule overrides explicit `pt-*` on cards with a divider (intended, all current cards are header + content); the sticky `th` background is `--panel`, which may differ slightly from a dialog background in the credentials table (no layout break; not visually checked in a dialog).
+
+### Still not done / honest limits
+- Banners reserve space only while the meta request is in flight; toggling the freeze later adds a 37–55 px banner and moves the page down once (a permanent empty reserve would be worse). The frozen banner wraps to two lines at 1024.
+- Contrast was measured by computed colour, not by eye, and only for the states the gate visits (no hover, disabled, dialogs, toasts, dropdown menus). The login page is excluded from contrast. Keyboard/screen-reader QA of dialogs remains manual.
+- Dialogs, dropdowns and toasts were not screenshotted at every width.
+- Button sizes: tables/toolbars use `sm` (28 px), everywhere else default (32 px); not enforced by a gate.
+- Soak was 10 minutes, not 60.

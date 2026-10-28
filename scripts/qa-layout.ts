@@ -220,7 +220,7 @@ async function measure(cdp: Cdp, tag: string, role: string, width: number, shot:
   for (const r of x.rows.slice(0, 3)) defects.push({ kind: 'row-too-short', where, detail: `${r.path} ${r.h}px` });
   for (const z of x.sizes) defects.push({ kind: 'off-scale-font', where, detail: `${z.size}px ${z.path} "${z.text}"` });
   for (const i of x.icons) defects.push({ kind: 'icon-not-16', where, detail: `${i.size} ${i.path}` });
-  for (const c of x.contrast.slice(0, 8)) defects.push({ kind: 'contrast', where, detail: `${c.ratio}:1 < ${c.need} (${c.size}px) ${c.path} "${c.text}"` });
+  for (const c of x.contrast.slice(0, 20)) defects.push({ kind: 'contrast', where, detail: `${c.ratio}:1 < ${c.need} (${c.size}px) ${c.path} "${c.text}"` });
   const png = await cdp.send('Page.captureScreenshot', { format: 'png' });
   fs.writeFileSync(shot, Buffer.from(png.data, 'base64'));
 }
@@ -230,12 +230,19 @@ async function checkFocus(cdp: Cdp, route: string, role: string) {
   await goto(cdp, route);
   if (process.env.QA_SELFTEST) await cdp.eval(`(() => { const b = document.createElement('button'); b.textContent = 'selftest no ring'; b.style.cssText = 'outline:none;box-shadow:none'; document.body.prepend(b); })()`);
   await cdp.eval('document.activeElement && document.activeElement.blur(); window.scrollTo(0,0)');
-  for (let i = 0; i < 14; i++) {
+  let mainTabs = 0;
+  for (let i = 0; i < 60; i++) {
     for (const type of ['keyDown', 'keyUp']) await cdp.send('Input.dispatchKeyEvent', { type, key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
-    const f = await cdp.eval<any>(`(() => { const e = document.activeElement; if (!e || e === document.body) return null; const s = getComputedStyle(e); const r = e.getBoundingClientRect();
-      return { tag: e.tagName.toLowerCase(), label: (e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, 30), outline: s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) >= 2, ring: s.boxShadow !== 'none', vis: r.width > 0 && r.height > 0 }; })()`);
-    if (f && f.vis && !f.outline && !f.ring) defects.push({ kind: 'no-focus-indicator', where: `${role} ${route} tab#${i + 1}`, detail: `${f.tag} "${f.label}"` });
+    // Indicator = outline or box-shadow that is present while focused and different once focus is removed.
+    const f = await cdp.eval<any>(`(() => { const e = document.activeElement; if (!e || e === document.body) return null;
+      const snap = () => { const s = getComputedStyle(e); return (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) >= 2 ? 'o:' + s.outlineColor : '') + '|' + s.boxShadow; };
+      const r = e.getBoundingClientRect(); const on = snap(); e.blur(); const off = snap(); e.focus({ focusVisible: true });
+      return { tag: e.tagName.toLowerCase(), label: (e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, 30), vis: r.width > 0 && r.height > 0, ok: on !== off, inMain: !!e.closest('main'), covered: (() => { const th = document.querySelector('[data-slot=table-container] thead th'); if (!th || !e.closest('tbody')) return false; return r.top < th.getBoundingClientRect().bottom - 1 && r.bottom > th.getBoundingClientRect().top; })() }; })()`);
+    if (f && f.vis && !f.ok) defects.push({ kind: 'no-focus-indicator', where: `${role} ${route} tab#${i + 1}`, detail: `${f.tag} "${f.label}"` });
+    if (f && f.covered) defects.push({ kind: 'focus-under-sticky-header', where: `${role} ${route} tab#${i + 1}`, detail: `${f.tag} "${f.label}"` });
+    if (f && f.inMain) mainTabs++;
   }
+  if (mainTabs < 3) defects.push({ kind: 'focus-gate-blind', where: `${role} ${route}`, detail: `only ${mainTabs} focus stops reached inside <main>` });
 }
 
 async function runRole(cdp: Cdp, role: string, user: string, pass: string, routes: string[]) {

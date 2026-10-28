@@ -46,11 +46,11 @@
     if (tops.size > 1 && (el.textContent || '').trim().includes(' ')) out.wraps.push({ path: css(el), text: (el.textContent || '').trim().slice(0, 40) });
   }
 
-  // (i) table body rows: minimum height 36.
+  // (i) table body rows: comfortable density is 44 px (h-11); anything shorter is a regression.
   for (const tr of document.querySelectorAll('[data-slot=table-container] tbody tr')) {
     if (!visible(tr)) continue;
     const h = tr.getBoundingClientRect().height;
-    if (h < 35.5) out.rows.push({ path: css(tr), h: Math.round(h) });
+    if (h < 43.5) out.rows.push({ path: css(tr), h: Math.round(h) });
   }
 
   // (h) text contrast from computed colours (WCAG AA: 4.5, large text 3). Elements over gradients/images are skipped.
