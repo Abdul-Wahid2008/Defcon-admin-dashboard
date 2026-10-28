@@ -239,6 +239,12 @@ describe('login limiter', () => {
     expect(() => checkLoginRateLimit('10.1.1.1', 'admin', T + 10)).not.toThrow();
   });
 
+  it('without TRUST_PROXY (address "direct") nothing blocks per address, so nobody can lock the admin out', () => {
+    for (let i = 0; i < 100; i++) recordLoginFailure('direct', 'admin', T);
+    expect(() => checkLoginRateLimit('direct', 'admin', T + 10)).not.toThrow();
+    expect(loginDelayMs('admin', T + 10)).toBe(3000);
+  });
+
   it('resetLoginLimiter clears pair, ip and username counters', () => {
     for (let i = 0; i < 5; i++) recordLoginFailure('5.5.5.5', 'erin', T);
     expect(() => checkLoginRateLimit('5.5.5.5', 'erin', T + 10)).toThrow(/Too many/);

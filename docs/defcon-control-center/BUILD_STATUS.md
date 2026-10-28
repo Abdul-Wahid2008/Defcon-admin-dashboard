@@ -357,3 +357,63 @@ To resume: `git status`; `npm run typecheck && npm test` (expect 403/403); read 
 **Open items carried forward (unchanged):** club inputs (real `scoreboard.json` sample, `template.compose.yml`, verdicts, reset semantics, agent owner), W8 evidence gate, dry-run, backup task registration and escalation table on the demo machine, freeze date unknown. New question for the club lead: confirm D24 (we build the leaderboard).
 
 **Next:** run U1 on `release/v1.2-ui` (diagnose first, then foundation, lockout fix, gate, soak, reviewer), then the dry-run when the scoreboard sample arrives. Leaderboard slices L0–L6 wait for D24 confirmation.
+
+## U1 — dashboard alignment, layout foundation and login lockout fix (28 Oct 2026, v1.2.0-rc.3)
+Branch `release/v1.2-ui` (from `release/v1.2` at `81c7a83`), tag `v1.2.0-rc.3`. **Not pushed, not merged to main or `release/v1.2`.** Spec: `17_UI_ALIGNMENT_AND_POLISH_PROMPT.md`.
+
+### Step 1 — diagnosis (measured before any layout change)
+`npm run qa:layout` (new, `scripts/qa-layout.ts`) seeds a temp DB, starts the production build on port 3100 with explicit env (port 3000 and `data/defcon.db` untouched), drives headless Chrome over CDP and, for 7 widths (1024, 1280, 1366, 1440, 1536, 1920, 2560; heights 768/900/1080) × routes, records: document horizontal overflow, clipping or unplanned horizontal scroll by any container, topbar/banner/content edge alignment, ellipsis truncation without a title, console errors, and a screenshot per case (`qa-out/layout/`, gitignored). Routes: `/login`; as admin `/overview`, `/overview?view=incidents`, `/teams`, `/teams/team-01` and each of its 5 tabs, `/audit`, `/settings`; as operator overview, teams, team detail, audit. Exit 1 on any defect.
+
+Before-table (rc.2 build, 150 defects):
+
+| Defect | Count | Root cause |
+|---|---|---|
+| Topbar inner edges (256..W-16) vs content (264..W-24): 8 px offset each side, every width, every route | 140 | Topbar used `px-4`, content `px-6`, banners `px-4`; content capped at 1440 px while the topbar spans the full width, so on wide screens the content floats with empty bands |
+| Unplanned horizontal scroll: overview matrix, Teams table, team Services tab, Audit table at 1024 | 10 | Tables wider than the content column with no scroll affordance; the Teams row-actions column was cut off at the right edge (the most likely "right side looks broken" report) |
+| Hard clipping by `overflow-hidden` ancestors | 0 | The suspected silent clipping did not occur: `main` is `overflow-y-auto`, which makes overflow-x auto, so wide content scrolled instead of being hidden. Found by measurement, not assumed. |
+
+The raw before-output file was deleted by mistake before this report; the table is from the run's printed output.
+
+### Step 2 — what changed
+- One `.page-container` (`--page-gutter: clamp(16px, 2vw, 32px)`, `--page-max: 1680px`, centred) used by the Topbar inner box, both banners and the page content; their inner edges match at every width.
+- One scroll region, `.console-scroll` (replaces `main` as the scroller), with `scrollbar-gutter: stable`; Topbar and banners are one sticky block inside it, so they share the page width and gutter. Shell uses `h-dvh`. The global 6 px WebKit scrollbar is replaced by `scrollbar-width: thin` (no layout change).
+- Wide tables scroll in their own `[data-qa-scroll]` container (shared `Table` component and the service matrix) with edge shadows. The Teams table (`.sticky-cols`) keeps checkbox + team name on the left and the actions column on the right; cell padding tightened so it fits at 1024; `scroll-padding-inline` keeps a focused cell out from under the sticky columns.
+- Banners: 16 px icons, opaque background (they are sticky), loading placeholder height matched to the real banner (37 px).
+- `package.json` version 1.2.0-rc.3; `.gitignore` adds `qa-out/`.
+
+### Step 3 — visual review
+Screenshots read: 2560 overview (content and topbar aligned, no empty bands), 1024 teams (all columns and the actions menu visible; the first sticky version hid the "Updated" header sort icon, fixed by the padding change), 1024 audit (Message column scrolls inside the card with an edge shadow), 1024 team detail. `npm run qa:layout` after the changes: PASS at all 7 widths, all routes, both roles.
+
+**Not done (honest scope):** the 5-size typographic scale, the 8 px spacing audit, 36/44 px row-density modes, sticky headers on the Teams and Audit tables (their scroll container only scrolls horizontally, so a sticky header would need an inner height limit), noise reduction of borders/shadows and unified button sizes were not applied systematically. Only the foundation, banners, tables and the Teams page were touched. No computed-style contrast pass was run. The Audit filter row still wraps the "Team" select onto its own line at 1024.
+
+### Step 4 — login lockout fix
+- Root cause: a per-username block (10 failures → 5 min, any address) let anyone who could reach the login page lock `admin` out; with `TRUST_PROXY` off every caller also shares the address `direct`, so the pair block (5 failures → 1 min) did the same.
+- Now (`src/lib/server/auth.ts`): ip+username (5 / 5 min → 1 min) and per-ip (30 / 10 min) block **only when the real address is known (`TRUST_PROXY=true`)**. Failures against a username add a delay to the next attempts (250 ms per failure after the 4th, max 3 s, `loginDelayMs`, applied in the login route before the password check) but never block. Global 120/min ceiling unchanged. With `TRUST_PROXY` off, guessing is bounded only by the delay and the global ceiling.
+- `npm run unlock` (`scripts/unlock.ts`) calls `POST /api/auth/unlock-limiter`: machine route, bearer = HMAC-SHA256 of `SESSION_SECRET` (so it needs the server's `.env`), cookies never authenticate it, 503 if `SESSION_SECRET` is unset or short, only bad-token attempts are rate limited (10/min), writes audit `auth.limiter_reset`. Clears the in-memory limiter without a restart. Documented in `docs/EVENT_RUNBOOK.md`. **I did not run `npm run unlock` against a live server.** The route is covered by the authz matrix (401 without a token) and the limiter by unit tests, but unlock with a valid token end to end is untested.
+- CONTRACT CHANGE (additive, in `03_API_CONTRACT.md`): route `/api/auth/unlock-limiter`; audit action `auth.limiter_reset` (TypeScript type, zod enum and audit page label map).
+- Tests: the old "username locked for 5 min from any address" test was replaced because the policy changed. New: other IPs never blocked, delay grows and caps, an attacker IP cannot lock another IP, `direct` never blocks, `resetLoginLimiter` clears all counters. The pair, per-ip, global 120/min and success-clears tests pass unchanged.
+
+### Step 5 — gate
+| Check | Result |
+|---|---|
+| `npm run typecheck` | 0 errors |
+| `npm run lint` | 0 errors, 69 warnings (64 legacy + 5 in the new scripts/tests) |
+| `npm test` | 409/409, 19 files (was 403) |
+| `npm run build` | 0 |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| `npm run qa:layout` | PASS, 7 widths |
+| authz matrix | unchanged except the new machine-route entry |
+| 10-minute soak (3 organizers, 24 teams, temp DB, port 3100) | overview p95 21.7 ms (p50 15.0, p99 27.9), teams p95 19.4 ms, max payload 20.1 KB, 29 stop + 29 start, 0 4xx/5xx/network errors, RSS 108 → 114 MB (+5.3%) |
+
+The soak ran on the build at commit `c663121`, before the reviewer-driven fixes below; the final code was not soaked again. The earlier 60-minute rc.2 soak predates the rc.2 security pass.
+
+### Reviewer (fresh subagent, diff `release/v1.2..HEAD`)
+Applied: (1) the unlock token was a public constant if `SESSION_SECRET` was unset → the route now fails closed with 503; (2) with `TRUST_PROXY` off a shared `direct:admin` pair block still let anyone lock admin out → pair and per-ip blocks skipped for `direct`, test added; (3) the unlock rate limit counted all calls, so an attacker could deny the operator's recovery → only bad tokens are counted; (4) sticky columns lacked `scroll-padding` → added.
+Rejected: (5) scroll shadows hidden behind opaque sticky cells on the Teams table; cosmetic, and the cells are opaque on purpose so rows do not show through.
+No defects reported in the login delay (capped at 3 s, at most ~6 concurrent sleepers under the 120/min ceiling) or in moving the scroller off `main` (nothing queries `main` or `scrollTo`; dialogs are `z-50`, above the topbar's `z-30`). The reviewer ran nothing, so its findings come from reading.
+
+### Hazards
+Port 3000 and `data/defcon.db` untouched. I attempted `taskkill /IM chrome.exe` once while debugging; the permission system blocked it before it ran (it would have closed your own Chrome). Chrome and servers were stopped only by the PIDs the scripts started. Temp DBs and Chrome profiles live under `%TEMP%` and are removed by the scripts. `qa-out/` and `soak10.log` are local only.
+
+### Open / next
+Finish the prompt-17 items listed under "Not done"; run `npm run unlock` against a live server once; push or merge `release/v1.2-ui` when you decide (nothing pushed); then the dry-run with the club's scoreboard sample and W8.

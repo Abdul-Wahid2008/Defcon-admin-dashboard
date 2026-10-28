@@ -27,12 +27,12 @@ export interface SessionUser {
 
 // ── Login limiter (in memory; resets on restart) ─────────────────────────────
 // Fixed-window limits that BLOCK:
-//   ip+username  5 failures / 5 min  → locked 1 min
-//   ip           30 failures / 10 min
+//   ip+username  5 failures / 5 min  → locked 1 min   (only with TRUST_PROXY: otherwise the address is unknown)
+//   ip           30 failures / 10 min                  (same)
 // and one that only SLOWS: failures against a username (from any address) add an increasing delay to the next
 // attempts (see loginDelayMs) but never hard-block it, so someone on the network cannot lock an organizer out.
-// Without TRUST_PROXY every caller shares the 'direct' address, so the ip+username lock is then shared too:
-// `npm run unlock` clears it (docs/EVENT_RUNBOOK.md).
+// Without TRUST_PROXY nothing blocks per address: guessing is bounded by the username delay and the global 120/min
+// ceiling. `npm run unlock` clears all counters (docs/EVENT_RUNBOOK.md).
 type Bucket = { count: number; resetAt: number };
 const pairAttempts = new Map<string, Bucket>();
 const ipAttempts = new Map<string, Bucket>();
@@ -75,8 +75,9 @@ function retryAfterSec(map: Map<string, Bucket>, key: string, max: number, now: 
 export function checkLoginRateLimit(ip: string, username: string, now = Date.now()): void {
   const u = username.toLowerCase();
   const retryAfter = Math.max(
-    retryAfterSec(pairAttempts, `${ip}:${u}`, PAIR.max, now),
-    // Without TRUST_PROXY every caller shares the 'direct' bucket, so a per-IP ceiling would lock everyone out.
+    // Without TRUST_PROXY every caller shares the 'direct' address, so neither the pair lock nor the per-IP ceiling
+    // may block: either would let anyone lock the admin out. Only the username delay and the global ceiling apply then.
+    ip === 'direct' ? 0 : retryAfterSec(pairAttempts, `${ip}:${u}`, PAIR.max, now),
     ip === 'direct' ? 0 : retryAfterSec(ipAttempts, ip, IP.max, now),
   );
   if (retryAfter > 0) {

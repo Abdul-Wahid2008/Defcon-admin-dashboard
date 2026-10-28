@@ -192,6 +192,7 @@ html { color-scheme: dark; }
 }
 
 /* Teams table: checkbox + team name stay left, row actions stay right while the middle columns scroll. */
+[data-qa-scroll] { scroll-padding-inline: 280px; } /* keeps a focused cell out from under the sticky columns */
 .sticky-cols tr > :first-child { position: sticky; left: 0; z-index: 1; width: 40px; min-width: 40px; background: var(--panel); }
 .sticky-cols tr > :nth-child(2) { position: sticky; left: 40px; z-index: 1; background: var(--panel); }
 .sticky-cols tr > :last-child { position: sticky; right: 0; z-index: 1; background: var(--panel); }
