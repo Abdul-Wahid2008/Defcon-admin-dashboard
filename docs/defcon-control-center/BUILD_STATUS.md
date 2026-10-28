@@ -344,3 +344,16 @@ Existing tests changed (none weakened): migration tests expect `user_version` 5;
 3. On the demo machine: register the Task Scheduler backup, fill the escalation table in `docs/EVENT_RUNBOOK.md`, do one rehearsal from the runbook (the 60-minute soak is done).
 4. Decide whether to push `release/v1.2` and `v1.2.0-rc.1` (nothing has been pushed), and whether the freeze/deadline is known yet.
 To resume: `git status`; `npm run typecheck && npm test` (expect 403/403); read this file, `docs/EVENT_RUNBOOK.md` and docs 12–15; QA on ports 3100/3101 only, on a production build; install with `npm ci --ignore-scripts`.
+
+## Session 28 Oct 2026 (docs-only) — U1 and leaderboard planning added, nothing implemented
+**Code state is unchanged:** branch `release/v1.2` at `1232f84` (v1.2.0-rc.2). No source, test, config or dependency file was touched this session, so the rc.2 validation gate above (typecheck 0, lint 0 errors, 403/403 tests, build 0, audit 0, 60-minute soak) still describes the code. I did not re-run it in this session.
+
+**Added (documents only):**
+- `16_LEADERBOARD_SPEC_AND_PROMPTS.md` — scope change D24 (from Abdul, **not yet confirmed by the club lead**): the leaderboard becomes a separate participant-facing application, not a page in the admin console. Contains facts/assumptions/decisions, a masterprompt and slices L0–L6. Until the club confirms, CLAUDE.md "out of scope: leaderboard" still stands.
+- `17_UI_ALIGNMENT_AND_POLISH_PROMPT.md` — slice **U1**: layout diagnosis and foundation fix, visual polish, login lockout fix, gate and 10-minute soak, tag `v1.2.0-rc.3` on a new branch `release/v1.2-ui`.
+
+**U1 status: NOT started.** The "right side looks broken" report is unverified. Suspects to confirm with `scripts/qa-layout.ts` before editing: `h-screen overflow-hidden` shell silently clipping wide children, a 1440 px content cap against a full-width Topbar on wide screens, and the custom scrollbar changing the right gutter. The lockout problem (username lockout lets anyone on the network lock the admin out) is a known availability bug for the live event and is scheduled as U1 step 4 (block per IP+username, per-IP ceiling, `npm run unlock`, runbook entry).
+
+**Open items carried forward (unchanged):** club inputs (real `scoreboard.json` sample, `template.compose.yml`, verdicts, reset semantics, agent owner), W8 evidence gate, dry-run, backup task registration and escalation table on the demo machine, freeze date unknown. New question for the club lead: confirm D24 (we build the leaderboard).
+
+**Next:** run U1 on `release/v1.2-ui` (diagnose first, then foundation, lockout fix, gate, soak, reviewer), then the dry-run when the scoreboard sample arrives. Leaderboard slices L0–L6 wait for D24 confirmation.
