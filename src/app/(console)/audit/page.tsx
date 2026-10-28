@@ -75,7 +75,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
   );
 }
 
-const SELECT_CLASS = 'h-8 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-3 text-sm';
+const SELECT_CLASS = 'h-8 w-full min-w-0 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-3 text-sm';
 
 export default function AuditPage() {
   const router = useRouter();
@@ -186,31 +186,31 @@ export default function AuditPage() {
   const lastShown = result ? Math.min(result.page * result.pageSize, total) : 0;
 
   return <QueryState loading={query.isLoading} error={query.error} onRetry={() => query.refetch()}>
-    <PageHeader title="Audit log" description="Append-only record of organizer activity" onRefresh={() => query.refetch()} refreshing={query.isFetching}><Button variant="outline" onClick={exportCsv}><Download size={15} />Export CSV</Button></PageHeader>
+    <PageHeader title="Audit log" description="Append-only record of organizer activity" onRefresh={() => query.refetch()} refreshing={query.isFetching}><Button variant="outline" onClick={exportCsv}><Download size={16} />Export CSV</Button></PageHeader>
     <div className="mb-4 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-3 text-sm text-[var(--muted)]">Audit entries are append-only and cannot be edited or deleted.</div>
     <Card className="console-surface"><CardContent className="p-4">
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="relative min-w-[220px] flex-1"><Search size={15} className="absolute left-3 top-2.5 text-[var(--muted)]" /><Input className="pl-9" placeholder="Search audit log" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} aria-label="Search audit log" /></div>
-        <label className="grid gap-1 text-xs text-[var(--muted)]">Date range
+      <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(200px,2fr)_repeat(3,minmax(140px,1fr))]">
+        <div className="relative min-w-0 sm:col-span-2 lg:col-span-1"><Search size={16} className="absolute left-3 top-2.5 text-[var(--muted)]" /><Input className="pl-9" placeholder="Search audit log" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} aria-label="Search audit log" /></div>
+        <label className="grid min-w-0 gap-1 text-xs text-[var(--muted)]">Date range
           <select aria-label="Date range" value={range} onChange={(e) => { const v = e.target.value as Range; setRange(v); setFromTs(rangeFromTs(v)); setPage(1); }} className={SELECT_CLASS}>
             <option value="all">All time</option>
             <option value="hour">Last hour</option>
             <option value="24h">Last 24 h</option>
           </select>
         </label>
-        <label className="grid gap-1 text-xs text-[var(--muted)]">Actor
+        <label className="grid min-w-0 gap-1 text-xs text-[var(--muted)]">Actor
           <select aria-label="Filter by actor" value={actor} onChange={(e) => { setActor(e.target.value); setPage(1); }} className={SELECT_CLASS}>
             <option value="">All actors</option>
             {actorOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </label>
-        <label className="grid gap-1 text-xs text-[var(--muted)]">Team
+        <label className="grid min-w-0 gap-1 text-xs text-[var(--muted)]">Team
           <select aria-label="Filter by team" value={teamFilter} onChange={(e) => { setTeamFilter(e.target.value); setPage(1); }} className={SELECT_CLASS}>
             <option value="">All teams</option>
             {(teams.data?.items ?? []).map((team) => <option key={team.id} value={team.id}>{team.id} · {team.name}</option>)}
           </select>
         </label>
-        {hasFilters && <Button variant="ghost" size="sm" onClick={resetFilters}>Clear filters</Button>}
+        {hasFilters && <Button variant="ghost" size="sm" className="justify-self-start sm:col-span-2 lg:col-span-4" onClick={resetFilters}>Clear filters</Button>}
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <span className="console-label mr-1">Actions</span>
@@ -227,12 +227,12 @@ export default function AuditPage() {
       {!result?.items.length
         ? <div className="py-12 text-center text-sm text-[var(--muted)]">No entries match these filters.</div>
         : <>
-          <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead className="w-8" /><TableHead>Time</TableHead><TableHead>Actor</TableHead><TableHead>Action</TableHead><TableHead>Target</TableHead><TableHead>Outcome</TableHead><TableHead>Message</TableHead></TableRow></TableHeader><TableBody>{result.items.map((entry) => <Fragment key={entry.id}><TableRow className="console-table-row cursor-pointer" onClick={() => setExpanded(expanded === entry.id ? null : entry.id)}><TableCell>{expanded === entry.id ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</TableCell><TableCell><span className="font-mono text-xs" title={entry.ts}>{formatTimestamp(entry.ts)}</span><div className="text-xs text-[var(--muted)]"><RelativeTime ts={entry.ts} /></div></TableCell><TableCell><div>{entry.actorName}</div><span className="mt-0.5 inline-block rounded border border-[var(--border-strong)] px-1 py-px text-[10px] uppercase tracking-wide text-[var(--muted)]">{entry.actorRole}</span></TableCell><TableCell className="font-mono text-xs">{entry.action}<div className="font-sans text-[10px] text-[var(--muted)]">{friendlyAction(entry.action)}</div></TableCell><TableCell className="font-mono text-xs">{entry.targetType === 'team' && entry.targetId ? <Link href={`/teams/${entry.targetId}`} className="text-[var(--accent)] hover:underline" onClick={(e) => e.stopPropagation()}>{entry.targetId}</Link> : entry.targetId ?? '—'}</TableCell><TableCell><OutcomeBadge outcome={entry.outcome} /></TableCell><TableCell className="max-w-[360px] truncate">{entry.message}</TableCell></TableRow>{expanded === entry.id && <TableRow><TableCell colSpan={7} className="p-0"><AuditEntryDetails entry={entry} /></TableCell></TableRow>}</Fragment>)}</TableBody></Table></div>
+          <div><Table containerClassName="max-h-[calc(100dvh-14rem)] min-h-64"><TableHeader><TableRow><TableHead className="w-8" /><TableHead>Time</TableHead><TableHead>Actor</TableHead><TableHead>Action</TableHead><TableHead>Target</TableHead><TableHead>Outcome</TableHead><TableHead>Message</TableHead></TableRow></TableHeader><TableBody>{result.items.map((entry) => <Fragment key={entry.id}><TableRow className="console-table-row cursor-pointer" onClick={() => setExpanded(expanded === entry.id ? null : entry.id)}><TableCell>{expanded === entry.id ? <ChevronDown size={16} /> : <ChevronRight size={16} />}</TableCell><TableCell><span className="font-mono text-xs" title={entry.ts}>{formatTimestamp(entry.ts)}</span><div className="text-xs text-[var(--muted)]"><RelativeTime ts={entry.ts} /></div></TableCell><TableCell><div>{entry.actorName}</div><span className="mt-0.5 inline-block rounded border border-[var(--border-strong)] px-1 py-px text-caption uppercase tracking-wide text-[var(--muted)]">{entry.actorRole}</span></TableCell><TableCell className="font-mono text-xs">{entry.action}<div className="font-sans text-caption text-[var(--muted)]">{friendlyAction(entry.action)}</div></TableCell><TableCell className="font-mono text-xs">{entry.targetType === 'team' && entry.targetId ? <Link href={`/teams/${entry.targetId}`} className="text-[var(--accent)] hover:underline" onClick={(e) => e.stopPropagation()}>{entry.targetId}</Link> : entry.targetId ?? '—'}</TableCell><TableCell><OutcomeBadge outcome={entry.outcome} /></TableCell><TableCell className="max-w-[360px] truncate">{entry.message}</TableCell></TableRow>{expanded === entry.id && <TableRow><TableCell colSpan={7} className="p-0"><AuditEntryDetails entry={entry} /></TableCell></TableRow>}</Fragment>)}</TableBody></Table></div>
           <div className="mt-4 flex items-center justify-between gap-3 text-sm text-[var(--muted)]">
             <span>Showing {firstShown}–{lastShown} of {total} entries</span>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => changePage(page - 1)} disabled={page <= 1 || query.isFetching}><ChevronLeft size={14} />Previous</Button>
-              <Button variant="outline" size="sm" onClick={() => changePage(page + 1)} disabled={lastShown >= total || query.isFetching}>Next<ChevronRight size={14} /></Button>
+              <Button variant="outline" size="sm" onClick={() => changePage(page - 1)} disabled={page <= 1 || query.isFetching}><ChevronLeft size={16} />Previous</Button>
+              <Button variant="outline" size="sm" onClick={() => changePage(page + 1)} disabled={lastShown >= total || query.isFetching}>Next<ChevronRight size={16} /></Button>
             </div>
           </div>
         </>}

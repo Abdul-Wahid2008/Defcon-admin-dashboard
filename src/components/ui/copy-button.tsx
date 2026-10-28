@@ -32,7 +32,7 @@ export function CopyButton({ value, className, size = 'sm' }: CopyButtonProps) {
       className={cn('h-6 w-6 p-0 text-[var(--muted)] hover:text-[var(--text)]', className)}
       aria-label={copied ? 'Copied' : 'Copy to clipboard'}
     >
-      {copied ? <Check size={12} className="text-[var(--ok)]" /> : <Copy size={12} />}
+      {copied ? <Check size={16} className="text-[var(--ok)]" /> : <Copy size={16} />}
     </Button>
   );
 }

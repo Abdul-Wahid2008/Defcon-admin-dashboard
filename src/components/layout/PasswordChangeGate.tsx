@@ -20,7 +20,7 @@ export function PasswordChangeGate() {
         className="grid w-full max-w-md gap-3 rounded-xl border border-[var(--border-strong)] bg-[var(--panel)] p-6"
         onSubmit={(e) => { e.preventDefault(); change.mutate(); }}
       >
-        <h2 id="pw-title" className="text-lg font-semibold">Change your password</h2>
+        <h2 id="pw-title" className="text-base font-semibold">Change your password</h2>
         <p className="text-sm text-[var(--muted)]">An administrator issued this password. Choose a new one (at least 12 characters) to continue.</p>
         <label className="grid gap-1 text-sm font-medium" htmlFor="pw-current">Current password<Input id="pw-current" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} autoFocus /></label>
         <label className="grid gap-1 text-sm font-medium" htmlFor="pw-new">New password<Input id="pw-new" type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} /></label>

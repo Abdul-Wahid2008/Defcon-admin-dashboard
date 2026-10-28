@@ -19,9 +19,9 @@ export function FlagstoreDots({ flagstores, stale }: { flagstores: FlagstoreResu
         const v = VERDICT[stale ? 'UNKNOWN' : f.verdict];
         const text = `${f.key}: ${stale ? 'stale (last ' + f.verdict + ')' : f.verdict}${f.message ? ` — ${f.message}` : ''}${f.round !== null ? ` · round ${f.round}` : ''}`;
         return (
-          <span key={f.key} role="listitem" title={text} aria-label={text}
-            className={cn('inline-flex items-center gap-0.5 rounded border px-1 py-0.5 font-mono text-[11px] leading-none', v.color)}>
-            <v.Icon size={10} aria-hidden="true" />
+          <span key={f.key} role="listitem" title={text} aria-label={text} data-qa-icon-exempt
+            className={cn('inline-flex items-center gap-0.5 rounded border px-1 py-0.5 font-mono text-caption leading-none', v.color)}>
+            <v.Icon size={12} aria-hidden="true" />
             {f.key.replace('flag', 'F')}
           </span>
         );

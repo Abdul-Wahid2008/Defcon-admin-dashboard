@@ -34,7 +34,7 @@ export function HealthBadge({ health, size = 'md' }: HealthBadgeProps) {
       )}
       aria-label={`Health: ${config.label}`}
     >
-      <Icon size={size === 'sm' ? 10 : 12} aria-hidden="true" />
+      <Icon size={16} aria-hidden="true" />
       {config.label}
     </span>
   );

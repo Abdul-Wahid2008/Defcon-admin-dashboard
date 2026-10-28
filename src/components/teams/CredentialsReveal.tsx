@@ -126,7 +126,7 @@ export function CredentialsReveal({
 
   return (
     <Overlay labelledBy="credentials-dialog-title" describedBy="credentials-dialog-description">
-      <h2 id="credentials-dialog-title" className="mb-2 text-lg font-semibold text-[var(--text)]">
+      <h2 id="credentials-dialog-title" className="mb-2 text-base font-semibold text-[var(--text)]">
         Credentials — save these now
       </h2>
       <p id="credentials-dialog-description" className="mb-4 text-sm text-[var(--bad)] font-medium">
@@ -138,7 +138,7 @@ export function CredentialsReveal({
           variant="outline"
           onClick={() => setVisible(allVisible ? [] : credentials.map((item) => item.participantId))}
         >
-          {allVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+          {allVisible ? <EyeOff size={16} /> : <Eye size={16} />}
           {allVisible ? 'Hide all' : 'Reveal all'}
         </Button>
         <Button size="sm" variant="outline" onClick={copyAll}>
@@ -173,7 +173,7 @@ export function CredentialsReveal({
                     onClick={() => toggleVisible(credential.participantId)}
                     aria-label={`${visible.includes(credential.participantId) ? 'Hide' : 'Reveal'} password for ${credential.username}`}
                   >
-                    {visible.includes(credential.participantId) ? <EyeOff size={14} /> : <Eye size={14} />}
+                    {visible.includes(credential.participantId) ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </TableCell>
                 <TableCell>
@@ -201,7 +201,7 @@ export function CredentialsReveal({
       </label>
       <div className="mt-4 flex justify-end gap-2">
         <Button variant="outline" onClick={download}>
-          <Download size={15} />Download CSV
+          <Download size={16} />Download CSV
         </Button>
         <Button disabled={!saved} onClick={onClose}>
           Close

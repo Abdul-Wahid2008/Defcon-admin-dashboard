@@ -42,7 +42,7 @@ export function AlertsPanel({ alerts }: { alerts: Alert[] }) {
               <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-[var(--text-subtle)]">
                 {alert.teamId ? <Link className="font-mono text-[var(--accent)] hover:underline" href={`/teams/${alert.teamId}`}>{alert.teamId}</Link> : 'System'}
                 <span aria-hidden="true">·</span><RelativeTime ts={alert.createdAt} />
-                {alert.ackedAt && !alert.resolvedAt && <span className="inline-flex items-center gap-1 text-[var(--text-subtle)]"><BellOff size={11} aria-hidden="true" />acknowledged by {alert.ackedBy ?? 'an organizer'}{alert.ackNote ? `: ${alert.ackNote}` : ''}</span>}
+                {alert.ackedAt && !alert.resolvedAt && <span className="inline-flex items-center gap-1 text-[var(--text-subtle)]"><BellOff size={16} aria-hidden="true" />acknowledged by {alert.ackedBy ?? 'an organizer'}{alert.ackNote ? `: ${alert.ackNote}` : ''}</span>}
               </div>
             </div>
             {!alert.resolvedAt && (

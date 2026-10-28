@@ -96,7 +96,7 @@ export function Topbar({ title, user }: TopbarProps) {
       <div className="page-container flex h-full items-center gap-4" data-qa="topbar-inner">
       <Sheet>
         <SheetTrigger render={<button className="grid size-8 place-items-center rounded-md text-[var(--muted)] hover:bg-[var(--panel-2)] hover:text-[var(--text)] md:hidden" aria-label="Open navigation" />}>
-          <Menu size={18} aria-hidden="true" />
+          <Menu size={16} aria-hidden="true" />
         </SheetTrigger>
         <SheetContent side="left" className="w-[min(82vw,300px)] border-r border-[var(--border)] bg-[var(--panel)] p-0">
           <SheetHeader className="border-b border-[var(--border)]">
@@ -117,9 +117,9 @@ export function Topbar({ title, user }: TopbarProps) {
 
       <div className="flex items-center gap-3">
         <form onSubmit={submitSearch} className="relative hidden w-48 lg:block" role="search">
-          <Search size={14} className="pointer-events-none absolute left-2.5 top-2 text-[var(--muted)]" aria-hidden="true" />
+          <Search size={16} className="pointer-events-none absolute left-2.5 top-2 text-[var(--muted)]" aria-hidden="true" />
           <Input id="global-team-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find a team  /" aria-label="Find a team" className="h-8 pl-8 pr-8 text-xs" />
-          <kbd className="pointer-events-none absolute right-2 top-1.5 rounded border border-[var(--border)] px-1 text-[10px] text-[var(--muted)]">/</kbd>
+          <kbd className="pointer-events-none absolute right-2 top-1.5 rounded border border-[var(--border)] px-1 text-caption text-[var(--muted)]">/</kbd>
         </form>
         <ServerClock />
         <AdapterBadge />
@@ -130,17 +130,17 @@ export function Topbar({ title, user }: TopbarProps) {
             className="flex h-8 items-center gap-2 rounded px-2 text-xs text-[var(--muted)] hover:text-[var(--text)]"
             aria-label="User menu"
           >
-            <User size={14} aria-hidden="true" />
+            <User size={16} aria-hidden="true" />
             <span className="hidden sm:block">{user.displayName}</span>
-            <span className="text-[10px] text-[var(--muted)] hidden sm:block capitalize">
+            <span className="text-caption text-[var(--muted)] hidden sm:block capitalize">
               ({roleLabel})
             </span>
-            <ChevronDown size={12} aria-hidden="true" />
+            <ChevronDown size={16} aria-hidden="true" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             <div className="px-3 py-2">
               <p className="text-xs font-medium text-[var(--text)]">{user.displayName}</p>
-              <p className="text-[10px] text-[var(--muted)] font-mono capitalize">{roleLabel}</p>
+              <p className="text-caption text-[var(--muted)] font-mono capitalize">{roleLabel}</p>
             </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -148,7 +148,7 @@ export function Topbar({ title, user }: TopbarProps) {
               disabled={loggingOut}
               className="text-[var(--bad)] focus:text-[var(--bad)] cursor-pointer"
             >
-              <LogOut size={14} className="mr-2" aria-hidden="true" />
+              <LogOut size={16} className="mr-2" aria-hidden="true" />
               {loggingOut ? 'Logging out…' : 'Log out'}
             </DropdownMenuItem>
           </DropdownMenuContent>

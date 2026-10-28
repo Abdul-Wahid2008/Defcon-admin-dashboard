@@ -45,7 +45,7 @@ export function AdapterBadge() {
             )}
             aria-label={`Data mode: ${badge}`}
           >
-            <Icon size={12} aria-hidden="true" />
+            <Icon size={16} aria-hidden="true" />
             {badge}
           </span>
         </TooltipTrigger>

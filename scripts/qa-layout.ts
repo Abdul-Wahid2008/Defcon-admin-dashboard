@@ -41,6 +41,7 @@ const env = {
   SEED_TEAMS: '24',
 } as NodeJS.ProcessEnv;
 
+const EXTRA = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(\w:)/, '$1')), 'qa-measure-extra.js'), 'utf8');
 const ROUTES_ADMIN = (process.env.QA_ROUTES ?? '/overview,/overview?view=incidents,/teams,/teams/team-01,/audit,/settings').split(',');
 const ROUTES_OPERATOR = ['/overview', '/teams', '/teams/team-01', '/audit'];
 
@@ -109,7 +110,10 @@ class Cdp {
 const MEASURE = `(() => {
   const out = { docClip: null, clipped: [], edges: null, truncated: [] };
   const de = document.documentElement;
-  if (de.scrollWidth > de.clientWidth + 1) out.docClip = de.scrollWidth + ' > ' + de.clientWidth;
+  if (de.scrollWidth > de.clientWidth + 1) {
+    const wide = [...document.querySelectorAll('body *')].filter(e => e.getBoundingClientRect().right > de.clientWidth + 1 && !(e.parentElement && e.parentElement.closest('[data-qa-scroll]'))).slice(0, 4).map(e => e.tagName.toLowerCase() + '.' + String(e.className).slice(0, 40) + '@' + getComputedStyle(e).position + ':' + Math.round(e.getBoundingClientRect().right));
+    out.docClip = de.scrollWidth + ' > ' + de.clientWidth + ' (first wide: ' + wide.join(' | ') + ')';
+  }
   const css = (el) => {
     const parts = [];
     for (let n = el; n && n.nodeType === 1 && parts.length < 5; n = n.parentElement) {
@@ -192,6 +196,10 @@ async function goto(cdp: Cdp, route: string) {
 }
 
 async function measure(cdp: Cdp, tag: string, role: string, width: number, shot: string) {
+  // QA_SELFTEST=1 injects known violations so the detectors can be shown to fail (expect contrast, card-alignment, wrapped-control, no-focus-indicator).
+  if (process.env.QA_SELFTEST) {
+    await cdp.eval(`(() => { const d = document.createElement('div'); d.innerHTML = '<p style="color:#445566;background:#334455;font-size:14px">low contrast sample</p><div style="display:grid;grid-template-columns:1fr 1fr"><div data-slot="card" style="height:50px"><div data-slot="card-title">a</div></div><div data-slot="card" style="height:90px"><div data-slot="card-title">b</div></div></div><button style="width:40px;border:1px solid red">two words here</button><button id="qa-noring" style="outline:none;box-shadow:none">no ring</button>'; (document.querySelector('main') || document.body).prepend(d); })()`);
+  }
   const m = await cdp.eval<any>(MEASURE);
   const where = `${role} ${tag} @${width}`;
   if (m.docClip) defects.push({ kind: 'doc-scroll-x', where, detail: m.docClip });
@@ -206,12 +214,34 @@ async function measure(cdp: Cdp, tag: string, role: string, width: number, shot:
     if (content && (Math.abs(b.left - content.left) > 1 || Math.abs(b.right - content.right) > 1)) defects.push({ kind: 'edge-misaligned', where, detail: `banner ${Math.round(b.left)}..${Math.round(b.right)} vs content` });
   }
   for (const t of m.truncated.slice(0, 5)) defects.push({ kind: 'truncated-no-title', where, detail: `${t.path} "${t.text}"` });
+  const x = await cdp.eval<any>(EXTRA);
+  for (const c of x.cards) defects.push({ kind: 'card-alignment', where, detail: `${c.path} — ${c.detail}` });
+  for (const w of x.wraps.slice(0, 5)) defects.push({ kind: 'wrapped-control', where, detail: `${w.path} "${w.text}"` });
+  for (const r of x.rows.slice(0, 3)) defects.push({ kind: 'row-too-short', where, detail: `${r.path} ${r.h}px` });
+  for (const z of x.sizes) defects.push({ kind: 'off-scale-font', where, detail: `${z.size}px ${z.path} "${z.text}"` });
+  for (const i of x.icons) defects.push({ kind: 'icon-not-16', where, detail: `${i.size} ${i.path}` });
+  for (const c of x.contrast.slice(0, 8)) defects.push({ kind: 'contrast', where, detail: `${c.ratio}:1 < ${c.need} (${c.size}px) ${c.path} "${c.text}"` });
   const png = await cdp.send('Page.captureScreenshot', { format: 'png' });
   fs.writeFileSync(shot, Buffer.from(png.data, 'base64'));
 }
 
+/** Tab through the first controls and require a visible focus indicator (outline or ring) on each. */
+async function checkFocus(cdp: Cdp, route: string, role: string) {
+  await goto(cdp, route);
+  if (process.env.QA_SELFTEST) await cdp.eval(`(() => { const b = document.createElement('button'); b.textContent = 'selftest no ring'; b.style.cssText = 'outline:none;box-shadow:none'; document.body.prepend(b); })()`);
+  await cdp.eval('document.activeElement && document.activeElement.blur(); window.scrollTo(0,0)');
+  for (let i = 0; i < 14; i++) {
+    for (const type of ['keyDown', 'keyUp']) await cdp.send('Input.dispatchKeyEvent', { type, key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+    const f = await cdp.eval<any>(`(() => { const e = document.activeElement; if (!e || e === document.body) return null; const s = getComputedStyle(e); const r = e.getBoundingClientRect();
+      return { tag: e.tagName.toLowerCase(), label: (e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, 30), outline: s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) >= 2, ring: s.boxShadow !== 'none', vis: r.width > 0 && r.height > 0 }; })()`);
+    if (f && f.vis && !f.outline && !f.ring) defects.push({ kind: 'no-focus-indicator', where: `${role} ${route} tab#${i + 1}`, detail: `${f.tag} "${f.label}"` });
+  }
+}
+
 async function runRole(cdp: Cdp, role: string, user: string, pass: string, routes: string[]) {
   await login(cdp, user, pass);
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 768, deviceScaleFactor: 1, mobile: false });
+  for (const r of routes.filter(r => !r.includes('?'))) await checkFocus(cdp, r, role);
   for (const w of WIDTHS) {
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: w, height: HEIGHT(w), deviceScaleFactor: 1, mobile: false });
     for (const route of routes) {
@@ -256,6 +286,12 @@ async function main() {
     await measure(cdp, '/login', 'anon', w, path.join(OUT, `anon_login_${w}.png`));
   }
   await runRole(cdp, 'admin', 'admin', ADMIN_PASS, ROUTES_ADMIN);
+  // Frozen state: the third banner must align with the others and the layout must still pass.
+  await login(cdp, 'admin', ADMIN_PASS);
+  const frz = await cdp.eval<number>(`fetch('/api/settings/freeze',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({frozen:true,confirm:'FREEZE'})}).then(r=>r.status)`);
+  if (frz !== 200) throw new Error(`freeze failed: ${frz}`);
+  await runRole(cdp, 'admin-frozen', 'admin', ADMIN_PASS, ['/overview', '/teams', '/settings']);
+  await cdp.eval(`fetch('/api/settings/freeze',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({frozen:false})}).then(r=>r.status)`);
   await runRole(cdp, 'operator', 'operator', OP_PASS, ROUTES_OPERATOR);
   if (cdp.consoleErrors.length) for (const e of new Set(cdp.consoleErrors)) defects.push({ kind: 'console', where: 'any', detail: e.slice(0, 200) });
   cdp.close();
@@ -272,7 +308,8 @@ async function main() {
     console.log(`## ${k} (${list.length})`);
     // Group identical details across routes/widths so the table stays readable.
     const g = new Map<string, string[]>();
-    for (const d of list) g.set(d.detail.replace(/\d+/g, '#'), [...(g.get(d.detail.replace(/\d+/g, '#')) ?? []), d.where]);
+    const keyOf = (d: Defect) => (k === 'doc-scroll-x' || k === 'icon-not-16' || k === 'off-scale-font' ? d.detail : d.detail.replace(/\d+/g, '#'));
+    for (const d of list) g.set(keyOf(d), [...(g.get(keyOf(d)) ?? []), d.where]);
     for (const [detail, wheres] of [...g].slice(0, 40)) console.log(`- x${wheres.length} ${detail}  e.g. ${wheres[0]}${wheres.length > 1 ? ' ; ' + wheres[wheres.length - 1] : ''}`);
   }
   process.exitCode = 1;

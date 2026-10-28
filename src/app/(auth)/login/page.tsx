@@ -88,15 +88,15 @@ function LoginForm() {
           <p className="login-lede">Team environments, service health and the audit log for the event.</p>
           <div className="login-principles">
             <div className="login-principle">
-              <span className="login-principle-icon"><CheckCircle2 size={17} /></span>
+              <span className="login-principle-icon"><CheckCircle2 size={16} /></span>
               <span><strong>Current state</strong><small>Which teams are running and which services are failing.</small></span>
             </div>
             <div className="login-principle">
-              <span className="login-principle-icon"><ShieldCheck size={17} /></span>
+              <span className="login-principle-icon"><ShieldCheck size={16} /></span>
               <span><strong>Roles and confirmations</strong><small>Destructive actions need the right role and a typed confirmation.</small></span>
             </div>
             <div className="login-principle">
-              <span className="login-principle-icon"><History size={17} /></span>
+              <span className="login-principle-icon"><History size={16} /></span>
               <span><strong>Audit log</strong><small>Every action is recorded and cannot be edited or deleted.</small></span>
             </div>
           </div>
@@ -159,7 +159,7 @@ function LoginForm() {
                 className="login-password-toggle"
                 aria-label={showPw ? 'Hide password' : 'Show password'}
               >
-                {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
+                {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
@@ -178,7 +178,7 @@ function LoginForm() {
           >
             {loading ? (
               <>
-                <Loader2 size={14} className="animate-spin mr-2" aria-hidden="true" />
+                <Loader2 size={16} className="animate-spin mr-2" aria-hidden="true" />
                 Signing in…
               </>
             ) : (

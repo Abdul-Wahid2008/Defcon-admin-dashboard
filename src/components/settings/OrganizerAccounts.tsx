@@ -54,7 +54,7 @@ export function OrganizerAccounts({ currentUserId }: { currentUserId: string | u
     <Card className="console-surface lg:col-span-2">
       <CardHeader className="flex-row items-center justify-between border-b border-[var(--border)]">
         <CardTitle>Organizer accounts</CardTitle>
-        <Button size="sm" onClick={() => setCreateOpen(true)}><Plus size={14} />Add organizer</Button>
+        <Button size="sm" onClick={() => setCreateOpen(true)}><Plus size={16} />Add organizer</Button>
       </CardHeader>
       <CardContent className="overflow-x-auto pt-4">
         {users.error ? <p role="alert" className="text-sm text-[var(--bad)]">{users.error.message}</p> : null}
@@ -75,9 +75,9 @@ export function OrganizerAccounts({ currentUserId }: { currentUserId: string | u
                 <TableCell><RelativeTime ts={u.lastLoginAt} /></TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
-                    <Button size="sm" variant="ghost" disabled={!u.active || reset.isPending} onClick={() => reset.mutate(u.id)}><KeyRound size={13} />Reset password</Button>
-                    <Button size="sm" variant="ghost" disabled={!u.active || revoke.isPending} onClick={() => revoke.mutate(u.id)}><LogOut size={13} />Revoke sessions</Button>
-                    <Button size="sm" variant="ghost" disabled={!u.active || u.id === currentUserId} title={u.id === currentUserId ? 'You cannot disable your own account' : undefined} onClick={() => setPendingDisable(u)}><UserX size={13} />Disable</Button>
+                    <Button size="sm" variant="ghost" disabled={!u.active || reset.isPending} onClick={() => reset.mutate(u.id)}><KeyRound size={16} />Reset password</Button>
+                    <Button size="sm" variant="ghost" disabled={!u.active || revoke.isPending} onClick={() => revoke.mutate(u.id)}><LogOut size={16} />Revoke sessions</Button>
+                    <Button size="sm" variant="ghost" disabled={!u.active || u.id === currentUserId} title={u.id === currentUserId ? 'You cannot disable your own account' : undefined} onClick={() => setPendingDisable(u)}><UserX size={16} />Disable</Button>
                   </div>
                 </TableCell>
               </TableRow>

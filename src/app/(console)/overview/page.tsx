@@ -25,7 +25,7 @@ function EventStrip({ event }: { event: OverviewData['event'] }) {
   if (!event.phase) {
     return (
       <p className="flex items-center gap-2 text-sm text-[var(--muted)]">
-        <Info size={15} aria-hidden="true" />
+        <Info size={16} aria-hidden="true" />
         Event clock not set.
         <Link href="/settings" className="text-[var(--accent)] underline-offset-2 hover:underline">Set the start time in Settings</Link>
       </p>
@@ -53,7 +53,7 @@ function Stat({ label, value, href, tone }: { label: string; value: number; href
   const body = (
     <>
       <span className="console-label">{label}</span>
-      <span className={`font-mono text-xl font-semibold tabular-nums ${color}`}>{value}</span>
+      <span className={`font-mono text-2xl font-semibold tabular-nums ${color}`}>{value}</span>
     </>
   );
   const cls = 'flex min-w-[88px] flex-col gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2';
@@ -75,7 +75,7 @@ export default function OverviewPage() {
           <PageHeader title="Overview" updatedAt={data.serverTime} onRefresh={() => query.refetch()} refreshing={query.isFetching}>
             {data.totals.failed > 0 && (
               <Link href="/teams?state=failed" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--bad)]/50 px-2.5 text-sm font-medium text-[var(--bad)] hover:bg-[var(--bad)]/10">
-                <TriangleAlert size={15} aria-hidden="true" />Show {data.totals.failed} failed {data.totals.failed === 1 ? 'team' : 'teams'}
+                <TriangleAlert size={16} aria-hidden="true" />Show {data.totals.failed} failed {data.totals.failed === 1 ? 'team' : 'teams'}
               </Link>
             )}
           </PageHeader>
@@ -131,7 +131,7 @@ export default function OverviewPage() {
               <CardHeader className="border-b border-[var(--border)]">
                 <CardTitle className="flex items-center justify-between">
                   <span>Recent activity</span>
-                  <Link href="/audit" className="inline-flex items-center gap-1 text-xs font-normal text-[var(--accent)] hover:underline">Open audit log <ArrowRight size={13} aria-hidden="true" /></Link>
+                  <Link href="/audit" className="inline-flex items-center gap-1 text-xs font-normal text-[var(--accent)] hover:underline">Open audit log <ArrowRight size={16} aria-hidden="true" /></Link>
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-2"><ActivityList entries={data.recentActivity} /></CardContent>

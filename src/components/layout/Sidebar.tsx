@@ -42,13 +42,13 @@ export function Sidebar({ role }: SidebarProps) {
       <div className="border-b px-4 py-5" style={{ borderColor: 'var(--border)' }}>
         <div className="flex items-center gap-2">
           <div className="grid size-8 shrink-0 place-items-center rounded-lg border border-cyan-300/30 bg-cyan-300/10">
-            <Shield size={17} className="text-[var(--accent)]" aria-hidden="true" />
+            <Shield size={16} className="text-[var(--accent)]" aria-hidden="true" />
           </div>
           <div>
           <p className="text-sm font-semibold leading-tight text-[var(--text)]">
             DEFCON Control Center
           </p>
-          <p className="mt-1 font-mono text-[10px] text-[var(--muted)]">control plane · v{meta?.version ?? '…'}</p>
+          <p className="mt-1 whitespace-nowrap font-mono text-caption text-[var(--muted)]">v{meta?.version ?? '…'}</p>
           </div>
         </div>
       </div>
@@ -72,14 +72,14 @@ export function Sidebar({ role }: SidebarProps) {
             >
               <Icon size={16} aria-hidden="true" />
               {item.label}
-              {item.href === '/overview' && openAlerts > 0 && <span className="ml-auto rounded-full bg-[var(--bad)] px-1.5 text-[11px] font-semibold tabular-nums text-[var(--bg)]" aria-label={`${openAlerts} unacknowledged alerts`}>{openAlerts}</span>}
+              {item.href === '/overview' && openAlerts > 0 && <span className="ml-auto rounded-full bg-[var(--bad)] px-1.5 text-caption font-semibold tabular-nums text-[var(--bg)]" aria-label={`${openAlerts} unacknowledged alerts`}>{openAlerts}</span>}
             </Link>
           );
         })}
       </nav>
 
       {/* Adapter info */}
-      <div className="border-t px-4 py-3 text-[10px] font-mono text-[var(--muted)]" style={{ borderColor: 'var(--border)' }}>
+      <div className="border-t px-4 py-3 text-caption font-mono text-[var(--muted)]" style={{ borderColor: 'var(--border)' }}>
         <span className="uppercase tracking-wide">
           {meta?.badge ?? 'SIMULATED'}
         </span>

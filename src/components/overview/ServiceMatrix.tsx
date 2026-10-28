@@ -43,7 +43,7 @@ function cellLabel(s: Svc): string {
 function Glyph({ label, status, stale }: { label: string; status: Check; stale: boolean }) {
   const shown: Check = stale ? 'unknown' : status;
   const { Icon, color } = CHECK[shown];
-  return <span className={cn('inline-flex items-center gap-0.5', color)}><span className="font-mono text-[10px] text-[var(--text-subtle)]">{label}</span>{stale ? <Clock size={12} aria-hidden="true" className="text-[var(--warn)]" /> : <Icon size={12} aria-hidden="true" />}</span>;
+  return <span className={cn('inline-flex items-center gap-0.5', color)}><span className="font-mono text-caption text-[var(--text-subtle)]">{label}</span>{stale ? <Clock size={16} aria-hidden="true" className="text-[var(--warn)]" /> : <Icon size={16} aria-hidden="true" />}</span>;
 }
 
 const Cell = memo(function Cell({ s }: { s: Svc }) {
@@ -101,14 +101,14 @@ export function ServiceMatrix({ grid }: { grid: Team[] }) {
         <span>R = reachability, F = functional, dots = flag0 flag1 flag2. Sorted worst first.</span>
         <label className="flex items-center gap-2"><input type="checkbox" checked={problemsOnly} onChange={(e) => setProblemsOnly(e.target.checked)} />Show only teams with a problem</label>
       </div>
-      <div data-qa-scroll className="max-h-[560px] overflow-auto rounded-lg border border-[var(--border)]">
-        <table className="w-full min-w-[820px] border-collapse text-[13px] tabular-nums">
+      <div data-qa-scroll className="relative max-h-[560px] overflow-auto rounded-lg border border-[var(--border)]">
+        <table className="w-full min-w-[820px] border-collapse text-sm tabular-nums">
           <thead>
-            <tr className="text-left text-[11px] uppercase tracking-wide text-[var(--text-subtle)]">
+            <tr className="text-left text-caption uppercase tracking-wide text-[var(--text-subtle)]">
               <th scope="col" className="sticky top-0 z-10 bg-[var(--panel)] px-2 py-2">Team</th>
               <th scope="col" className="sticky top-0 z-10 bg-[var(--panel)] px-2 py-2">State</th>
               <th scope="col" className="sticky top-0 z-10 bg-[var(--panel)] px-2 py-2">Health</th>
-              {columns.map(c => <th key={c.key} scope="col" className="sticky top-0 z-10 bg-[var(--panel)] px-2 py-2 normal-case">{c.name}</th>)}
+              {columns.map(c => <th key={c.key} scope="col" className="sticky top-0 z-10 whitespace-nowrap bg-[var(--panel)] px-2 py-2 normal-case">{c.name}</th>)}
             </tr>
           </thead>
           <tbody>

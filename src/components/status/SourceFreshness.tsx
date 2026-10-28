@@ -24,7 +24,7 @@ export function describeSourceError(code: string | null): string {
 /** Plain statement of where health data comes from and how fresh it is. */
 export function SourceFreshness({ source }: { source: OverviewData['healthSource'] }) {
   if (source.source === 'mock') {
-    return <div className="flex items-center gap-2 text-sm text-[var(--muted)]"><CircleDashed size={15} aria-hidden="true" />Health data is simulated (HEALTH_SOURCE=mock).</div>;
+    return <div className="flex items-center gap-2 text-sm text-[var(--muted)]"><CircleDashed size={16} aria-hidden="true" />Health data is simulated (HEALTH_SOURCE=mock).</div>;
   }
   const name = source.source === 'scoreboard' ? 'Scoreboard' : 'Ingest';
   const round = source.lastRound !== null ? `, round ${source.lastRound}` : '';
@@ -36,11 +36,11 @@ export function SourceFreshness({ source }: { source: OverviewData['healthSource
     disabled: { Icon: CircleAlert, tone: 'text-[var(--bad)]', text: 'Ingest is selected but INGEST_TOKEN is not set; the ingest route is disabled.' },
   }[source.state as 'error' | 'stale' | 'frozen' | 'never' | 'disabled'];
   if (problem) {
-    return <div role="status" className={`flex items-start gap-2 text-sm ${problem.tone}`}><problem.Icon size={15} className="mt-0.5 shrink-0" aria-hidden="true" /><span>{problem.text}</span></div>;
+    return <div role="status" className={`flex items-start gap-2 text-sm ${problem.tone}`}><problem.Icon size={16} className="mt-0.5 shrink-0" aria-hidden="true" /><span>{problem.text}</span></div>;
   }
   return (
     <div className="flex items-center gap-2 text-sm text-[var(--ok)]">
-      <CircleCheck size={15} aria-hidden="true" />
+      <CircleCheck size={16} aria-hidden="true" />
       <span>{name} live{round}, updated <RelativeTime ts={source.lastOkAt} /></span>
     </div>
   );

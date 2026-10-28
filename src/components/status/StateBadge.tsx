@@ -47,7 +47,7 @@ export function StateBadge({ state, size = 'md' }: StateBadgeProps) {
       aria-label={`State: ${config.label}`}
     >
       <Icon
-        size={size === 'sm' ? 10 : 12}
+        size={16}
         className={config.pending ? 'animate-spin' : ''}
         aria-hidden="true"
       />

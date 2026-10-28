@@ -23,7 +23,7 @@ export function CheckStatus({ status, detail }: { status: 'pass' | 'fail' | 'unk
     fail: { label: 'Fail', Icon: CircleX, color: 'text-[var(--bad)]' },
     unknown: { label: 'Unknown', Icon: CircleHelp, color: 'text-[var(--idle)]' },
   }[status];
-  return <span className={`inline-flex items-center gap-1.5 ${config.color}`} title={detail ?? undefined}><config.Icon size={14} aria-hidden="true" />{config.label}</span>;
+  return <span className={`inline-flex items-center gap-1.5 ${config.color}`} title={detail ?? undefined}><config.Icon size={16} aria-hidden="true" />{config.label}</span>;
 }
 
 export function ResourceBars({ resources }: { resources: ResourceUsage | null }) {
@@ -42,7 +42,7 @@ export function ResourceBars({ resources }: { resources: ResourceUsage | null })
 
 export function StatCard({ label, value, caption, href, tone = 'neutral' }: { label: string; value: number; caption: string; href?: string; tone?: 'neutral' | 'ok' | 'warn' | 'bad' }) {
   const toneClass = { neutral: 'border-[var(--border)]', ok: 'border-[var(--ok)]/40', warn: 'border-[var(--warn)]/40', bad: 'border-[var(--bad)]/40' }[tone];
-  const content = <Card className={`h-full border ${toneClass}`}><CardContent className="py-4"><div className="console-label">{label}</div><div className="mt-2 font-mono text-3xl font-semibold tracking-tight">{value}</div><div className="mt-1 text-xs text-[var(--muted)]">{caption}</div></CardContent></Card>;
+  const content = <Card className={`h-full border ${toneClass}`}><CardContent className="py-4"><div className="console-label">{label}</div><div className="mt-2 font-mono text-2xl font-semibold tracking-tight">{value}</div><div className="mt-1 text-xs text-[var(--muted)]">{caption}</div></CardContent></Card>;
   return href ? <Link href={href} className="block transition hover:-translate-y-0.5">{content}</Link> : content;
 }
 
@@ -55,7 +55,7 @@ export function OutcomeBadge({ outcome }: { outcome: AuditEntry['outcome'] }) {
     noop: ['text-[var(--idle)]', Minus, 'No-op'],
   } as const;
   const [color, Icon, label] = config[outcome];
-  return <span className={`inline-flex items-center gap-1 text-xs ${color}`}><Icon size={13} />{label}</span>;
+  return <span className={`inline-flex items-center gap-1 text-xs ${color}`}><Icon size={16} />{label}</span>;
 }
 
 export function ActivityList({ entries, limit = 10 }: { entries: AuditEntry[]; limit?: number }) {
@@ -68,11 +68,11 @@ export function EnvironmentTile({ team }: { team: { teamId: string; name: string
 }
 
 export function PageHeader({ title, description, updatedAt, onRefresh, refreshing, children }: { title: string; description?: React.ReactNode; updatedAt?: string; onRefresh?: () => void; refreshing?: boolean; children?: React.ReactNode }) {
-  return <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-[var(--border)] pb-5"><div className="min-w-0"><h1 className="text-2xl font-semibold tracking-tight">{title}</h1>{description && <p className="mt-1 text-sm text-[var(--muted)]">{description}</p>}{updatedAt && <p className="mt-2 text-xs text-[var(--muted)]">Last sync <RelativeTime ts={updatedAt} /></p>}</div><div className="flex items-center gap-2">{children}{onRefresh && <Button variant="outline" size="icon" aria-label="Refresh" onClick={onRefresh} disabled={refreshing}><RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} /></Button>}</div></div>;
+  return <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-[var(--border)] pb-5"><div className="min-w-0"><h1 className="text-2xl font-semibold tracking-tight">{title}</h1>{description && <p className="mt-1 text-sm text-[var(--muted)]">{description}</p>}{updatedAt && <p className="mt-2 text-xs text-[var(--muted)]">Last sync <RelativeTime ts={updatedAt} /></p>}</div><div className="flex items-center gap-2">{children}{onRefresh && <Button variant="outline" size="icon" aria-label="Refresh" onClick={onRefresh} disabled={refreshing}><RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} /></Button>}</div></div>;
 }
 
 function CopyableId({ label, value }: { label: string; value: string | null }) {
-  return <span className="inline-flex items-center gap-1">{label}: <code>{value ?? '—'}</code>{value && <button type="button" aria-label={`Copy ${label.toLowerCase()} id`} className="rounded p-1 text-[var(--muted)] hover:text-[var(--accent)]" onClick={() => navigator.clipboard.writeText(value)}><Copy size={11} className="inline" /></button>}</span>;
+  return <span className="inline-flex items-center gap-1">{label}: <code>{value ?? '—'}</code>{value && <button type="button" aria-label={`Copy ${label.toLowerCase()} id`} className="rounded p-1 text-[var(--muted)] hover:text-[var(--accent)]" onClick={() => navigator.clipboard.writeText(value)}><Copy size={16} className="inline" /></button>}</span>;
 }
 
 export function AuditEntryDetails({ entry }: { entry: AuditEntry }) {

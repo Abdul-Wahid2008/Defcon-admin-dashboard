@@ -59,7 +59,7 @@ export default function SettingsPage() {
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
             <Card className="console-surface">
               <CardHeader className="border-b border-[var(--border)]">
-                <CardTitle className="flex items-center gap-2"><Settings2 size={17} className="text-[var(--accent)]" />Competition display status</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Settings2 size={16} className="text-[var(--accent)]" />Competition display status</CardTitle>
               </CardHeader>
               <CardContent className="space-y-5 pt-5">
                 <div>
@@ -71,8 +71,8 @@ export default function SettingsPage() {
                 </div>
                 {update.error && <p role="alert" className="rounded-lg border border-[var(--bad)]/40 bg-[var(--bad)]/10 p-3 text-sm text-[var(--bad)]">{update.error.message}</p>}
                 <div className="flex items-center gap-3">
-                  <Button disabled={update.isPending || selectedStatus === settings.data.competitionStatus} onClick={() => update.mutate({ competitionStatus: selectedStatus }, { onSuccess: () => { setStatus(null); toast.success('Competition status saved'); } })}><Save size={15} />{update.isPending ? 'Saving…' : 'Save status'}</Button>
-                  {selectedStatus === settings.data.competitionStatus && <span className="flex items-center gap-1.5 text-xs text-[var(--ok)]"><CheckCircle2 size={14} />Saved</span>}
+                  <Button disabled={update.isPending || selectedStatus === settings.data.competitionStatus} onClick={() => update.mutate({ competitionStatus: selectedStatus }, { onSuccess: () => { setStatus(null); toast.success('Competition status saved'); } })}><Save size={16} />{update.isPending ? 'Saving…' : 'Save status'}</Button>
+                  {selectedStatus === settings.data.competitionStatus && <span className="flex items-center gap-1.5 text-xs text-[var(--ok)]"><CheckCircle2 size={16} />Saved</span>}
                 </div>
               </CardContent>
             </Card>
@@ -116,7 +116,7 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>}
               <Card className="console-surface">
-                <CardHeader className="border-b border-[var(--border)]"><CardTitle className="flex items-center gap-2"><Info size={17} className="text-[var(--accent)]" />Runtime metadata</CardTitle></CardHeader>
+                <CardHeader className="border-b border-[var(--border)]"><CardTitle className="flex items-center gap-2"><Info size={16} className="text-[var(--accent)]" />Runtime metadata</CardTitle></CardHeader>
                 <CardContent className="space-y-3 pt-4 text-sm">
                   <div className="flex items-center justify-between gap-4"><span className="text-[var(--muted)]">Adapter</span><span className="font-mono text-[var(--warn)]">{meta.data.adapter}</span></div>
                   <div className="flex items-center justify-between gap-4"><span className="text-[var(--muted)]">Console version</span><span className="font-mono">{meta.data.version}</span></div>
@@ -124,11 +124,11 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
               <Card className="console-surface border-amber-300/30">
-                <CardHeader className="border-b border-amber-300/20"><CardTitle className="flex items-center gap-2 text-[var(--warn)]"><FlaskConical size={17} />Simulation boundary</CardTitle></CardHeader>
+                <CardHeader className="border-b border-amber-300/20"><CardTitle className="flex items-center gap-2 text-[var(--warn)]"><FlaskConical size={16} />Simulation boundary</CardTitle></CardHeader>
                 <CardContent className="pt-4 text-sm leading-6 text-[var(--muted)]">The default SQLite adapter is deliberately simulated. Actions update demo state and never control real containers. Docker Compose, when explicitly selected, remains a partial adapter and is never reported as live.</CardContent>
               </Card>
               {meta.data.demoControls && <Card className="console-surface border-amber-300/30">
-                <CardHeader className="border-b border-amber-300/20"><CardTitle className="flex items-center gap-2 text-[var(--warn)]"><FlaskConical size={17} />Demo controls</CardTitle></CardHeader>
+                <CardHeader className="border-b border-amber-300/20"><CardTitle className="flex items-center gap-2 text-[var(--warn)]"><FlaskConical size={16} />Demo controls</CardTitle></CardHeader>
                 <CardContent className="space-y-3 pt-4 text-sm">
                   <p className="text-[var(--muted)]">Simulation only. Every demo action is audited and never controls real containers.</p>
                   <select aria-label="Demo team" value={demoTeamId} onChange={(event) => setDemoTeamId(event.target.value)} className="h-8 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface-inset)] px-2 text-sm"><option value="">Choose a team</option>{teams.data?.items.map((team) => <option key={team.id} value={team.id}>{team.id} · {team.name}</option>)}</select>

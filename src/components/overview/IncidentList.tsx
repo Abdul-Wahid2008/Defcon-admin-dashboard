@@ -72,11 +72,11 @@ const Row = memo(function Row({ team, canRestart, simulated, onRefresh }: { team
         </ul>
       </div>
       <div className="flex flex-wrap gap-1.5">
-        <Button size="sm" variant="outline" render={<Link href={`/teams/${team.teamId}`} />}><ExternalLink size={13} aria-hidden="true" />Open team</Button>
-        <Button size="sm" variant="outline" disabled={!running || busy !== null} title={running ? undefined : 'The environment is not running'} onClick={() => void check()}><Activity size={13} aria-hidden="true" />{busy === 'check' ? 'Checking…' : 'Run check'}</Button>
+        <Button size="sm" variant="outline" render={<Link href={`/teams/${team.teamId}`} />}><ExternalLink size={16} aria-hidden="true" />Open team</Button>
+        <Button size="sm" variant="outline" disabled={!running || busy !== null} title={running ? undefined : 'The environment is not running'} onClick={() => void check()}><Activity size={16} aria-hidden="true" />{busy === 'check' ? 'Checking…' : 'Run check'}</Button>
         {canRestart && failing.slice(0, 2).map(s => (
           <Button key={s.key} size="sm" variant="outline" disabled={!running || team.pending || busy !== null} title={team.pending ? 'Another action is in progress for this team' : undefined} onClick={() => void restart(s)}>
-            <RotateCw size={13} aria-hidden="true" />{busy === s.key ? 'Requesting…' : `Restart ${s.name.split(' ')[0]}`}
+            <RotateCw size={16} aria-hidden="true" />{busy === s.key ? 'Requesting…' : `Restart ${s.name.split(' ')[0]}`}
           </Button>
         ))}
       </div>
