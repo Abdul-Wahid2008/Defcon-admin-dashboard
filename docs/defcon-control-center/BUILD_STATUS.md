@@ -457,3 +457,45 @@ Not applied, by choice: contrast gate skips elements over gradients (the login p
 - Dialogs, dropdowns and toasts were not screenshotted at every width.
 - Button sizes: tables/toolbars use `sm` (28 px), everywhere else default (32 px); not enforced by a gate.
 - Soak was 10 minutes, not 60.
+
+## Session 29 Oct 2026 — leaderboard overnight job started (separate repo); dashboard code unchanged
+**Dashboard state:** branch `release/v1.2-ui`, version `1.2.0-rc.3`, no source, test, config or dependency file changed this session. The U1/rc.3 gate above still describes the code; I did not re-run it. Nothing was pushed or merged. Doc 17 (U1) was read: its five steps are all recorded as done in the two U1 sections above; nothing in it is outstanding except the items already listed under "Still not done / honest limits".
+
+**Documents committed this session (dashboard repo):** `16_LEADERBOARD_SPEC_AND_PROMPTS.md` (v2, decisions D25–D36, public contract, Supabase rules, checklist P1–P14), `16_LEADERBOARD_SPEC_AND_PROMPTS.v1-superseded.md`, `18_LEADERBOARD_OVERNIGHT_MASTERPROMPT.md`. D24/A32 (we build the leaderboard; EnoEngine alone computes points) is from Abdul and is **not yet confirmed by the club lead**, so the "leaderboard is out of scope" line in CLAUDE.md still stands for this repo; the leaderboard lives in its own repo.
+
+### Leaderboard repo: `C:\Users\tipty\defcon-leaderboard` (branch `main`, local only, no remote, nothing pushed)
+Run in this session by pasting doc 18 as the brief. **Only L0 and L1 were executed. L2–L7 were NOT started.**
+
+| Slice | Commit / tag | Status |
+|---|---|---|
+| L0 scaffold | `5d0da14`, `lb-L0` | done |
+| L1 source, parser, ranking | `3760863`, `lb-L1` (+ `42db23e` wording) | done |
+| L2 stores (memory, JSONL, Supabase) | none | **not started** |
+| L3 collector, freeze, CLI, public API | none | **not started** |
+| L4 UI and `qa:layout` | none | **not started** |
+| L5 attack pass and load test | none | **not started** |
+| L6 DEPLOY / RUNBOOK / GOLIVE docs | none | **not started** |
+| L7 morning report | none | **not started** (this section is the interim report) |
+
+**L0 (evidence).** Next 16.4.2 / React 19.3 / Tailwind 4 / zod 4 / Vitest 5, TS strict. Lazy fail-closed `getConfig()` (zod), pure `checkEnv()` + `npm run check-env`, per-request CSP nonce in `src/proxy.ts` (shared header module, no `unsafe-inline` scripts, no third-party origins), static security headers, `/api/healthz`. Gates: typecheck 0, lint 0 errors, build 0. Verified against the running production build on 127.0.0.1:3200: `/api/healthz` 200 `{"ok":true}`; nonce present on every script tag and different per request; malformed percent path 400; no CORS, cookie, HSTS or `X-Powered-By`. `check-env` exits 1 with a bad release env (names only, no values) and 0 with a good one.
+
+**L1 (evidence).** `src/lib/source/`: fetcher (host allow-list, 5 s timeout, `redirect:'error'`, no credentials, 2 MB streamed cap, content-type check, errors are short codes with no URL or host), mapping-driven parser (`config/source-map.json`, own-property dotted paths, all-or-nothing, unknown shape = `SOURCE_SHAPE_UNKNOWN`), name sanitiser, competition ranker with `tied` and `rankDelta`, round decision, roster overrides (display names only). **The mapping and fixture are PROVISIONAL**: no real `scoreboard.json` has been seen; `docs/SOURCE_MAPPING.md` lists what to confirm, and a test parses `docs/club-inputs/scoreboard.sample.json` as soon as it exists (skipped until then). Gates after review fixes: typecheck 0, lint 0 errors, vitest 129 passed + 1 skipped in 8 files, build 0, coverage of `src/lib/source` branches 98.19% (target 95%).
+
+**Reviewer (fresh subagent, read-only, ran nothing, L0+L1 together): 12 findings, all applied** — release gate failed open on `CHECK_RELEASE=TRUE`/`yes`; lone surrogates, blank-looking fillers (U+3164, U+2800, …) and Zalgo passed the name sanitiser; total bound off by one against `numeric(14,3)`; ranking compared raw doubles while storage keeps 3 decimals; a mapped optional field missing in the source was silently dropped (now fails closed); timestamp accepted V8 legacy junk (now ISO only, stored as UTC); `-0`; response body not cancelled before a refusal; hyphens in map paths; `BASE_PATH` `//`. Partly applied: the bind check only errors on a non-loopback `HOSTNAME`/`HOST` (unset cannot be told from "not exported"; `npm start` hardcodes `-H 127.0.0.1`). Not done: map keys containing dots or spaces.
+
+**Supabase:** `list_projects` shows only `pitch-under-pressure` (INACTIVE) — **not touched**. Project `defcon-leaderboard` was **not created**: the brief requires `get_cost` to show no recurring charge and this session has no `get_cost` tool, so the cost could not be verified (BLOCKERS B1). No Supabase call other than `list_projects` was made.
+
+**Decisions made without asking** (all in `docs/OVERNIGHT_LOG.md`): relative imports in `src/lib` so `tsx` scripts need no alias; `vitest.config.mts`; `vite` added as devDependency because Vitest 5 needs it as a peer (same as the dashboard); `npm install --ignore-scripts --legacy-peer-deps`; npm scripts for later slices are added by the slice that creates them, not as dead stubs.
+
+### Not done, and why (honest)
+- L2–L7 (see table). The session stopped after L1 so the end-of-session commit and this write-up could be done accurately; nothing from those slices is claimed.
+- Pre-flight items 1–4 of doc 18 belong to Abdul and were not done by me: power settings, `claude mcp list`, and the push/ff-merge of `release/v1.2-ui` into `release/v1.2` (not performed; nothing pushed).
+- No browser/headless-Chrome check, `qa:layout`, load test or security pass exists for the leaderboard yet (L4/L5). The only UI is a placeholder page.
+- The 60-minute dashboard soak still predates the rc.2 security pass (unchanged).
+
+### Hazards
+- Ports used: 3200 only (the leaderboard production server). I stopped it by the PID listening on 127.0.0.1:3200 (7756, started by me). 3000, 3100, 3201, 3290 and 9333 were not used. Dashboard `data/` untouched.
+- A mistyped `npx tsc` (before dependencies finished installing) made npx fetch an unrelated deprecated package `tsc@2.0.4` into the npx cache and print its banner; it did nothing to the repo. A stray empty `python` heredoc hung and was stopped. Neither affected files.
+
+### Resume
+`cd C:\Users\tipty\defcon-leaderboard`, start Claude Code there with `--add-dir C:\Users\tipty\defcon-control-center`, and paste: `Read CLAUDE.md, docs/OVERNIGHT_LOG.md and BLOCKERS.md. Continue with L2. Last commit: 42db23e.` The full brief is doc 18; L2 begins with the store contract suite and `supabase/migrations/lb_init.sql`.
